@@ -83,10 +83,10 @@ function handleFile(file) {
   
   // Validate file type
   const fileName = file.name.toLowerCase();
-  const isValidExtension = fileName.endsWith('.xls') || fileName.endsWith('.xlsx');
+  const isValidExtension = fileName.endsWith('.csv');
   
   if (!isValidExtension) {
-    showMessage('Invalid file type. Please upload .xls or .xlsx file only.', 'error');
+    showMessage('Invalid file type. Please upload CSV file only. Convert your Excel to CSV first (File > Save As > CSV).', 'error');
     return;
   }
   
