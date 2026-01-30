@@ -509,5 +509,31 @@ const API = {
       calculatedTotal,
       matched
     });
+  },
+
+// ADD THESE TWO FUNCTIONS:
+  checkNumberPlateConflicts: async function(records) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('checkNumberPlateConflicts', {
+      sessionId: session.sessionId,
+      records: records
+    });
+  },
+
+  bulkUpdateNumberPlates: async function(records, overwriteExisting) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('bulkUpdateNumberPlates', {
+      sessionId: session.sessionId,
+      records: records,
+      overwriteExisting: overwriteExisting
+    });
   }
 };
