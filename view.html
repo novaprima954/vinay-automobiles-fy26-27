@@ -49,6 +49,124 @@
       box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
     }
 
+    /* Status Indicator Styles */
+    .status-indicator-section {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 25px;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .status-item {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: center;
+      transition: all 0.3s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-item:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    }
+
+    .status-icon {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 10px;
+      font-size: 28px;
+      font-weight: bold;
+      transition: all 0.3s;
+    }
+
+    .status-icon.complete {
+      background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+      color: white;
+      animation: pulse-success 2s infinite;
+    }
+
+    .status-icon.pending {
+      background: linear-gradient(135deg, #dc3545 0%, #fd7e14 100%);
+      color: white;
+      animation: pulse-danger 2s infinite;
+    }
+
+    .status-icon.partial {
+      background: linear-gradient(135deg, #ffc107 0%, #ff9800 100%);
+      color: white;
+    }
+
+    @keyframes pulse-success {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7); }
+      50% { box-shadow: 0 0 0 10px rgba(40, 167, 69, 0); }
+    }
+
+    @keyframes pulse-danger {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+      50% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    }
+
+    .status-label {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+      margin-bottom: 5px;
+    }
+
+    .status-value {
+      font-size: 12px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    /* Vehicle Details Section */
+    .vehicle-details-bar {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .vehicle-detail-item {
+      text-align: center;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+    }
+
+    .vehicle-detail-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+
+    .vehicle-detail-value {
+      font-size: 16px;
+      font-weight: 700;
+      color: #333;
+      font-family: 'Courier New', monospace;
+    }
+
     .detail-section {
       margin-bottom: 20px;
     }
@@ -104,6 +222,14 @@
 
     @media (max-width: 768px) {
       .filter-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .status-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .vehicle-details-bar {
         grid-template-columns: 1fr;
       }
     }
@@ -182,7 +308,7 @@
         </div>
 
         <div style="display: flex; gap: 10px;">
-          <button class="btn-primary" onclick="searchRecords()" style="flex: 1;">🔍 Search</button>
+          <button class="btn-primary" onclick="searchRecords()" style="flex: 1;">🔎 Search</button>
         </div>
 
         <div class="export-section">
@@ -213,6 +339,62 @@
       <!-- Details Section -->
       <div id="detailsSection" class="details-section" style="display: none;">
         <h3>📋 Complete Record Details</h3>
+
+        <!-- Status Indicators -->
+        <div class="status-indicator-section">
+          <div class="status-grid">
+            <!-- Accounts Status -->
+            <div class="status-item">
+              <div class="status-icon" id="statusAccountsIcon">?</div>
+              <div class="status-label">Accounts</div>
+              <div class="status-value" id="statusAccountsValue">-</div>
+            </div>
+
+            <!-- DMS Status -->
+            <div class="status-item">
+              <div class="status-icon" id="statusDMSIcon">?</div>
+              <div class="status-label">DMS</div>
+              <div class="status-value" id="statusDMSValue">-</div>
+            </div>
+
+            <!-- Insurance Status -->
+            <div class="status-item">
+              <div class="status-icon" id="statusInsuranceIcon">?</div>
+              <div class="status-label">Insurance</div>
+              <div class="status-value" id="statusInsuranceValue">-</div>
+            </div>
+
+            <!-- RTO Status -->
+            <div class="status-item">
+              <div class="status-icon" id="statusRTOIcon">?</div>
+              <div class="status-label">RTO/Vahan</div>
+              <div class="status-value" id="statusRTOValue">-</div>
+            </div>
+
+            <!-- Accessories Status -->
+            <div class="status-item">
+              <div class="status-icon" id="statusAccessoriesIcon">?</div>
+              <div class="status-label">Accessories</div>
+              <div class="status-value" id="statusAccessoriesValue">-</div>
+            </div>
+          </div>
+
+          <!-- Vehicle Details Bar -->
+          <div class="vehicle-details-bar">
+            <div class="vehicle-detail-item">
+              <div class="vehicle-detail-label">🔧 Engine Number</div>
+              <div class="vehicle-detail-value" id="vehicleEngineNumber">-</div>
+            </div>
+            <div class="vehicle-detail-item">
+              <div class="vehicle-detail-label">🔩 Frame Number</div>
+              <div class="vehicle-detail-value" id="vehicleFrameNumber">-</div>
+            </div>
+            <div class="vehicle-detail-item">
+              <div class="vehicle-detail-label">🚗 Vehicle Number</div>
+              <div class="vehicle-detail-value" id="vehicleNumber">-</div>
+            </div>
+          </div>
+        </div>
 
         <!-- Sales Information -->
         <div class="detail-section">

@@ -273,9 +273,58 @@ async function viewRecordDetails(row) {
 }
 
 /**
+ * Update status indicator
+ */
+function updateStatusIndicator(elementId, status) {
+  const iconElement = document.getElementById(elementId + 'Icon');
+  const valueElement = document.getElementById(elementId + 'Value');
+  
+  // Normalize status value
+  const normalizedStatus = (status || '').toString().trim();
+  
+  // Check if complete (Yes or Done)
+  const isComplete = normalizedStatus === 'Yes' || normalizedStatus === 'Done';
+  const isPending = !normalizedStatus || normalizedStatus === '' || normalizedStatus === 'No' || normalizedStatus === 'Pending';
+  
+  if (isComplete) {
+    // Green tick for complete
+    iconElement.textContent = '✓';
+    iconElement.className = 'status-icon complete';
+    valueElement.textContent = 'Complete';
+    valueElement.style.color = '#28a745';
+  } else if (isPending) {
+    // Red cross for pending/blank
+    iconElement.textContent = '✗';
+    iconElement.className = 'status-icon pending';
+    valueElement.textContent = normalizedStatus || 'Pending';
+    valueElement.style.color = '#dc3545';
+  } else {
+    // Yellow for partial/other
+    iconElement.textContent = '◐';
+    iconElement.className = 'status-icon partial';
+    valueElement.textContent = normalizedStatus;
+    valueElement.style.color = '#ffc107';
+  }
+}
+
+/**
  * Display complete record details
  */
 function displayRecordDetails(record) {
+  console.log('Displaying record:', record);
+  
+  // Update Status Indicators
+  updateStatusIndicator('statusAccounts', record.accountCheck);
+  updateStatusIndicator('statusDMS', record.dmsStatus);
+  updateStatusIndicator('statusInsurance', record.insuranceStatus);
+  updateStatusIndicator('statusRTO', record.vahanStatus || record.rtoStatus);
+  updateStatusIndicator('statusAccessories', record.accessoryFitted);
+  
+  // Update Vehicle Details
+  document.getElementById('vehicleEngineNumber').textContent = record.engineNumber || '-';
+  document.getElementById('vehicleFrameNumber').textContent = record.frameNumber || '-';
+  document.getElementById('vehicleNumber').textContent = record.numberPlateDetails || record.vehicleNumber || '-';
+  
   // Sales Information
   document.getElementById('detailReceiptNo').textContent = record.receiptNo || '';
   document.getElementById('detailExecName').textContent = record.executiveName || '';
