@@ -511,29 +511,35 @@ const API = {
     });
   },
 
-// ADD THESE TWO FUNCTIONS:
-  checkNumberPlateConflicts: async function(records) {
-    const session = SessionManager.getSession();
-    if (!session) {
-      throw new Error('No session');
-    }
-    
-    return this.call('checkNumberPlateConflicts', {
-      sessionId: session.sessionId,
-      records: records
-    });
-  },
-
-  bulkUpdateNumberPlates: async function(records, overwriteExisting) {
-    const session = SessionManager.getSession();
-    if (!session) {
-      throw new Error('No session');
-    }
-    
-    return this.call('bulkUpdateNumberPlates', {
-      sessionId: session.sessionId,
-      records: records,
-      overwriteExisting: overwriteExisting
-    });
+/**
+ * Parse Excel and check conflicts (combined function)
+ */
+parseAndCheckExcel: async function(base64Data, fileName) {
+  const session = SessionManager.getSession();
+  if (!session) {
+    throw new Error('No session');
   }
+  
+  return this.call('parseAndCheckExcel', {
+    sessionId: session.sessionId,
+    base64Data: base64Data,
+    fileName: fileName
+  });
+},
+
+/**
+ * Bulk update number plates
+ */
+bulkUpdateNumberPlates: async function(records, overwriteExisting) {
+  const session = SessionManager.getSession();
+  if (!session) {
+    throw new Error('No session');
+  }
+  
+  return this.call('bulkUpdateNumberPlates', {
+    sessionId: session.sessionId,
+    records: records,
+    overwriteExisting: overwriteExisting
+  });
+}
 };

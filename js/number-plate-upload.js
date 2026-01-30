@@ -1,5 +1,6 @@
 // ==========================================
 // NUMBER PLATE BULK UPLOAD LOGIC
+// Backend-based Excel parsing (no XLSX library)
 // ==========================================
 
 let currentFile = null;
@@ -33,6 +34,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   
   // Setup drag and drop
   setupDragAndDrop();
+  
+  // Setup file input
+  document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 });
 
 /**
@@ -78,15 +82,10 @@ function handleFile(file) {
   console.log('File selected:', file.name);
   
   // Validate file type
-  const validTypes = [
-    'application/vnd.ms-excel', // .xls
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' // .xlsx
-  ];
-  
   const fileName = file.name.toLowerCase();
   const isValidExtension = fileName.endsWith('.xls') || fileName.endsWith('.xlsx');
   
-  if (!validTypes.includes(file.type) && !isValidExtension) {
+  if (!isValidExtension) {
     showMessage('Invalid file type. Please upload .xls or .xlsx file only.', 'error');
     return;
   }
@@ -115,7 +114,7 @@ function formatFileSize(bytes) {
 }
 
 /**
- * Process file
+ * Process file - Send to backend for parsing
  */
 async function processFile() {
   if (!currentFile) {
@@ -130,44 +129,13 @@ async function processFile() {
   document.getElementById('btnUpload').disabled = true;
   
   try {
-    // Read file
-    const data = await readExcelFile(currentFile);
+    // Convert file to base64
+    const base64Data = await fileToBase64(currentFile);
     
-    console.log('Excel data parsed:', data.length, 'rows');
+    console.log('File converted to base64, sending to backend...');
     
-    if (data.length === 0) {
-      throw new Error('Excel file is empty or has no data rows');
-    }
-    
-    // Parse and validate data
-    const result = parseExcelData(data);
-    
-    console.log('Parse result:', result);
-    
-    if (result.valid.length === 0) {
-      document.getElementById('loadingState').classList.remove('show');
-      showMessage('No valid records found in Excel file', 'error');
-      document.getElementById('btnUpload').disabled = false;
-      return;
-    }
-    
-    // Store parsed data
-    parsedData = result.valid;
-    
-    // Show skipped/error summary if any
-    if (result.skipped.length > 0 || result.errors.length > 0) {
-      const msg = [];
-      if (result.skipped.length > 0) {
-        msg.push(`${result.skipped.length} rows skipped (blank data)`);
-      }
-      if (result.errors.length > 0) {
-        msg.push(`${result.errors.length} rows have errors`);
-      }
-      console.log('Validation warnings:', msg.join(', '));
-    }
-    
-    // Check for matches and conflicts in backend
-    const response = await API.checkNumberPlateConflicts(parsedData);
+    // Send to backend for parsing and conflict check
+    const response = await API.parseAndCheckExcel(base64Data, currentFile.name);
     
     document.getElementById('loadingState').classList.remove('show');
     
@@ -177,16 +145,25 @@ async function processFile() {
       return;
     }
     
-    console.log('Conflict check result:', response);
+    console.log('Backend response:', response);
     
-    // If there are conflicts, show confirmation modal
+    // Store parsed data
+    parsedData = response.validRecords || [];
+    
+    if (parsedData.length === 0) {
+      showMessage('No valid records found in Excel file', 'error');
+      document.getElementById('btnUpload').disabled = false;
+      return;
+    }
+    
+    // Check for conflicts
     if (response.conflicts && response.conflicts.length > 0) {
       conflictRecords = response.conflicts;
       showConfirmationModal(response.conflicts);
-      processCallback = () => submitUpdate(false);
+      processCallback = () => submitUpdate(true); // overwrite = true
     } else {
       // No conflicts, proceed directly
-      await submitUpdate(true);
+      await submitUpdate(false); // overwrite = false (no conflicts anyway)
     }
     
   } catch (error) {
@@ -198,92 +175,19 @@ async function processFile() {
 }
 
 /**
- * Read Excel file
+ * Convert file to base64
  */
-function readExcelFile(file) {
+function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
-    
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        
-        // Get first sheet
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        
-        // Convert to JSON (header row = row 1)
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { 
-          header: 'A',
-          defval: ''
-        });
-        
-        resolve(jsonData);
-      } catch (error) {
-        reject(error);
-      }
+    reader.onload = () => {
+      // Remove data:*/*;base64, prefix
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
     };
-    
     reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
+    reader.readAsDataURL(file);
   });
-}
-
-/**
- * Parse Excel data
- */
-function parseExcelData(data) {
-  const valid = [];
-  const skipped = [];
-  const errors = [];
-  
-  // Skip header row (index 0)
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const rowNumber = i + 1; // Excel row number (1-based)
-    
-    // Column F = Registration Number (index 'F')
-    // Column G = Chassis Number (index 'G')
-    const registrationNumber = (row.F || '').toString().trim();
-    const chassisNumber = (row.G || '').toString().trim();
-    
-    // Skip if both are blank
-    if (!registrationNumber && !chassisNumber) {
-      continue; // Completely blank row, don't count as skipped
-    }
-    
-    // Skip if either is blank
-    if (!chassisNumber) {
-      skipped.push({
-        row: rowNumber,
-        reason: 'Chassis number is blank',
-        data: { registrationNumber, chassisNumber }
-      });
-      continue;
-    }
-    
-    if (!registrationNumber) {
-      skipped.push({
-        row: rowNumber,
-        reason: 'Registration number is blank',
-        data: { registrationNumber, chassisNumber }
-      });
-      continue;
-    }
-    
-    // Valid record
-    valid.push({
-      chassisNumber: chassisNumber, // EXACT case sensitive
-      registrationNumber: registrationNumber,
-      rowNumber: rowNumber
-    });
-  }
-  
-  return {
-    valid,
-    skipped,
-    errors
-  };
 }
 
 /**
@@ -321,13 +225,13 @@ function confirmOverwrite(confirmed) {
 /**
  * Submit update to backend
  */
-async function submitUpdate(skipConflictCheck) {
-  console.log('Submitting update...');
+async function submitUpdate(overwriteExisting) {
+  console.log('Submitting update, overwrite:', overwriteExisting);
   
   document.getElementById('loadingState').classList.add('show');
   
   try {
-    const response = await API.bulkUpdateNumberPlates(parsedData, !skipConflictCheck);
+    const response = await API.bulkUpdateNumberPlates(parsedData, overwriteExisting);
     
     document.getElementById('loadingState').classList.remove('show');
     
@@ -375,11 +279,10 @@ function displayResults(results) {
     document.getElementById('successSection').style.display = 'block';
   }
   
-  // Show skipped details (from parsing)
-  const parseResult = parseExcelData(await readExcelFile(currentFile));
-  if (parseResult.skipped.length > 0) {
+  // Show skipped details
+  if (results.skippedDetails && results.skippedDetails.length > 0) {
     const skippedList = document.getElementById('skippedList');
-    skippedList.innerHTML = parseResult.skipped.map(item => `
+    skippedList.innerHTML = results.skippedDetails.map(item => `
       <div class="detail-item">
         <div class="detail-icon">⚠️</div>
         <div class="detail-content">

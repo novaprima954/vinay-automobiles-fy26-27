@@ -33,11 +33,11 @@ const ROLE_CARDS = {
   ],
   accessories: [
     { title: 'Accessories', icon: '🔧', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'accessories.html', description: 'Manage accessories' },
-    { title: 'Number Plate Update', icon: '🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'number-plate-upload.html', description: 'Number Plate Upload' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' }
   ],
   operator: [
     { title: 'Operator', icon: '🚗', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'operator-update.html', description: 'Vehicle operations' },
+    { title: 'Number Plate Update', icon: '🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'number-plate-upload.html', description: 'Number Plate Upload' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' }
   ]
 };

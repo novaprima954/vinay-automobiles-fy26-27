@@ -535,21 +535,6 @@
     <!-- Message -->
     <div id="statusMessage" class="message"></div>
 
-    <!-- Instructions -->
-    <div class="instructions-card">
-      <div class="instructions-title">
-        📖 Instructions
-      </div>
-      <ul class="instructions-list">
-        <li><strong>Column F:</strong> Registration Number/Number Plate (to update)</li>
-        <li><strong>Column G:</strong> Chassis/Frame Number (for matching - case sensitive)</li>
-        <li><strong>Matching:</strong> Exact case-sensitive match with existing chassis numbers</li>
-        <li><strong>Existing Values:</strong> You'll be asked to confirm overwriting existing number plates</li>
-        <li><strong>Supported Formats:</strong> .xls, .xlsx files</li>
-        <li><strong>Skip:</strong> Rows with blank chassis or registration numbers will be skipped</li>
-      </ul>
-    </div>
-
     <!-- Upload Area -->
     <div class="upload-card">
       <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
@@ -564,7 +549,6 @@
         id="fileInput" 
         class="file-input" 
         accept=".xls,.xlsx"
-        onchange="handleFileSelect(event)"
       >
 
       <div class="file-info" id="fileInfo">
@@ -647,7 +631,6 @@
     </div>
   </div>
 
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js"></script>
