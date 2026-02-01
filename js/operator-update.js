@@ -370,7 +370,10 @@ function cancelUpdate() {
 }
 
 function showLoading(show) {
-  document.getElementById('loadingSpinner').style.display = show ? 'flex' : 'none';
+  const loader = document.getElementById('loadingState');
+  if (loader) {
+    loader.style.display = show ? 'flex' : 'none';
+  }
 }
 
 function showMessage(text, type) {

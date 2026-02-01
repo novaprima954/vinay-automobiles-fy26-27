@@ -438,12 +438,13 @@ const API = {
   /**
    * Get Operator Pending Counts
    */
-  async getOperatorPendingCounts() {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('getOperatorPendingCounts', {
-      sessionId
-    });
-  },
+async getOperatorPendingCounts(month) {
+  const sessionId = SessionManager.getSessionId();
+  return await this.call('getOperatorPendingCounts', {
+    sessionId,
+    month  // ADDED: Pass month to backend
+  });
+},
   
   /**
    * Search Operator Records
@@ -483,13 +484,14 @@ const API = {
   /**
    * Get Operator Pending List
    */
-  async getOperatorPendingList(type) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('getOperatorPendingList', {
-      sessionId,
-      type
-    });
-  },
+async getOperatorPendingList(type, month) {
+  const sessionId = SessionManager.getSessionId();
+  return await this.call('getOperatorPendingList', {
+    sessionId,
+    type,
+    month  // ADDED: Pass month to backend
+  });
+},
   
   /**
    * Get PriceMaster Models
