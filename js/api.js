@@ -643,5 +643,23 @@ downloadHSRPData: async function() {
   return this.call('downloadHSRPData', {
     sessionId: session.sessionId
   });
+},
+
+/**
+ * Search HSRP data
+ */
+searchHSRPData: async function(searchBy, searchValue, dateFilter, customDate) {
+  const session = SessionManager.getSession();
+  if (!session) {
+    throw new Error('No session');
+  }
+  
+  return this.call('searchHSRPData', {
+    sessionId: session.sessionId,
+    searchBy: searchBy,
+    searchValue: searchValue || '',
+    dateFilter: dateFilter || '',
+    customDate: customDate || ''
+  });
 }
 };

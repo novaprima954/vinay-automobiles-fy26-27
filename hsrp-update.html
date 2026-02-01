@@ -9,6 +9,10 @@
       margin: 0;
       padding: 0;
       box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
     }
 
     body {
@@ -16,6 +20,7 @@
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       min-height: 100vh;
       padding: 20px;
+      -webkit-touch-callout: none;
     }
 
     .container {
@@ -219,6 +224,7 @@
       display: flex;
       gap: 10px;
       margin-top: 20px;
+      flex-wrap: wrap;
     }
 
     .results-card {
@@ -321,6 +327,36 @@
       box-shadow: 0 4px 6px rgba(0,0,0,0.1);
     }
 
+    .search-controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      color: #333;
+      font-weight: 600;
+      font-size: 14px;
+    }
+
+    .form-group select,
+    .form-group input {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
     .data-table {
       width: 100%;
       border-collapse: collapse;
@@ -338,6 +374,9 @@
       background: #f8f9fa;
       font-weight: 600;
       color: #333;
+      position: sticky;
+      top: 0;
+      z-index: 10;
     }
 
     .data-table tr:hover {
@@ -370,6 +409,10 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
 <body>
@@ -383,14 +426,64 @@
     <!-- View Current Data -->
     <div class="view-data-section">
       <h2 style="margin-bottom: 20px;">📊 Current HSRP Data</h2>
+      
+      <!-- Search Controls -->
+      <div class="search-controls">
+        <div class="form-group">
+          <label for="searchBy">Search By</label>
+          <select id="searchBy" onchange="handleSearchByChange()">
+            <option value="">-- Select --</option>
+            <option value="invoiceNo">Invoice No</option>
+            <option value="customerName">Customer Name</option>
+            <option value="registrationNo">Registration No</option>
+            <option value="invoiceDate">Invoice Date</option>
+          </select>
+        </div>
+        
+        <div class="form-group" id="searchValueGroup" style="display: none;">
+          <label for="searchValue">Search Value</label>
+          <input type="text" id="searchValue" placeholder="Enter search value">
+        </div>
+        
+        <div class="form-group" id="dateFilterGroup" style="display: none;">
+          <label for="dateFilter">Date Filter</label>
+          <select id="dateFilter" onchange="handleDateFilterChange()">
+            <option value="">-- Select --</option>
+            <option value="today">Today</option>
+            <option value="thisMonth">This Month</option>
+            <option value="customDate">Custom Date</option>
+          </select>
+        </div>
+        
+        <div class="form-group" id="customDateGroup" style="display: none;">
+          <label for="customDate">Select Date</label>
+          <input type="date" id="customDate">
+        </div>
+        
+        <div class="form-group" style="flex: 0;">
+          <label>&nbsp;</label>
+          <button class="btn btn-primary" onclick="searchData()">
+            🔍 Search
+          </button>
+        </div>
+        
+        <div class="form-group" style="flex: 0;">
+          <label>&nbsp;</label>
+          <button class="btn btn-secondary" onclick="clearSearch()">
+            🔄 Clear
+          </button>
+        </div>
+      </div>
+      
       <div class="btn-group">
-        <button class="btn btn-secondary" onclick="viewData()">
-          📋 View Data
+        <button class="btn btn-secondary" onclick="viewAllData()">
+          📋 View All Data
         </button>
-        <button class="btn btn-secondary" onclick="downloadData()">
+        <button class="btn btn-secondary" id="downloadBtn" onclick="downloadData()" style="display: none;">
           ⬇️ Download CSV
         </button>
       </div>
+      
       <div id="dataTableContainer" style="display: none; margin-top: 20px;">
         <div class="table-container">
           <table class="data-table" id="dataTable">
@@ -502,9 +595,9 @@
     </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/hsrp-update.js"></script>
+  <script src="https://novaprima954.github.io/vinay-automobiles-fy24-25/config.js"></script>
+  <script src="https://novaprima954.github.io/vinay-automobiles-fy24-25/auth.js"></script>
+  <script src="https://novaprima954.github.io/vinay-automobiles-fy24-25/api.js"></script>
+  <script src="https://novaprima954.github.io/vinay-automobiles-fy24-25/hsrp-update.js"></script>
 </body>
 </html>
