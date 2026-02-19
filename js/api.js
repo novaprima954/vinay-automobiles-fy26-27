@@ -606,7 +606,7 @@ uploadV301File: async function(base64Data, fileName) {
 /**
  * Upload Registration file (Step 2)
  */
-uploadRegistrationFile: async function(base64Data, fileName) {
+uploadRegistrationFile: async function(base64Data, fileName, orderDate) {
   const session = SessionManager.getSession();
   if (!session) {
     throw new Error('No session');
@@ -615,7 +615,24 @@ uploadRegistrationFile: async function(base64Data, fileName) {
   return this.call('uploadRegistrationFile', {
     sessionId: session.sessionId,
     base64Data: base64Data,
-    fileName: fileName
+    fileName: fileName,
+    orderDate: orderDate || ''  // Optional order date
+  });
+},
+
+/**
+ * Update HSRP status
+ */
+updateHSRPStatus: async function(srNo, newStatus) {
+  const session = SessionManager.getSession();
+  if (!session) {
+    throw new Error('No session');
+  }
+  
+  return this.call('updateHSRPStatus', {
+    sessionId: session.sessionId,
+    srNo: srNo,
+    newStatus: newStatus
   });
 },
 

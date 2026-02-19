@@ -183,6 +183,43 @@
       color: #333;
     }
 
+    /* NEW: Order Date Section */
+    .order-date-section {
+      background: #e3f2fd;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .order-date-section.show {
+      display: block;
+    }
+
+    .order-date-section h3 {
+      color: #1976d2;
+      font-size: 16px;
+      margin-bottom: 15px;
+    }
+
+    .date-input-group {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+
+    .date-input-group label {
+      font-weight: 600;
+      color: #333;
+    }
+
+    .date-input-group input[type="date"] {
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
     .btn {
       padding: 12px 30px;
       border: none;
@@ -383,6 +420,21 @@
       background: #f8f9fa;
     }
 
+    /* NEW: Inline Status Dropdown */
+    .data-table select.status-dropdown {
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 13px;
+      cursor: pointer;
+      background: white;
+    }
+
+    .data-table select.status-dropdown:focus {
+      border-color: #667eea;
+      outline: none;
+    }
+
     .table-container {
       max-height: 400px;
       overflow-y: auto;
@@ -436,7 +488,9 @@
             <option value="invoiceNo">Invoice No</option>
             <option value="customerName">Customer Name</option>
             <option value="registrationNo">Registration No</option>
+            <option value="refCustomer">Ref Customer</option>
             <option value="invoiceDate">Invoice Date</option>
+            <option value="orderDate">Order Date</option>
           </select>
         </div>
         
@@ -580,6 +634,18 @@
         <div class="file-info-row">
           <span class="file-info-label">File Size:</span>
           <span class="file-info-value" id="step2FileSize"></span>
+        </div>
+      </div>
+
+      <!-- NEW: Order Date Section -->
+      <div class="order-date-section" id="orderDateSection">
+        <h3>📅 Set Order Date (Optional)</h3>
+        <p style="font-size: 13px; color: #666; margin-bottom: 10px;">
+          This date will be applied to all records in this upload
+        </p>
+        <div class="date-input-group">
+          <label for="orderDateInput">Order Date:</label>
+          <input type="date" id="orderDateInput">
         </div>
       </div>
 

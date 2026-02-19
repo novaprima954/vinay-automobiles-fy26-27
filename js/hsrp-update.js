@@ -1,6 +1,6 @@
 // ==========================================
-// HSRP UPDATE PAGE - FRONTEND (UPDATED)
-// Two-step upload + Search + Admin-only Download
+// HSRP UPDATE PAGE - FRONTEND (COMPLETE UPDATED VERSION)
+// Two-step upload + Search + Admin-only Download + Order Date + Status Dropdown
 // ==========================================
 
 console.log('=== HSRP UPDATE PAGE ===');
@@ -77,9 +77,10 @@ function handleSearchByChange() {
   dateFilterGroup.style.display = 'none';
   customDateGroup.style.display = 'none';
   
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
+  // NEW: Added 'refCustomer' and 'orderDate' options
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'refCustomer') {
     searchValueGroup.style.display = 'block';
-  } else if (searchBy === 'invoiceDate') {
+  } else if (searchBy === 'invoiceDate' || searchBy === 'orderDate') {
     dateFilterGroup.style.display = 'block';
   }
 }
@@ -107,13 +108,15 @@ async function searchData() {
   let dateFilter = '';
   let customDate = '';
   
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
+  // NEW: Updated condition to include refCustomer
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'refCustomer') {
     searchValue = document.getElementById('searchValue').value.trim();
     if (!searchValue) {
       alert('Please enter a search value');
       return;
     }
-  } else if (searchBy === 'invoiceDate') {
+  // NEW: Updated condition to include orderDate
+  } else if (searchBy === 'invoiceDate' || searchBy === 'orderDate') {
     dateFilter = document.getElementById('dateFilter').value;
     if (!dateFilter) {
       alert('Please select a date filter');
@@ -235,6 +238,11 @@ function handleFile(step, file) {
   document.getElementById(`${step}FileInfo`).classList.add('show');
   document.getElementById(`${step}UploadBtn`).style.display = 'inline-flex';
   
+  // NEW: Show order date section for step2
+  if (step === 'step2') {
+    document.getElementById('orderDateSection').classList.add('show');
+  }
+  
   document.getElementById(`${step}Results`).classList.remove('show');
   hideMessage(step);
 }
@@ -244,8 +252,6 @@ function formatFileSize(bytes) {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 }
-
-// Continue in next part...
 
 // ==========================================
 // STEP 1: UPLOAD V301 FILE
@@ -354,7 +360,12 @@ async function uploadStep2() {
     const base64Data = await fileToBase64(step2File);
     console.log('File converted to base64, sending to backend...');
     
-    const response = await API.uploadRegistrationFile(base64Data, step2File.name);
+    // NEW: Get order date from input (optional)
+    const orderDateInput = document.getElementById('orderDateInput').value;
+    console.log('Order Date selected:', orderDateInput || 'None');
+    
+    // Call API with order date parameter
+    const response = await API.uploadRegistrationFile(base64Data, step2File.name, orderDateInput);
     
     console.log('Step 2 response:', response);
     
@@ -406,7 +417,7 @@ function displayStep2Results(results) {
     html += '<h3>⚠️ Skipped (Already Has Registration)</h3>';
     html += '<div class="results-list">';
     results.skippedDetails.forEach(item => {
-      html += `<div class="result-item">Frame No: ${item.frameNo} - Current: ${item.currentReg}</div>`;
+      html += `<div class="result-item">Row ${item.row}: ${item.reason}</div>`;
     });
     html += '</div></div>';
   }
@@ -435,7 +446,17 @@ function displayDataTable(data) {
     html += `<td>${row.srNo}</td>`;
     html += `<td>${row.invoiceNo}</td>`;
     html += `<td>${row.invoiceDate}</td>`;
-    html += `<td>${row.status}</td>`;
+    
+    // NEW: Status as dropdown
+    html += '<td>';
+    html += `<select class="status-dropdown" data-sr-no="${row.srNo}" data-original="${row.status || ''}" onchange="updateStatus(this)">`;
+    html += `<option value="" ${!row.status ? 'selected' : ''}>-- Select --</option>`;
+    html += `<option value="Ordered" ${row.status === 'Ordered' ? 'selected' : ''}>Ordered</option>`;
+    html += `<option value="Received" ${row.status === 'Received' ? 'selected' : ''}>Received</option>`;
+    html += `<option value="Fitted" ${row.status === 'Fitted' ? 'selected' : ''}>Fitted</option>`;
+    html += '</select>';
+    html += '</td>';
+    
     html += `<td>${row.mobileNo}</td>`;
     html += `<td>${row.customerName}</td>`;
     html += `<td>${row.frameNo}</td>`;
@@ -451,6 +472,61 @@ function displayDataTable(data) {
   tableContainer.style.display = 'block';
   
   console.log('✅ Data displayed:', data.length, 'rows');
+}
+
+/**
+ * NEW: Update status for a record (inline editing)
+ */
+async function updateStatus(selectElement) {
+  const srNo = selectElement.getAttribute('data-sr-no');
+  const newStatus = selectElement.value;
+  const originalStatus = selectElement.getAttribute('data-original');
+  
+  if (!newStatus) {
+    return; // User selected "-- Select --", do nothing
+  }
+  
+  console.log('Updating status for Sr No:', srNo, '→', newStatus);
+  
+  // Disable dropdown during save
+  selectElement.disabled = true;
+  
+  try {
+    const response = await API.updateHSRPStatus(srNo, newStatus);
+    
+    if (response.success) {
+      console.log('✅ Status updated successfully');
+      
+      // Update original value
+      selectElement.setAttribute('data-original', newStatus);
+      
+      // If status is "Fitted", refresh the table to show updated fitment date
+      if (newStatus === 'Fitted') {
+        console.log('Status set to Fitted, refreshing table...');
+        // Refresh current view
+        const searchBy = document.getElementById('searchBy').value;
+        if (searchBy) {
+          await searchData();
+        } else {
+          await viewAllData();
+        }
+      }
+      
+      selectElement.disabled = false;
+      
+    } else {
+      alert('Error updating status: ' + response.message);
+      // Revert dropdown
+      selectElement.value = originalStatus || '';
+      selectElement.disabled = false;
+    }
+  } catch (error) {
+    console.error('Error updating status:', error);
+    alert('Error updating status: ' + error.message);
+    // Revert dropdown
+    selectElement.value = originalStatus || '';
+    selectElement.disabled = false;
+  }
 }
 
 async function downloadData() {
