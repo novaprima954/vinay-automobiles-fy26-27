@@ -663,14 +663,14 @@ async function exportToPdf() {
     document.getElementById('pdfExportSpinner').classList.remove('show');
     document.getElementById('pdfExportConfirmBtn').disabled = false;
     
-    if (response.success && response.pdfUrl) {
-      showPdfMessage('PDF generated successfully! Opening in new tab...', 'success');
+    if (response.success && response.records) {
+      showPdfMessage('Generating PDF...', 'success');
       
-      // Open PDF in new tab
+      // Generate and download PDF
       setTimeout(() => {
-        window.open(response.pdfUrl, '_blank');
+        generatePdfDownload(response.records, response.fromDate, response.toDate);
         closePdfExportModal();
-      }, 1500);
+      }, 500);
       
     } else {
       showPdfMessage('Error: ' + (response.message || 'Failed to generate PDF'), 'error');
@@ -681,6 +681,104 @@ async function exportToPdf() {
     document.getElementById('pdfExportSpinner').classList.remove('show');
     document.getElementById('pdfExportConfirmBtn').disabled = false;
     showPdfMessage('Error: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Generate PDF and trigger download using jsPDF
+ */
+function generatePdfDownload(records, fromDate, toDate) {
+  try {
+    // Use jsPDF library (loaded via CDN)
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF('landscape', 'mm', 'a4');
+    
+    // Add title
+    doc.setFontSize(18);
+    doc.setFont(undefined, 'bold');
+    doc.text('HSRP Registration Details', doc.internal.pageSize.getWidth() / 2, 15, { align: 'center' });
+    
+    // Add date range
+    doc.setFontSize(11);
+    doc.setFont(undefined, 'normal');
+    doc.text('Invoice Date: ' + fromDate + ' to ' + toDate, doc.internal.pageSize.getWidth() / 2, 23, { align: 'center' });
+    
+    // Prepare table data
+    const tableData = records.map(function(record, index) {
+      return [
+        (index + 1).toString(),
+        record.invoiceNo || '',
+        record.invoiceDate || '',
+        record.customerName || '',
+        record.frameNo || '',
+        record.plateNo || '',
+        '', // Remark - blank
+        ''  // Sign & Date - blank
+      ];
+    });
+    
+    // Generate table
+    doc.autoTable({
+      startY: 30,
+      head: [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'Frame No', 'Plate No', 'Remark', 'Sign & Date']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [102, 126, 234],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'center',
+        fontSize: 9
+      },
+      bodyStyles: {
+        fontSize: 8,
+        cellPadding: 3
+      },
+      alternateRowStyles: {
+        fillColor: [248, 249, 250]
+      },
+      columnStyles: {
+        0: { halign: 'center', cellWidth: 15 }, // Sr No
+        1: { cellWidth: 30 }, // Invoice No
+        2: { cellWidth: 30 }, // Invoice Date
+        3: { cellWidth: 55 }, // Customer Name
+        4: { cellWidth: 40 }, // Frame No
+        5: { cellWidth: 35, fontStyle: 'bold' }, // Plate No
+        6: { cellWidth: 35 }, // Remark
+        7: { cellWidth: 35 }  // Sign & Date
+      },
+      margin: { top: 30, right: 10, bottom: 20, left: 10 },
+      didDrawPage: function(data) {
+        // Add footer with page number and total
+        const pageCount = doc.internal.getNumberOfPages();
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        
+        doc.setFontSize(9);
+        doc.text(
+          'Total Records: ' + records.length,
+          pageSize.width - 15,
+          pageHeight - 10,
+          { align: 'right' }
+        );
+        
+        doc.text(
+          'Page ' + data.pageNumber + ' of ' + pageCount,
+          15,
+          pageHeight - 10
+        );
+      }
+    });
+    
+    // Save PDF
+    const fileName = 'HSRP_Export_' + fromDate + '_to_' + toDate + '.pdf';
+    doc.save(fileName);
+    
+    console.log('✅ PDF downloaded:', fileName);
+    
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    alert('Error generating PDF: ' + error.message);
   }
 }
 
