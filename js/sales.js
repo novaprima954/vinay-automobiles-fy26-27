@@ -183,7 +183,10 @@ function renderAccessories(details) {
     { key: 'seatCoverPrice', name: 'Seat Cover', id: 'seatCover' },
     { key: 'matinPrice', name: 'Matin', id: 'matin' },
     { key: 'tankCoverPrice', name: 'Tank Cover', id: 'tankCover' },
-    { key: 'handleHookPrice', name: 'Handle Hook', id: 'handleHook' }
+    { key: 'handleHookPrice', name: 'Handle Hook', id: 'handleHook' },
+    { key: 'rainCoverPrice', name: 'Rain Cover', id: 'rainCover' },
+    { key: 'buzzerPrice', name: 'Buzzer', id: 'buzzer' },
+    { key: 'backRestPrice', name: 'Back Rest', id: 'backRest' }
   ];
   
   // Render regular checkboxes
@@ -288,7 +291,10 @@ function getAccessoryValues() {
     matin: '',
     tankcover: '',  // Changed from tankCover
     handlehook: '',  // Changed from handleHook
-    helmet: ''
+    helmet: '',
+    raincover: '',
+    buzzer: '',
+    backrest: ''
   };
   
   // Only set Yes/No for accessories that are actually rendered (exist in DOM)
@@ -328,7 +334,22 @@ function getAccessoryValues() {
   } else if (helmetEl) {
     values.helmet = 'No';
   }
-  
+
+  const rainCoverEl = document.getElementById('rainCover');
+  if (rainCoverEl) {
+    values.raincover = rainCoverEl.checked ? 'Yes' : 'No';
+  }
+
+  const buzzerEl = document.getElementById('buzzer');
+  if (buzzerEl) {
+    values.buzzer = buzzerEl.checked ? 'Yes' : 'No';
+  }
+
+  const backRestEl = document.getElementById('backRest');
+  if (backRestEl) {
+    values.backrest = backRestEl.checked ? 'Yes' : 'No';
+  }
+
   return values;
 }
 
@@ -389,6 +410,9 @@ async function handleSubmit(e) {
     tankcover: accessories.tankcover,  // Changed from tankCover
     handlehook: accessories.handlehook,  // Changed from handleHook
     helmet: accessories.helmet,
+    raincover: accessories.raincover,
+    buzzer: accessories.buzzer,
+    backrest: accessories.backrest,
     salesRemark: document.getElementById('salesRemark').value.trim(),
     receiptNo1: document.getElementById('receiptNo1').value.trim(),
     receipt1Amount: document.getElementById('receipt1Amount').value,
@@ -467,7 +491,16 @@ function showWhatsAppModal(data) {
     if (priceMasterDetails.helmetPrice) {
       // Show helmet quantity or No
       const helmetText = (data.helmet && data.helmet !== 'No') ? data.helmet : 'No';
-      accessoriesText += `Helmet - ${helmetText}`;
+      accessoriesText += `Helmet - ${helmetText}\n`;
+    }
+    if (priceMasterDetails.rainCoverPrice) {
+      accessoriesText += `Rain Cover - ${data.raincover}\n`;
+    }
+    if (priceMasterDetails.buzzerPrice) {
+      accessoriesText += `Buzzer - ${data.buzzer}\n`;
+    }
+    if (priceMasterDetails.backRestPrice) {
+      accessoriesText += `Back Rest - ${data.backrest}`;
     }
   }
   
