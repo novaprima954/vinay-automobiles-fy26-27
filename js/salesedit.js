@@ -477,7 +477,10 @@ function renderAccessoriesWithSavedValues(pmDetails, savedRecord) {
     { id: 'seatcover', name: 'Seat Cover', priceKey: 'seatCoverPrice' },
     { id: 'matin', name: 'Matin', priceKey: 'matinPrice' },
     { id: 'tankcover', name: 'Tank Cover', priceKey: 'tankCoverPrice' },
-    { id: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice' }
+    { id: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice' },
+    { id: 'raincover', name: 'Rain Cover', priceKey: 'rainCoverPrice' },
+    { id: 'buzzer', name: 'Buzzer', priceKey: 'buzzerPrice' },
+    { id: 'backrest', name: 'Back Rest', priceKey: 'backRestPrice' }
   ];
   
   accessories.forEach(function(acc) {
@@ -649,7 +652,7 @@ async function handleUpdate(e) {
   };
   
   // Add accessories
-  const accessoryIds = ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet'];
+  const accessoryIds = ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet', 'raincover', 'buzzer', 'backrest'];
   accessoryIds.forEach(function(id) {
     const element = document.getElementById(id);
     if (element) {
@@ -789,7 +792,10 @@ function showWhatsAppModal(data) {
     {key: 'matin', name: 'Matin', priceKey: 'matinPrice'},
     {key: 'tankcover', name: 'Tank Cover', priceKey: 'tankCoverPrice'},
     {key: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice'},
-    {key: 'helmet', name: 'Helmet', priceKey: 'helmetPrice'}
+    {key: 'helmet', name: 'Helmet', priceKey: 'helmetPrice'},
+    {key: 'raincover', name: 'Rain Cover', priceKey: 'rainCoverPrice'},
+    {key: 'buzzer', name: 'Buzzer', priceKey: 'buzzerPrice'},
+    {key: 'backrest', name: 'Back Rest', priceKey: 'backRestPrice'}
   ];
   
   // Only show accessories that exist in PriceMaster for this model

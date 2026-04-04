@@ -351,7 +351,10 @@ function displayRecordDetails(record) {
     { label: 'Matin', value: record.matin },
     { label: 'Tank Cover', value: record.tankCover },
     { label: 'Handle Hook', value: record.handleHook },
-    { label: 'Helmet', value: record.helmet }
+    { label: 'Helmet', value: record.helmet },
+    { label: 'Rain Cover', value: record.rainCover },
+    { label: 'Buzzer', value: record.buzzer },
+    { label: 'Back Rest', value: record.backRest }
   ];
   
   accessories.forEach(acc => {

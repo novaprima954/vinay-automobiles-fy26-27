@@ -578,7 +578,10 @@ async function renderAccessoriesFromPriceMaster(model, variant, record) {
         { key: 'seatCoverPrice', name: 'Seat Cover', id: 'seatcover' },
         { key: 'matinPrice', name: 'Matin', id: 'matin' },
         { key: 'tankCoverPrice', name: 'Tank Cover', id: 'tankcover' },
-        { key: 'handleHookPrice', name: 'Handle Hook', id: 'handlehook' }
+        { key: 'handleHookPrice', name: 'Handle Hook', id: 'handlehook' },
+        { key: 'rainCoverPrice', name: 'Rain Cover', id: 'raincover' },
+        { key: 'buzzerPrice', name: 'Buzzer', id: 'buzzer' },
+        { key: 'backRestPrice', name: 'Back Rest', id: 'backrest' }
       ];
       
       accessories.forEach(function(acc) {
@@ -974,7 +977,10 @@ async function calculatePrice() {
       { id: 'seatcover', name: 'Seat Cover', priceKey: 'seatCoverPrice' },
       { id: 'matin', name: 'Matin', priceKey: 'matinPrice' },
       { id: 'tankcover', name: 'Tank Cover', priceKey: 'tankCoverPrice' },
-      { id: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice' }
+      { id: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice' },
+      { id: 'raincover', name: 'Rain Cover', priceKey: 'rainCoverPrice' },
+      { id: 'buzzer', name: 'Buzzer', priceKey: 'buzzerPrice' },
+      { id: 'backrest', name: 'Back Rest', priceKey: 'backRestPrice' }
     ];
     
     accessoryMappings.forEach(acc => {

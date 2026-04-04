@@ -45,8 +45,8 @@ const MODEL_VARIANTS = {
   }
 };
 
-// Additional pending items to add to all models
-const ADDITIONAL_PENDING_ITEMS = ['Buzzer', 'Mirror', 'Side Stand', 'Center Stand'];
+// Additional pending items to add to all models (generic dealer-added items not tracked per-sale)
+const ADDITIONAL_PENDING_ITEMS = ['Mirror', 'Side Stand', 'Center Stand'];
 
 /**
  * Get model config - case insensitive lookup
@@ -575,6 +575,12 @@ function populateDetails(record, user) {
         value.textContent = record.handleHook || record.handlehook || '-';
       } else if (accessory === 'Helmet') {
         value.textContent = record.helmet || '-';
+      } else if (accessory === 'Rain Cover') {
+        value.textContent = record.raincover || '-';
+      } else if (accessory === 'Buzzer') {
+        value.textContent = record.buzzer || '-';
+      } else if (accessory === 'Back Rest') {
+        value.textContent = record.backrest || '-';
       }
       
       
@@ -655,9 +661,14 @@ function populatePendingItems(record) {
         isOrdered = (record.handleHook === 'Yes' || record.handlehook === 'Yes');
       } else if (accessory === 'Helmet') {
         isOrdered = record.helmet === 'Yes';
+      } else if (accessory === 'Rain Cover') {
+        isOrdered = record.raincover === 'Yes';
+      } else if (accessory === 'Buzzer') {
+        isOrdered = record.buzzer === 'Yes';
+      } else if (accessory === 'Back Rest') {
+        isOrdered = record.backrest === 'Yes';
       } else {
-        // For ADDITIONAL_PENDING_ITEMS (Buzzer, Mirror, Side Stand, Center Stand)
-        // These are always available as they might be dealer-added items
+        // For any other ADDITIONAL_PENDING_ITEMS
         isOrdered = true;
       }
       
