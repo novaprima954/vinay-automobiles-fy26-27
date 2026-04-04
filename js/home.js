@@ -16,7 +16,8 @@ const ROLE_CARDS = {
     { title: 'ALL Number Plate Update', icon: '🔢🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'hsrp-update.html', description: 'V301 AD+Counter' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
     { title: 'Vehicle Scanner', icon: '📷', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', link: 'scanner.html', description: 'Scan vehicle stickers' },
-    { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' }
+    { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
+    { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' }
   ],
   sales: [
     { title: 'Dashboard', icon: '📊', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'dashboard.html', description: 'View your performance' },
@@ -30,7 +31,8 @@ const ROLE_CARDS = {
     { title: 'Dashboard', icon: '📊', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'dashboard.html', description: 'Financial overview' },
     { title: 'Accounts', icon: '💰', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', link: 'accounts.html', description: 'Manage accounts' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
-    { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' }
+    { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
+    { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' }
   ],
   accessories: [
     { title: 'Accessories', icon: '🔧', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'accessories.html', description: 'Manage accessories' },
@@ -40,7 +42,8 @@ const ROLE_CARDS = {
     { title: 'Operator', icon: '🚗', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'operator-update.html', description: 'Vehicle operations' },
     { title: 'Number Plate Update', icon: '🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'number-plate-upload.html', description: 'Number Plate Upload' },
     { title: 'ALL Number Plate Update', icon: '🔢🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'hsrp-update.html', description: 'V301 AD+Counter' },
-    { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' }
+    { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
+    { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' }
   ]
 };
 

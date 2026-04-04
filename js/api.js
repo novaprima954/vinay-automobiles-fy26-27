@@ -91,10 +91,14 @@ const API = {
   },
   
   /**
-   * Validate session
+   * Validate session (auto-uses session from SessionManager)
    */
-  async validateSession(sessionId) {
-    return await this.call('validateSession', { sessionId });
+  async validateSession() {
+    const session = SessionManager.getSession();
+    if (!session) {
+      return { success: false, message: 'No session found' };
+    }
+    return await this.call('validateSession', { sessionId: session.sessionId });
   },
   
   /**
@@ -366,115 +370,43 @@ const API = {
   },
   
   /**
-   * Add note to lead
+   * Get lead history
    */
-  async addLeadNote(leadId, note) {
+  async getLeadHistory(leadId) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('addLeadNote', {
-      sessionId,
-      leadId,
-      note
-    });
-  },
-  
-  /**
-   * Convert lead to sale
-   */
-  async convertLeadToSale(leadId) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('convertLeadToSale', {
+    return await this.call('getLeadHistory', {
       sessionId,
       leadId
     });
   },
   
   /**
-   * Get Sales Dashboard
+   * Get Dashboard Data
    */
-  async getSalesDashboard(dateFilter) {
+  async getDashboardData() {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getSalesDashboard', {
-      sessionId,
-      dateFilter
-    });
-  },
-  
-
-  
-  /**
-   * Get Accessories Dashboard
-   */
-  async getAccessoriesDashboard(dateFilter) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('getAccessoriesDashboard', {
-      sessionId,
-      dateFilter
+    return await this.call('getDashboardData', {
+      sessionId
     });
   },
   
   /**
-   * Get Admin Dashboard
+   * Get sales record by receipt
    */
-  async getAdminDashboard(dateFilter) {
+  async getSalesRecordByReceipt(receiptNo) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getAdminDashboard', {
-      sessionId,
-      dateFilter
-    });
-  },
-  
-  /**
-   * Get Accessory Breakdown
-   */
-  async getAccessoryBreakdown(type, dateFilter) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('getAccessoryBreakdown', {
-      sessionId,
-      accessoryType: type,
-      dateFilter
-    });
-  },
-  
-  /**
-   * Get Operator Pending Counts
-   */
-async getOperatorPendingCounts(month) {
-  const sessionId = SessionManager.getSessionId();
-  return await this.call('getOperatorPendingCounts', {
-    sessionId,
-    month  // ADDED: Pass month to backend
-  });
-},
-  
-  /**
-   * Search Operator Records
-   */
-  async searchOperatorRecords(searchBy, searchValue) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('searchOperatorRecords', {
-      sessionId,
-      searchBy,
-      searchValue
-    });
-  },
-  
-  /**
-   * Get Operator Record Details
-   */
-  async getOperatorRecordDetails(receiptNo) {
-    const sessionId = SessionManager.getSessionId();
-    return await this.call('getOperatorRecordDetails', {
+    return await this.call('getSalesRecordByReceipt', {
       sessionId,
       receiptNo
     });
   },
   
   /**
-   * Update Operator Status
+   * Update sales record
    */
-  async updateOperatorStatus(receiptNo, data) {
+  async updateSalesRecord(receiptNo, data) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('updateOperatorStatus', {
+    return await this.call('updateSalesRecord', {
       sessionId,
       receiptNo,
       data: JSON.stringify(data)
@@ -484,14 +416,14 @@ async getOperatorPendingCounts(month) {
   /**
    * Get Operator Pending List
    */
-async getOperatorPendingList(type, month) {
-  const sessionId = SessionManager.getSessionId();
-  return await this.call('getOperatorPendingList', {
-    sessionId,
-    type,
-    month  // ADDED: Pass month to backend
-  });
-},
+  async getOperatorPendingList(type, month) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getOperatorPendingList', {
+      sessionId,
+      type,
+      month
+    });
+  },
   
   /**
    * Get PriceMaster Models
@@ -550,151 +482,278 @@ async getOperatorPendingList(type, month) {
     });
   },
 
-/**
- * Parse Excel and check conflicts (combined function)
- */
-parseAndCheckExcel: async function(base64Data, fileName) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('parseAndCheckExcel', {
-    sessionId: session.sessionId,
-    base64Data: base64Data,
-    fileName: fileName
-  });
-},
+  /**
+   * Parse Excel and check conflicts (combined function)
+   */
+  async parseAndCheckExcel(base64Data, fileName) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('parseAndCheckExcel', {
+      sessionId: session.sessionId,
+      base64Data: base64Data,
+      fileName: fileName
+    });
+  },
 
-/**
- * Bulk update number plates
- */
-bulkUpdateNumberPlates: async function(records, overwriteExisting) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('bulkUpdateNumberPlates', {
-    sessionId: session.sessionId,
-    records: records,
-    overwriteExisting: overwriteExisting
-  });
-},
+  /**
+   * Bulk update number plates
+   */
+  async bulkUpdateNumberPlates(records, overwriteExisting) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('bulkUpdateNumberPlates', {
+      sessionId: session.sessionId,
+      records: records,
+      overwriteExisting: overwriteExisting
+    });
+  },
 
-// ==========================================
-// API ADDITIONS FOR HSRP
-// Add these to your api.js file at the end (before the closing brace)
-// ==========================================
+  // ==========================================
+  // HSRP FUNCTIONS
+  // ==========================================
 
-/**
- * Upload V301 file (Step 1)
- */
-uploadV301File: async function(base64Data, fileName) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('uploadV301File', {
-    sessionId: session.sessionId,
-    base64Data: base64Data,
-    fileName: fileName
-  });
-},
+  /**
+   * Upload V301 file (Step 1)
+   */
+  async uploadV301File(base64Data, fileName) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('uploadV301File', {
+      sessionId: session.sessionId,
+      base64Data: base64Data,
+      fileName: fileName
+    });
+  },
 
-/**
- * Upload Registration file (Step 2)
- */
-uploadRegistrationFile: async function(base64Data, fileName, orderDate) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('uploadRegistrationFile', {
-    sessionId: session.sessionId,
-    base64Data: base64Data,
-    fileName: fileName,
-    orderDate: orderDate || ''  // Optional order date
-  });
-},
+  /**
+   * Upload Registration file (Step 2)
+   */
+  async uploadRegistrationFile(base64Data, fileName, orderDate) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('uploadRegistrationFile', {
+      sessionId: session.sessionId,
+      base64Data: base64Data,
+      fileName: fileName,
+      orderDate: orderDate || ''
+    });
+  },
 
-/**
- * Update HSRP status
- */
-updateHSRPStatus: async function(srNo, newStatus) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('updateHSRPStatus', {
-    sessionId: session.sessionId,
-    srNo: srNo,
-    newStatus: newStatus
-  });
-},
+  /**
+   * Update HSRP status
+   */
+  async updateHSRPStatus(srNo, newStatus) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('updateHSRPStatus', {
+      sessionId: session.sessionId,
+      srNo: srNo,
+      newStatus: newStatus
+    });
+  },
 
-/**
- * Export HSRP to PDF
- */
-exportHSRPToPdf: async function(fromDate, toDate) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('exportHSRPToPdf', {
-    sessionId: session.sessionId,
-    fromDate: fromDate,
-    toDate: toDate
-  });
-},
+  /**
+   * Export HSRP to PDF
+   */
+  async exportHSRPToPdf(fromDate, toDate) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('exportHSRPToPdf', {
+      sessionId: session.sessionId,
+      fromDate: fromDate,
+      toDate: toDate
+    });
+  },
 
-/**
- * Get HSRP data
- */
-getHSRPData: async function() {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('getHSRPData', {
-    sessionId: session.sessionId
-  });
-},
+  /**
+   * Get HSRP data
+   */
+  async getHSRPData() {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getHSRPData', {
+      sessionId: session.sessionId
+    });
+  },
 
-/**
- * Download HSRP data
- */
-downloadHSRPData: async function() {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
-  
-  return this.call('downloadHSRPData', {
-    sessionId: session.sessionId
-  });
-},
+  /**
+   * Download HSRP data
+   */
+  async downloadHSRPData() {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('downloadHSRPData', {
+      sessionId: session.sessionId
+    });
+  },
 
-/**
- * Search HSRP data
- */
-searchHSRPData: async function(searchBy, searchValue, dateFilter, customDate) {
-  const session = SessionManager.getSession();
-  if (!session) {
-    throw new Error('No session');
-  }
+  /**
+   * Search HSRP data
+   */
+  async searchHSRPData(searchBy, searchValue, dateFilter, customDate) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('searchHSRPData', {
+      sessionId: session.sessionId,
+      searchBy: searchBy,
+      searchValue: searchValue || '',
+      dateFilter: dateFilter || '',
+      customDate: customDate || ''
+    });
+  },
+
+  // ==========================================
+  // VEHICLE MILEAGE FUNCTIONS
+  // ==========================================
+
+  /**
+   * Get Vehicle Mileage Dashboard
+   */
+  async getVehicleMileageDashboard() {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getVehicleMileageDashboard', {
+      sessionId: session.sessionId
+    });
+  },
   
-  return this.call('searchHSRPData', {
-    sessionId: session.sessionId,
-    searchBy: searchBy,
-    searchValue: searchValue || '',
-    dateFilter: dateFilter || '',
-    customDate: customDate || ''
-  });
-}
+  /**
+   * Get last KM reading for vehicle (auto-fetch)
+   */
+  async getLastKmReading(vehicleName) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getLastKmReading', {
+      sessionId: session.sessionId,
+      vehicleName: vehicleName
+    });
+  },
+  
+  /**
+   * Add fuel entry
+   */
+  async addFuelEntry(data) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('addFuelEntry', {
+      sessionId: session.sessionId,
+      data: JSON.stringify(data)
+    });
+  },
+  
+  /**
+   * Get vehicle mileage history
+   */
+  async getVehicleMileageHistory(vehicleName, dateFrom, dateTo) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getVehicleMileageHistory', {
+      sessionId: session.sessionId,
+      vehicleName: vehicleName || '',
+      dateFrom: dateFrom || '',
+      dateTo: dateTo || ''
+    });
+  },
+  
+  /**
+   * Get all fuel entries
+   */
+  async getAllFuelEntries(dateFrom, dateTo) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getAllFuelEntries', {
+      sessionId: session.sessionId,
+      dateFrom: dateFrom || '',
+      dateTo: dateTo || ''
+    });
+  },
+  
+  /**
+   * Get HPCL wallet transaction history
+   */
+  async getHPCLWalletHistory() {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('getHPCLWalletHistory', {
+      sessionId: session.sessionId
+    });
+  },
+  
+  /**
+   * Add HPCL wallet top-up
+   */
+  async addHPCLWalletTopup(amount, notes) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('addHPCLWalletTopup', {
+      sessionId: session.sessionId,
+      amount: amount,
+      notes: notes || ''
+    });
+  },
+  
+  /**
+   * Export vehicle mileage to Excel
+   */
+  async exportVehicleMileageToExcel(vehicleName, dateFrom, dateTo) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+    
+    return this.call('exportVehicleMileageToExcel', {
+      sessionId: session.sessionId,
+      vehicleName: vehicleName || '',
+      dateFrom: dateFrom || '',
+      dateTo: dateTo || ''
+    });
+  }
 };
