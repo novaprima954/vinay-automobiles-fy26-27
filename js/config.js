@@ -4,7 +4,7 @@
 
 const CONFIG = {
   // Apps Script Backend API
-  API_ENDPOINT: 'https://script.google.com/macros/s/AKfycbwspc7qwDq4QSd5FHphzCp6xrmj6xP89ShvfOtvIkW1Z9OtU-VXG19sqbE02i9Bz_ozfw/exec',
+  API_ENDPOINT: 'https://script.google.com/u/0/home/projects/1g2rxcoX-66bh-vvlXSXvtjmCbsfx_VVlcHtHk4R2EPaVuqfmioYSqzt1/edit',
   
   // Session Configuration
   SESSION_DURATION: 9 * 60 * 60 * 1000, // 9 hours in milliseconds
