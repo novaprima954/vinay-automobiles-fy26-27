@@ -10,6 +10,7 @@ const ROLE_CARDS = {
     { title: 'Edit Sales', icon: '✏️', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', link: 'salesedit.html', description: 'Modify existing sales' },
     { title: 'Accounts', icon: '💰', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', link: 'accounts.html', description: 'Financial records' },
     { title: 'Accessories', icon: '🔧', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'accessories.html', description: 'Accessory management' },
+    { title: 'Inventory', icon: '📦', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'inventory.html', description: 'Stock management' },
     { title: 'CRM', icon: '👥', color: 'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', link: 'crm.html', description: 'Customer relationship' },
     { title: 'Operator', icon: '🚗', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'operator-update.html', description: 'Vehicle operations' },
     { title: 'Number Plate Update', icon: '🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'number-plate-upload.html', description: 'Number Plate Upload' },
@@ -30,12 +31,14 @@ const ROLE_CARDS = {
   accounts: [
     { title: 'Dashboard', icon: '📊', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'dashboard.html', description: 'Financial overview' },
     { title: 'Accounts', icon: '💰', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', link: 'accounts.html', description: 'Manage accounts' },
+    { title: 'Inventory', icon: '📦', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'inventory.html', description: 'Stock management' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
     { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
     { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' }
   ],
   accessories: [
     { title: 'Accessories', icon: '🔧', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'accessories.html', description: 'Manage accessories' },
+    { title: 'Inventory', icon: '📦', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'inventory.html', description: 'Stock management' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' }
   ],
   operator: [
