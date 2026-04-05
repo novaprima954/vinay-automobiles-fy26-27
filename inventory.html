@@ -124,7 +124,7 @@
     .sku-issue-list { margin: 12px 0; }
     .sku-issue-item {
       display: grid;
-      grid-template-columns: 2fr 1fr 1fr auto;
+      grid-template-columns: 1.2fr 2fr 0.6fr 1.5fr auto;
       gap: 10px;
       align-items: end;
       padding: 10px;
@@ -133,6 +133,16 @@
       margin-bottom: 8px;
     }
     .sku-issue-item label { font-size: 12px; }
+    /* Booking search results */
+    .booking-result-item:hover { background: #f0f2ff; }
+    .booking-result-item:last-child { border-bottom: none !important; }
+    /* Account check warning */
+    .acct-check-warning {
+      margin-top: 10px; padding: 10px 14px;
+      background: #fff3cd; border: 1px solid #ffc107;
+      border-radius: 6px; color: #856404;
+      font-weight: 600; font-size: 13px;
+    }
     .btn-remove-sku {
       background: #dc3545; color: white; border: none;
       border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 16px;
@@ -192,7 +202,7 @@
       .form-row { grid-template-columns: 1fr; }
       .form-row.triple { grid-template-columns: 1fr 1fr; }
       .masters-grid { grid-template-columns: 1fr; }
-      .sku-issue-item { grid-template-columns: 1fr 1fr; }
+      .sku-issue-item { grid-template-columns: 1fr 1fr 1fr; }
     }
   </style>
 </head>
@@ -350,39 +360,54 @@
           <div class="inv-form">
             <div class="form-row">
               <div>
-                <label>Receipt No</label>
+                <label>Search By</label>
+                <select id="issueSearchType" onchange="onIssueSearchTypeChange()">
+                  <option value="receiptNo">Receipt No</option>
+                  <option value="customerName">Customer Name</option>
+                  <option value="executiveName">Executive Name</option>
+                  <option value="deliveryDate">Delivery Date</option>
+                </select>
+              </div>
+              <div>
+                <label id="issueSearchLabel">Receipt No</label>
                 <div style="display:flex; gap:8px;">
-                  <input type="text" id="issueReceiptNo" placeholder="Enter receipt number" style="flex:1;">
-                  <button class="btn-primary" onclick="lookupBooking()" style="white-space:nowrap; padding:9px 16px;">Look Up</button>
+                  <input type="text" id="issueSearchText" placeholder="Enter receipt number" style="flex:1;">
+                  <input type="date" id="issueSearchDate" style="flex:1; display:none;">
+                  <button class="btn-primary" onclick="lookupBooking()" style="white-space:nowrap; padding:9px 16px;">Search</button>
                 </div>
               </div>
             </div>
+            <!-- Multi-result picker -->
+            <div id="bookingSearchResults" style="display:none; margin-bottom:12px;">
+              <label style="font-weight:600; font-size:13px; color:#555; display:block; margin-bottom:6px;">Multiple bookings found — select one:</label>
+              <div id="bookingResultsList" style="border:2px solid #ddd; border-radius:8px; max-height:200px; overflow-y:auto;"></div>
+            </div>
             <div class="booking-info-box" id="bookingInfoBox">
               <div class="booking-info-row" id="bookingInfoRow"></div>
+              <div id="accountCheckWarning" class="acct-check-warning" style="display:none;">
+                ⚠️ Account Check not completed. Accessories cannot be issued until accounts verification is done.
+              </div>
             </div>
             <div id="issueItemsSection" style="display:none;">
-              <label style="font-weight:700; font-size:14px; color:#333;">Accessories to Issue:</label>
-              <div class="sku-issue-list" id="issueSkuList"></div>
-              <button class="btn-add-sku" onclick="addIssueSkuRow()">+ Add Accessory</button>
-              <div class="form-row" style="margin-top:16px;">
-                <div>
-                  <label>Issue From Location</label>
-                  <select id="issueLocation">
-                    <option value="">-- Select Location --</option>
-                  </select>
-                </div>
+              <div class="form-row" style="margin-bottom:8px;">
                 <div>
                   <label>Delivery Date</label>
                   <input type="date" id="issueDeliveryDate">
                 </div>
               </div>
-              <div class="form-row single">
+              <label style="font-weight:700; font-size:14px; color:#333; display:block; margin-bottom:6px;">Accessories to Issue:</label>
+              <div style="display:grid; grid-template-columns:1.2fr 2fr 0.6fr 1.5fr auto; gap:10px; padding:6px 10px; font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.5px;">
+                <span>Accessory</span><span>SKU</span><span>Qty</span><span>Location</span><span></span>
+              </div>
+              <div class="sku-issue-list" id="issueSkuList"></div>
+              <button class="btn-add-sku" onclick="addIssueSkuRow()">+ Add Row</button>
+              <div class="form-row single" style="margin-top:16px;">
                 <div>
                   <label>Remarks (optional)</label>
                   <input type="text" id="issueRemarks" placeholder="Any notes">
                 </div>
               </div>
-              <button class="btn-primary" onclick="submitIssue()">✅ Confirm Issue</button>
+              <button class="btn-primary" id="issueSubmitBtn" onclick="submitIssue()" style="margin-top:8px;">✅ Confirm Issue</button>
             </div>
           </div>
         </div>
