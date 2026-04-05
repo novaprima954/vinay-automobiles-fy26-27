@@ -3,6 +3,7 @@
 // ==========================================
 
 let currentUser = null;
+let currentSessionId = null;
 let currentFilter = 'month'; // Default to 'This Month'
 let dashboardData = null;
 
@@ -19,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   currentUser = session.user;
+  currentSessionId = session.sessionId;
   console.log('✅ User:', currentUser.name, '| Role:', currentUser.role);
   
   // Load dashboard
@@ -40,7 +42,7 @@ async function loadDashboard() {
         renderSalesDashboard(response.dashboard);
       }
     } else if (currentUser.role === 'accounts') {
-      response = await API.getAccountsDashboard(currentFilter);
+      response = await API.getAccountsDashboard(currentSessionId, currentFilter);
       if (response.success) {
         renderAccountsDashboard(response.dashboard);
       }
