@@ -782,5 +782,12 @@ const API = {
       dateFrom: dateFrom || '',
       dateTo: dateTo || ''
     });
+  },
+
+  /**
+   * Generic inventory call — passes action + params directly
+   */
+  async inventoryCall(action, params = {}) {
+    return await this.call(action, params);
   }
 };

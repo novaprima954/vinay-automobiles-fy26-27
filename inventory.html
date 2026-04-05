@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Inventory Management - Vinay Automobiles</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    .inv-tabs {
+      display: flex;
+      gap: 4px;
+      background: #f0f2f5;
+      padding: 6px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .inv-tab {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 13px;
+      color: #666;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .inv-tab.active {
+      background: white;
+      color: #333;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+    }
+    .inv-tab:hover:not(.active) { background: #e2e6ea; color: #333; }
+    .inv-panel { display: none; }
+    .inv-panel.active { display: block; }
+
+    /* Stock table */
+    .stock-grid {
+      overflow-x: auto;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    }
+    .stock-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .stock-table th {
+      background: #667eea;
+      color: white;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .stock-table td { padding: 10px 14px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .stock-table tr:hover td { background: #f8f9ff; }
+    .stock-qty {
+      font-weight: 700;
+      font-size: 15px;
+      color: #333;
+      text-align: center;
+    }
+    .stock-qty.low { color: #dc3545; }
+    .stock-qty.zero { color: #aaa; }
+    .low-badge {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      color: #856404;
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    /* Alert cards */
+    .alert-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 12px; margin-bottom: 20px; }
+    .alert-card {
+      background: #fff8e1;
+      border: 2px solid #ffc107;
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .alert-card .sku-name { font-weight: 700; color: #333; font-size: 13px; margin-bottom: 4px; }
+    .alert-card .sku-stock { font-size: 22px; font-weight: 800; color: #dc3545; }
+    .alert-card .sku-min { font-size: 11px; color: #888; }
+
+    /* Forms */
+    .inv-form { max-width: 700px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .form-row.single { grid-template-columns: 1fr; }
+    .form-row.triple { grid-template-columns: 1fr 1fr 1fr; }
+    .inv-form label { display: block; font-weight: 600; font-size: 13px; color: #555; margin-bottom: 5px; }
+    .inv-form input, .inv-form select, .inv-form textarea {
+      width: 100%; padding: 9px 12px; border: 2px solid #ddd; border-radius: 8px;
+      font-size: 14px; box-sizing: border-box; transition: border-color 0.2s;
+    }
+    .inv-form input:focus, .inv-form select:focus, .inv-form textarea:focus {
+      border-color: #667eea; outline: none;
+    }
+    .inv-form input[readonly] { background: #f5f5f5; color: #555; }
+
+    /* Toggle */
+    .type-toggle { display: flex; gap: 0; border: 2px solid #667eea; border-radius: 8px; overflow: hidden; margin-bottom: 20px; width: fit-content; }
+    .type-toggle button {
+      padding: 10px 24px; border: none; background: white; color: #667eea;
+      font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.2s;
+    }
+    .type-toggle button.active { background: #667eea; color: white; }
+
+    /* Booking info box */
+    .booking-info-box {
+      background: #e8f5e9;
+      border: 2px solid #4caf50;
+      border-radius: 10px;
+      padding: 14px;
+      margin: 12px 0 16px 0;
+      display: none;
+    }
+    .booking-info-box.show { display: block; }
+    .booking-info-row { display: flex; gap: 24px; flex-wrap: wrap; }
+    .booking-info-item { font-size: 13px; }
+    .booking-info-item span { font-weight: 700; color: #2e7d32; }
+
+    /* SKU items in issue form */
+    .sku-issue-list { margin: 12px 0; }
+    .sku-issue-item {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr auto;
+      gap: 10px;
+      align-items: end;
+      padding: 10px;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .sku-issue-item label { font-size: 12px; }
+    .btn-remove-sku {
+      background: #dc3545; color: white; border: none;
+      border-radius: 6px; padding: 8px 12px; cursor: pointer; font-size: 16px;
+    }
+    .btn-add-sku {
+      background: #28a745; color: white; border: none;
+      border-radius: 8px; padding: 9px 16px; cursor: pointer; font-weight: 600; font-size: 13px;
+    }
+
+    /* History table */
+    .txn-type-badge {
+      padding: 3px 9px; border-radius: 12px; font-size: 11px; font-weight: 700;
+    }
+    .txn-STOCK_IN    { background: #d4edda; color: #155724; }
+    .txn-TRANSFER    { background: #cce5ff; color: #004085; }
+    .txn-ISSUE       { background: #d1ecf1; color: #0c5460; }
+    .txn-OTC_SALE    { background: #fff3cd; color: #856404; }
+    .txn-RETURN      { background: #f8d7da; color: #721c24; }
+    .txn-ADJUSTMENT  { background: #e2e3e5; color: #383d41; }
+
+    /* Masters */
+    .masters-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+    .master-card {
+      background: white;
+      border: 2px solid #e9ecef;
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .master-card h3 { margin: 0 0 16px 0; font-size: 15px; color: #333; }
+    .master-list { max-height: 200px; overflow-y: auto; margin-bottom: 12px; }
+    .master-item {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 8px 10px; border-bottom: 1px solid #eee; font-size: 13px;
+    }
+    .master-item:last-child { border-bottom: none; }
+    .btn-deactivate {
+      background: none; border: 1px solid #dc3545; color: #dc3545;
+      border-radius: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;
+    }
+    .field-values-section { margin-top: 16px; }
+    .field-tab-row { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+    .field-tab {
+      padding: 5px 14px; border: 2px solid #ddd; border-radius: 20px;
+      background: white; font-size: 12px; cursor: pointer; font-weight: 600; color: #666;
+    }
+    .field-tab.active { border-color: #667eea; color: #667eea; background: #f0f2ff; }
+
+    /* Filters */
+    .filter-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; margin-bottom: 16px; }
+    .filter-row .form-group { margin: 0; }
+    .filter-row label { font-size: 12px; font-weight: 600; color: #555; display: block; margin-bottom: 4px; }
+    .filter-row select, .filter-row input {
+      padding: 8px 10px; border: 2px solid #ddd; border-radius: 7px; font-size: 13px;
+    }
+
+    @media (max-width: 768px) {
+      .form-row { grid-template-columns: 1fr; }
+      .form-row.triple { grid-template-columns: 1fr 1fr; }
+      .masters-grid { grid-template-columns: 1fr; }
+      .sku-issue-item { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-title">
+        <span style="font-size:30px;">📦</span>
+        <h1>Inventory Management</h1>
+      </div>
+      <div class="header-right">
+        <span id="currentUser"></span>
+        <button class="btn-secondary" onclick="goBack()">← Back</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="statusMessage" class="message hidden"></div>
+
+      <!-- Tabs -->
+      <div class="inv-tabs">
+        <button class="inv-tab active" onclick="showTab('dashboard')">📊 Dashboard</button>
+        <button class="inv-tab" onclick="showTab('stockin')">📥 Stock In</button>
+        <button class="inv-tab" onclick="showTab('transfer')">🔄 Transfer</button>
+        <button class="inv-tab" onclick="showTab('issue')">🔖 Issue / Sale</button>
+        <button class="inv-tab" onclick="showTab('returns')">↩ Returns</button>
+        <button class="inv-tab" onclick="showTab('history')">📋 History</button>
+        <button class="inv-tab" id="mastersTab" onclick="showTab('masters')" style="display:none;">⚙️ Masters</button>
+      </div>
+
+      <!-- ===== DASHBOARD ===== -->
+      <div id="panel-dashboard" class="inv-panel active">
+        <div id="lowStockSection" style="display:none;">
+          <h3 style="color:#dc3545; margin-bottom:10px;">⚠️ Low Stock Alerts</h3>
+          <div class="alert-grid" id="lowStockGrid"></div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+          <h3 style="margin:0;">Current Stock Levels</h3>
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <select id="dashLocationFilter" onchange="renderDashboard()" style="padding:8px 12px; border:2px solid #ddd; border-radius:7px; font-size:13px;">
+              <option value="">All Locations</option>
+            </select>
+            <select id="dashCategoryFilter" onchange="renderDashboard()" style="padding:8px 12px; border:2px solid #ddd; border-radius:7px; font-size:13px;">
+              <option value="">All Categories</option>
+            </select>
+            <button class="btn-secondary" onclick="exportStockCSV()" style="padding:8px 14px; font-size:13px;">📥 Export</button>
+          </div>
+        </div>
+        <div class="stock-grid">
+          <table class="stock-table">
+            <thead>
+              <tr>
+                <th>Category</th>
+                <th>Type</th>
+                <th>Brand</th>
+                <th>Color</th>
+                <th id="stockTableHeaders"><!-- location headers injected --></th>
+              </tr>
+            </thead>
+            <tbody id="stockTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== STOCK IN ===== -->
+      <div id="panel-stockin" class="inv-panel">
+        <h3>📥 Record Stock Received</h3>
+        <div class="inv-form">
+          <div class="form-row">
+            <div>
+              <label>Accessory (SKU)</label>
+              <select id="siSku" onchange="onSkuChange('si')">
+                <option value="">-- Select Accessory --</option>
+              </select>
+            </div>
+            <div>
+              <label>Location</label>
+              <select id="siLocation">
+                <option value="">-- Select Location --</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>Quantity</label>
+              <input type="number" id="siQty" min="1" placeholder="Enter quantity">
+            </div>
+            <div>
+              <label>Date</label>
+              <input type="date" id="siDate">
+            </div>
+          </div>
+          <div class="form-row single">
+            <div>
+              <label>Remarks (optional)</label>
+              <input type="text" id="siRemarks" placeholder="e.g. Purchased from supplier">
+            </div>
+          </div>
+          <button class="btn-primary" onclick="submitStockIn()">📥 Record Stock In</button>
+        </div>
+      </div>
+
+      <!-- ===== TRANSFER ===== -->
+      <div id="panel-transfer" class="inv-panel">
+        <h3>🔄 Transfer Stock Between Locations</h3>
+        <div class="inv-form">
+          <div class="form-row">
+            <div>
+              <label>Accessory (SKU)</label>
+              <select id="trSku">
+                <option value="">-- Select Accessory --</option>
+              </select>
+            </div>
+            <div>
+              <label>Quantity</label>
+              <input type="number" id="trQty" min="1" placeholder="Enter quantity">
+            </div>
+          </div>
+          <div class="form-row">
+            <div>
+              <label>From Location</label>
+              <select id="trFrom" onchange="showTransferStock()">
+                <option value="">-- Select --</option>
+              </select>
+            </div>
+            <div>
+              <label>To Location</label>
+              <select id="trTo">
+                <option value="">-- Select --</option>
+              </select>
+            </div>
+          </div>
+          <div id="trAvailableStock" style="font-size:13px; color:#555; margin-bottom:12px;"></div>
+          <div class="form-row single">
+            <div>
+              <label>Remarks (optional)</label>
+              <input type="text" id="trRemarks" placeholder="Reason for transfer">
+            </div>
+          </div>
+          <button class="btn-primary" onclick="submitTransfer()">🔄 Transfer Stock</button>
+        </div>
+      </div>
+
+      <!-- ===== ISSUE / SALE ===== -->
+      <div id="panel-issue" class="inv-panel">
+        <div class="type-toggle">
+          <button id="toggleIssue" class="active" onclick="setIssueType('issue')">🔖 Issue to Booking</button>
+          <button id="toggleOtc" onclick="setIssueType('otc')">🛒 OTC Sale</button>
+        </div>
+
+        <!-- Issue to Booking -->
+        <div id="issueBookingForm">
+          <h3>🔖 Issue Accessories Against Booking</h3>
+          <div class="inv-form">
+            <div class="form-row">
+              <div>
+                <label>Receipt No</label>
+                <div style="display:flex; gap:8px;">
+                  <input type="text" id="issueReceiptNo" placeholder="Enter receipt number" style="flex:1;">
+                  <button class="btn-primary" onclick="lookupBooking()" style="white-space:nowrap; padding:9px 16px;">Look Up</button>
+                </div>
+              </div>
+            </div>
+            <div class="booking-info-box" id="bookingInfoBox">
+              <div class="booking-info-row" id="bookingInfoRow"></div>
+            </div>
+            <div id="issueItemsSection" style="display:none;">
+              <label style="font-weight:700; font-size:14px; color:#333;">Accessories to Issue:</label>
+              <div class="sku-issue-list" id="issueSkuList"></div>
+              <button class="btn-add-sku" onclick="addIssueSkuRow()">+ Add Accessory</button>
+              <div class="form-row" style="margin-top:16px;">
+                <div>
+                  <label>Issue From Location</label>
+                  <select id="issueLocation">
+                    <option value="">-- Select Location --</option>
+                  </select>
+                </div>
+                <div>
+                  <label>Delivery Date</label>
+                  <input type="date" id="issueDeliveryDate">
+                </div>
+              </div>
+              <div class="form-row single">
+                <div>
+                  <label>Remarks (optional)</label>
+                  <input type="text" id="issueRemarks" placeholder="Any notes">
+                </div>
+              </div>
+              <button class="btn-primary" onclick="submitIssue()">✅ Confirm Issue</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- OTC Sale -->
+        <div id="otcSaleForm" style="display:none;">
+          <h3>🛒 Over-The-Counter Sale</h3>
+          <div class="inv-form">
+            <div class="form-row">
+              <div>
+                <label>Customer Name</label>
+                <input type="text" id="otcCustomer" placeholder="Customer name">
+              </div>
+              <div>
+                <label>Mobile No (optional)</label>
+                <input type="text" id="otcMobile" placeholder="Mobile number">
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label>OTC Receipt No</label>
+                <input type="text" id="otcReceiptNo" placeholder="Receipt / bill number">
+              </div>
+              <div>
+                <label>Sale Amount (₹)</label>
+                <input type="number" id="otcAmount" placeholder="Total amount">
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label>Date</label>
+                <input type="date" id="otcDate">
+              </div>
+              <div>
+                <label>From Location</label>
+                <select id="otcLocation">
+                  <option value="">-- Select Location --</option>
+                </select>
+              </div>
+            </div>
+            <label style="font-weight:700; font-size:14px; color:#333;">Items Sold:</label>
+            <div class="sku-issue-list" id="otcSkuList"></div>
+            <button class="btn-add-sku" onclick="addOtcSkuRow()">+ Add Item</button>
+            <div class="form-row single" style="margin-top:16px;">
+              <div>
+                <label>Remarks (optional)</label>
+                <input type="text" id="otcRemarks">
+              </div>
+            </div>
+            <button class="btn-primary" onclick="submitOtcSale()" style="margin-top:12px;">🛒 Record Sale</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== RETURNS ===== -->
+      <div id="panel-returns" class="inv-panel">
+        <h3>↩ Process Return</h3>
+        <div class="inv-form">
+          <div class="form-row">
+            <div>
+              <label>Return Type</label>
+              <select id="returnType" onchange="onReturnTypeChange()">
+                <option value="booking">From Booking (Receipt No)</option>
+                <option value="otc">From OTC Sale</option>
+              </select>
+            </div>
+            <div>
+              <label id="returnRefLabel">Booking Receipt No</label>
+              <div style="display:flex; gap:8px;">
+                <input type="text" id="returnRefNo" placeholder="Enter reference" style="flex:1;">
+                <button class="btn-primary" onclick="lookupReturn()" style="padding:9px 16px;">Look Up</button>
+              </div>
+            </div>
+          </div>
+          <div id="returnInfoBox" class="booking-info-box">
+            <div id="returnInfoRow" class="booking-info-row"></div>
+          </div>
+          <div id="returnItemsSection" style="display:none;">
+            <label style="font-weight:700; font-size:14px; color:#333; display:block; margin-bottom:8px;">Items to Return:</label>
+            <div class="sku-issue-list" id="returnSkuList"></div>
+            <button class="btn-add-sku" onclick="addReturnSkuRow()">+ Add Item</button>
+            <div class="form-row" style="margin-top:16px;">
+              <div>
+                <label>Return to Location</label>
+                <select id="returnToLocation">
+                  <option value="">-- Select Location --</option>
+                </select>
+              </div>
+              <div>
+                <label>Return Date</label>
+                <input type="date" id="returnDate">
+              </div>
+            </div>
+            <div class="form-row single">
+              <div>
+                <label>Reason for Return</label>
+                <input type="text" id="returnReason" placeholder="e.g. Customer changed mind">
+              </div>
+            </div>
+            <button class="btn-primary" onclick="submitReturn()">↩ Process Return</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== HISTORY ===== -->
+      <div id="panel-history" class="inv-panel">
+        <h3>📋 Transaction History</h3>
+        <div class="filter-row">
+          <div class="form-group">
+            <label>Type</label>
+            <select id="histType" onchange="loadHistory()">
+              <option value="">All</option>
+              <option value="STOCK_IN">Stock In</option>
+              <option value="TRANSFER">Transfer</option>
+              <option value="ISSUE">Issue</option>
+              <option value="OTC_SALE">OTC Sale</option>
+              <option value="RETURN">Return</option>
+              <option value="ADJUSTMENT">Adjustment</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Location</label>
+            <select id="histLocation" onchange="loadHistory()">
+              <option value="">All Locations</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>From Date</label>
+            <input type="date" id="histFrom" onchange="loadHistory()">
+          </div>
+          <div class="form-group">
+            <label>To Date</label>
+            <input type="date" id="histTo" onchange="loadHistory()">
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button class="btn-secondary" onclick="exportHistoryCSV()">📥 Export</button>
+          </div>
+        </div>
+        <div class="stock-grid">
+          <table class="stock-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Accessory</th>
+                <th>From</th>
+                <th>To</th>
+                <th>Qty</th>
+                <th>Reference</th>
+                <th>Customer</th>
+                <th>User</th>
+                <th>Remarks</th>
+              </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+          </table>
+        </div>
+        <div id="historyPager" style="margin-top:12px; text-align:center; font-size:13px; color:#666;"></div>
+      </div>
+
+      <!-- ===== MASTERS (Admin only) ===== -->
+      <div id="panel-masters" class="inv-panel">
+        <h3>⚙️ Masters Management</h3>
+        <div class="masters-grid">
+
+          <!-- Locations -->
+          <div class="master-card">
+            <h3>📍 Locations</h3>
+            <div class="master-list" id="locationsList"></div>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="newLocationName" placeholder="New location name" style="flex:1; padding:8px; border:2px solid #ddd; border-radius:7px; font-size:13px;">
+              <button class="btn-primary" onclick="addLocation()" style="padding:8px 14px; font-size:13px;">Add</button>
+            </div>
+          </div>
+
+          <!-- SKU Master -->
+          <div class="master-card" style="grid-column: span 1;">
+            <h3>🏷️ Accessory SKUs</h3>
+            <div class="master-list" id="skuList"></div>
+            <div style="border-top:1px solid #eee; padding-top:12px; margin-top:4px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+                <div>
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Category</label>
+                  <select id="newSkuCategory" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;" onchange="filterTypesByCategory()">
+                    <option value="">-- Category --</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Type</label>
+                  <select id="newSkuType" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+                    <option value="">-- Type --</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Brand</label>
+                  <select id="newSkuBrand" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+                    <option value="">-- Brand (optional) --</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Color</label>
+                  <select id="newSkuColor" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+                    <option value="">-- Color (optional) --</option>
+                  </select>
+                </div>
+                <div>
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Min Stock</label>
+                  <input type="number" id="newSkuMinStock" placeholder="0" min="0" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+                </div>
+              </div>
+              <button class="btn-primary" onclick="addSku()" style="width:100%; font-size:13px;">+ Add SKU</button>
+            </div>
+          </div>
+
+          <!-- Field Values -->
+          <div class="master-card" style="grid-column: 1 / -1;">
+            <h3>🗂️ Field Values (Category / Type / Brand / Color)</h3>
+            <div class="field-tab-row">
+              <button class="field-tab active" onclick="showFieldTab('Category')">Category</button>
+              <button class="field-tab" onclick="showFieldTab('Type')">Type</button>
+              <button class="field-tab" onclick="showFieldTab('Brand')">Brand</button>
+              <button class="field-tab" onclick="showFieldTab('Color')">Color</button>
+            </div>
+            <div class="master-list" id="fieldValuesList"></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <input type="hidden" id="currentFieldTab" value="Category">
+              <input type="text" id="newFieldValue" placeholder="New value" style="flex:1; padding:8px; border:2px solid #ddd; border-radius:7px; font-size:13px;">
+              <button class="btn-primary" onclick="addFieldValue()" style="padding:8px 14px; font-size:13px;">Add</button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /content -->
+  </div><!-- /container -->
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/inventory.js"></script>
+</body>
+</html>
