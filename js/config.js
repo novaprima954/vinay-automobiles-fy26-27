@@ -12,22 +12,22 @@ const CONFIG = {
   // Role-based Access Control
   ROLE_ACCESS: {
     // Full access - Owner/IT Admin
-    'admin': ['sales', 'salesedit', 'accounts', 'accessory', 'view', 'crm', 'dashboard', 'users'],
-    
+    'admin': ['sales', 'salesedit', 'accounts', 'accessory', 'view', 'crm', 'dashboard', 'users', 'inventory'],
+
     // Sales Team - Sagar, Punam, Manisha, Hemant
     'sales': ['sales', 'salesedit', 'view', 'crm', 'dashboard'],
-    
+
     // Accounts Department - Financial transactions
-    'accounts': ['accounts', 'view', 'dashboard'],
-    
+    'accounts': ['accounts', 'view', 'dashboard', 'inventory'],
+
     // Accessories Department - Fitting & inventory
-    'accessories': ['accessory', 'view', 'dashboard'],
+    'accessories': ['accessory', 'view', 'dashboard', 'inventory'],
     
     // Operator - Status updates
     'operator': ['operator-update', 'view'],
     
     // Manager/Supervisor - Oversees operations
-    'manager': ['sales', 'salesedit', 'accounts', 'accessory', 'view', 'crm', 'dashboard'],
+    'manager': ['sales', 'salesedit', 'accounts', 'accessory', 'view', 'crm', 'dashboard', 'inventory'],
     
     // CRM/Telecaller - Lead management
     'crm': ['crm', 'view', 'dashboard'],
@@ -86,11 +86,17 @@ const CONFIG = {
       description: 'View analytics and reports',
       class: 'card-dashboard'
     },
-    'users': { 
-      title: 'User Management', 
-      icon: '👤', 
+    'users': {
+      title: 'User Management',
+      icon: '👤',
       description: 'Manage user accounts',
       class: 'card-users'
+    },
+    'inventory': {
+      title: 'Inventory',
+      icon: '📦',
+      description: 'Accessory stock management',
+      class: 'card-inventory'
     }
   }
 };
