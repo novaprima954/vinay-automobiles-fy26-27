@@ -145,6 +145,33 @@ const API = {
   async getAccountsDashboard(sessionId, month) {
     return await this.call('getAccountsDashboard', { sessionId, month });
   },
+
+  /**
+   * Get admin dashboard data
+   */
+  async getAdminDashboard(filter) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return await this.call('getAdminDashboard', { sessionId: session.sessionId, filter });
+  },
+
+  /**
+   * Get sales dashboard data
+   */
+  async getSalesDashboard(filter) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return await this.call('getSalesDashboard', { sessionId: session.sessionId, filter });
+  },
+
+  /**
+   * Get accessories dashboard data
+   */
+  async getAccessoriesDashboard(filter) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return await this.call('getAccessoriesDashboard', { sessionId: session.sessionId, filter });
+  },
   
   /**
    * Get accounts by status
