@@ -1313,7 +1313,7 @@ function exportResultsToCSV(results, filename) {
   }
   
   // CSV header
-  let csv = 'Receipt No,Executive Name,Booking Date,Customer Name,Mobile No,Model,Variant,Colour,Discount,Final Price,Financier Name,Delivery Date,Guard,Grip Cover,Seat Cover,Matin,Tank Cover,Handle Hook,Helmet,Sales Remark,Accountant Name,Account Check,Account Remark,Receipt No 1,Receipt 1 Amount,Receipt No 2,Receipt 2 Amount,Receipt No 3,Receipt 3 Amount,Receipt No 4,Receipt 4 Amount,DO Number,Disbursed Amount\n';
+  let csv = 'Receipt No,Executive Name,Booking Date,Customer Name,Mobile No,Model,Variant,Colour,Discount,Final Price,Financier Name,Delivery Date,Guard,Grip Cover,Seat Cover,Matin,Tank Cover,Handle Hook,Helmet,Rain Cover,Buzzer,Back Rest,Sales Remark,Accountant Name,Account Check,Account Remark,Receipt No 1,Receipt 1 Amount,Receipt No 2,Receipt 2 Amount,Receipt No 3,Receipt 3 Amount,Receipt No 4,Receipt 4 Amount,DO Number,Disbursed Amount\n';
   
   // CSV rows
   results.forEach(function(r) {
@@ -1337,6 +1337,9 @@ function exportResultsToCSV(results, filename) {
       r.tankcover || '',
       r.handlehook || '',
       r.helmet || '',
+      r.raincover || '',
+      r.buzzer || '',
+      r.backrest || '',
       r.salesRemark || '',
       r.accountantName || '',
       r.accountCheck || '',
