@@ -15,6 +15,20 @@ let issueSkuRowCount = 0;
 let otcSkuRowCount = 0;
 let returnSkuRowCount = 0;
 let currentBooking = null;
+let bookingSearchResults = [];
+
+const ACCESSORY_FIELDS = [
+  { key: 'guard',      label: 'Guard' },
+  { key: 'gripcover',  label: 'Grip Cover' },
+  { key: 'seatcover',  label: 'Seat Cover' },
+  { key: 'matin',      label: 'Matin' },
+  { key: 'tankcover',  label: 'Tank Cover' },
+  { key: 'handlehook', label: 'Handle Hook' },
+  { key: 'helmet',     label: 'Helmet' },
+  { key: 'raincover',  label: 'Rain Cover' },
+  { key: 'buzzer',     label: 'Buzzer' },
+  { key: 'backrest',   label: 'Back Rest' }
+];
 
 // ==========================================
 // INIT
@@ -111,7 +125,7 @@ function populateLocationDropdowns() {
   const locOptions = invLocations.map(l =>
     `<option value="${l.locationId}">${l.name}</option>`
   ).join('');
-  ['siLocation', 'trFrom', 'trTo', 'issueLocation', 'otcLocation', 'returnToLocation',
+  ['siLocation', 'trFrom', 'trTo', 'otcLocation', 'returnToLocation',
    'dashLocationFilter', 'histLocation'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -324,54 +338,163 @@ function setIssueType(type) {
   if (type === 'otc' && document.getElementById('otcSkuList').children.length === 0) addOtcSkuRow();
 }
 
+function onIssueSearchTypeChange() {
+  const type = document.getElementById('issueSearchType').value;
+  const textEl = document.getElementById('issueSearchText');
+  const dateEl = document.getElementById('issueSearchDate');
+  const label = document.getElementById('issueSearchLabel');
+  const labels = { receiptNo: 'Receipt No', customerName: 'Customer Name', executiveName: 'Executive Name', deliveryDate: 'Delivery Date' };
+  const placeholders = { receiptNo: 'Enter receipt number', customerName: 'Enter customer name', executiveName: 'Enter executive name' };
+  label.textContent = labels[type] || 'Search Value';
+  if (type === 'deliveryDate') {
+    textEl.style.display = 'none';
+    dateEl.style.display = '';
+    textEl.value = '';
+  } else {
+    textEl.style.display = '';
+    dateEl.style.display = 'none';
+    dateEl.value = '';
+    textEl.placeholder = placeholders[type] || 'Enter search value';
+  }
+  resetBookingSearch();
+}
+
+function resetBookingSearch() {
+  currentBooking = null;
+  bookingSearchResults = [];
+  document.getElementById('bookingInfoBox').classList.remove('show');
+  document.getElementById('bookingSearchResults').style.display = 'none';
+  document.getElementById('issueItemsSection').style.display = 'none';
+  document.getElementById('issueSkuList').innerHTML = '';
+  issueSkuRowCount = 0;
+}
+
 async function lookupBooking() {
-  const receiptNo = document.getElementById('issueReceiptNo').value.trim();
-  if (!receiptNo) { showMessage('Enter a receipt number', 'error'); return; }
+  const searchType = document.getElementById('issueSearchType').value;
+  const isDate = searchType === 'deliveryDate';
+  const searchValue = isDate
+    ? document.getElementById('issueSearchDate').value
+    : document.getElementById('issueSearchText').value.trim();
+
+  if (!searchValue) { showMessage('Enter a search value', 'error'); return; }
 
   showLoading(true);
-  const res = await API.inventoryCall('getBookingForIssue', { sessionId: invSessionId, receiptNo });
+  const res = await API.inventoryCall('getBookingForIssue', { sessionId: invSessionId, searchType, searchValue });
   showLoading(false);
 
-  if (res.success && res.booking) {
-    currentBooking = res.booking;
-    const b = res.booking;
-    const box = document.getElementById('bookingInfoBox');
-    document.getElementById('bookingInfoRow').innerHTML = `
-      <div class="booking-info-item">Customer: <span>${b.customerName || '-'}</span></div>
-      <div class="booking-info-item">Executive: <span>${b.executiveName || '-'}</span></div>
-      <div class="booking-info-item">Model: <span>${b.model || '-'} ${b.variant || ''}</span></div>
-      <div class="booking-info-item">Booking Date: <span>${b.bookingDate || '-'}</span></div>
-    `;
-    box.classList.add('show');
-    document.getElementById('issueItemsSection').style.display = '';
-    if (b.deliveryDate) document.getElementById('issueDeliveryDate').value = b.deliveryDate;
-    if (document.getElementById('issueSkuList').children.length === 0) addIssueSkuRow();
-  } else {
+  document.getElementById('bookingSearchResults').style.display = 'none';
+
+  if (!res.success) {
     showMessage(res.message || 'Booking not found', 'error');
+    resetBookingSearch();
+    return;
+  }
+
+  if (res.bookings && res.bookings.length > 1) {
+    bookingSearchResults = res.bookings;
+    renderBookingResults(res.bookings);
+    document.getElementById('bookingSearchResults').style.display = '';
     document.getElementById('bookingInfoBox').classList.remove('show');
     document.getElementById('issueItemsSection').style.display = 'none';
-    currentBooking = null;
+  } else {
+    const booking = res.booking || (res.bookings && res.bookings[0]);
+    if (booking) {
+      showBookingDetails(booking);
+    } else {
+      showMessage('Booking not found', 'error');
+      resetBookingSearch();
+    }
   }
 }
 
-function addIssueSkuRow() {
+function renderBookingResults(bookings) {
+  const list = document.getElementById('bookingResultsList');
+  list.innerHTML = bookings.map((b, i) =>
+    `<div class="booking-result-item" onclick="selectBookingFromResults(${i})"
+      style="padding:10px 14px; border-bottom:1px solid #eee; cursor:pointer; font-size:13px; display:flex; gap:16px; flex-wrap:wrap;">
+      <span><strong>${b.receiptNo || '-'}</strong></span>
+      <span>${b.customerName || '-'}</span>
+      <span style="color:#666;">${b.executiveName || '-'}</span>
+      <span style="color:#888;">${b.deliveryDate || 'No delivery date'}</span>
+    </div>`
+  ).join('');
+}
+
+function selectBookingFromResults(index) {
+  document.getElementById('bookingSearchResults').style.display = 'none';
+  showBookingDetails(bookingSearchResults[index]);
+}
+
+function showBookingDetails(booking) {
+  currentBooking = booking;
+  const b = booking;
+  const acctOk = b.accountCheck === 'Yes';
+
+  document.getElementById('bookingInfoRow').innerHTML = `
+    <div class="booking-info-item">Receipt: <span>${b.receiptNo || '-'}</span></div>
+    <div class="booking-info-item">Customer: <span>${b.customerName || '-'}</span></div>
+    <div class="booking-info-item">Executive: <span>${b.executiveName || '-'}</span></div>
+    <div class="booking-info-item">Model: <span>${b.model || '-'} ${b.variant || ''}</span></div>
+    <div class="booking-info-item">Delivery Date: <span>${b.deliveryDate || 'Not set'}</span></div>
+    <div class="booking-info-item">Account Check: <span style="color:${acctOk ? '#2e7d32' : '#c62828'}; font-weight:700;">${b.accountCheck || 'Pending'}</span></div>
+  `;
+  document.getElementById('bookingInfoBox').classList.add('show');
+
+  const warning = document.getElementById('accountCheckWarning');
+  const submitBtn = document.getElementById('issueSubmitBtn');
+  warning.style.display = acctOk ? 'none' : '';
+  submitBtn.disabled = !acctOk;
+  submitBtn.style.opacity = acctOk ? '' : '0.5';
+  submitBtn.style.cursor = acctOk ? '' : 'not-allowed';
+
+  document.getElementById('issueItemsSection').style.display = '';
+  if (b.deliveryDate) document.getElementById('issueDeliveryDate').value = b.deliveryDate;
+
+  document.getElementById('issueSkuList').innerHTML = '';
+  issueSkuRowCount = 0;
+  renderOrderedAccessories(b);
+}
+
+function renderOrderedAccessories(booking) {
+  const ordered = ACCESSORY_FIELDS.filter(a => booking[a.key] === 'Yes');
+  if (ordered.length === 0) {
+    document.getElementById('issueSkuList').innerHTML =
+      '<div style="color:#888; font-size:13px; padding:10px;">No accessories ordered in this booking.</div>';
+    return;
+  }
+  ordered.forEach(a => addIssueSkuRow(a.label));
+}
+
+function addIssueSkuRow(accessoryName) {
   const id = ++issueSkuRowCount;
   const row = document.createElement('div');
   row.className = 'sku-issue-item';
   row.id = 'issue-row-' + id;
+
+  const storeLocation = invLocations.find(l => l.name.toLowerCase() === 'store');
+  const locOptions = invLocations.map(l =>
+    `<option value="${l.locationId}" ${storeLocation && l.locationId === storeLocation.locationId ? 'selected' : ''}>${l.name}</option>`
+  ).join('');
+
   row.innerHTML = `
     <div>
-      <label>Accessory</label>
-      <select style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
-        <option value="">-- Select --</option>${buildSkuOptions()}
+      <input type="text" value="${accessoryName || ''}" placeholder="Type" readonly
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; background:#f0f0f0; color:#444;">
+    </div>
+    <div>
+      <select data-role="sku" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+        <option value="">-- Select SKU --</option>${buildSkuOptions()}
       </select>
     </div>
     <div>
-      <label>Qty</label>
       <input type="number" min="1" value="1" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
     </div>
-    <div></div>
-    <button class="btn-remove-sku" onclick="document.getElementById('issue-row-${id}').remove()">✕</button>
+    <div>
+      <select data-role="location" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+        <option value="">-- Location --</option>${locOptions}
+      </select>
+    </div>
+    <button class="btn-remove-sku" onclick="document.getElementById('issue-row-${id}').remove()" style="margin-top:2px;">✕</button>
   `;
   document.getElementById('issueSkuList').appendChild(row);
 }
@@ -401,10 +524,15 @@ function addOtcSkuRow() {
 function collectSkuRows(listId) {
   const items = [];
   document.querySelectorAll('#' + listId + ' .sku-issue-item').forEach(row => {
-    const sel = row.querySelector('select');
+    const skuSel = row.querySelector('[data-role="sku"]') || row.querySelector('select');
+    const locSel = row.querySelector('[data-role="location"]');
     const inp = row.querySelector('input[type="number"]');
-    if (sel && inp && sel.value) {
-      items.push({ skuId: sel.value, qty: parseInt(inp.value) || 1 });
+    if (skuSel && inp && skuSel.value) {
+      items.push({
+        skuId: skuSel.value,
+        qty: parseInt(inp.value) || 1,
+        locationId: locSel ? locSel.value : ''
+      });
     }
   });
   return items;
@@ -412,10 +540,17 @@ function collectSkuRows(listId) {
 
 async function submitIssue() {
   if (!currentBooking) { showMessage('Look up a booking first', 'error'); return; }
+  if (currentBooking.accountCheck !== 'Yes') {
+    showMessage('Cannot issue: Account Check not completed for this booking', 'error'); return;
+  }
+
   const items = collectSkuRows('issueSkuList');
-  if (items.length === 0) { showMessage('Add at least one accessory', 'error'); return; }
-  const locationId = document.getElementById('issueLocation').value;
-  if (!locationId) { showMessage('Select a location', 'error'); return; }
+  if (items.length === 0) { showMessage('Add at least one accessory row', 'error'); return; }
+
+  for (const item of items) {
+    if (!item.skuId) { showMessage('Select a SKU for every accessory row', 'error'); return; }
+    if (!item.locationId) { showMessage('Select a location for every accessory row', 'error'); return; }
+  }
 
   showLoading(true);
   const res = await API.inventoryCall('invIssueToBooking', {
@@ -424,7 +559,6 @@ async function submitIssue() {
     customerName: currentBooking.customerName,
     executiveName: currentBooking.executiveName,
     deliveryDate: document.getElementById('issueDeliveryDate').value,
-    locationId,
     items: JSON.stringify(items),
     remarks: document.getElementById('issueRemarks').value
   });
@@ -434,12 +568,9 @@ async function submitIssue() {
     showMessage('Accessories issued successfully', 'success');
     await loadStock();
     renderDashboard();
-    document.getElementById('issueReceiptNo').value = '';
-    document.getElementById('bookingInfoBox').classList.remove('show');
-    document.getElementById('issueItemsSection').style.display = 'none';
-    document.getElementById('issueSkuList').innerHTML = '';
-    issueSkuRowCount = 0;
-    currentBooking = null;
+    resetBookingSearch();
+    document.getElementById('issueSearchText').value = '';
+    document.getElementById('issueRemarks').value = '';
   } else {
     showMessage(res.message || 'Issue failed', 'error');
   }
