@@ -647,6 +647,11 @@ function accSkuDisplayName(sku) {
   return [sku.category, sku.type, sku.brand, sku.color].filter(Boolean).join(' / ');
 }
 
+// value format: "SKUID — Category / Type / Brand / Color"  (searchable by SKU ID or name)
+function accSkuDatalistValue(s) {
+  return s.skuId + ' — ' + accSkuDisplayName(s);
+}
+
 function buildAccSkuDatalistOptions(filterLabel) {
   const filtered = filterLabel
     ? accInvSkus.filter(s =>
@@ -657,7 +662,7 @@ function buildAccSkuDatalistOptions(filterLabel) {
   // Fall back to all SKUs if no match for the filter
   const source = (filtered.length === 0 && filterLabel) ? accInvSkus : filtered;
   return source.map(s =>
-    `<option value="${accSkuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
+    `<option value="${accSkuDatalistValue(s)}" data-sku-id="${s.skuId}"></option>`
   ).join('');
 }
 
