@@ -618,6 +618,10 @@
                   <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Min Stock</label>
                   <input type="number" id="newSkuMinStock" placeholder="0" min="0" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
                 </div>
+                <div style="grid-column: 1 / -1;">
+                  <label style="font-size:12px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Custom SKU ID <span style="font-weight:400; color:#999;">(optional — leave blank to auto-generate)</span></label>
+                  <input type="text" id="newSkuCustomId" placeholder="e.g. SC-COTTON-001" style="width:100%; padding:7px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+                </div>
               </div>
               <button class="btn-primary" onclick="addSku()" style="width:100%; font-size:13px;">+ Add SKU</button>
             </div>
