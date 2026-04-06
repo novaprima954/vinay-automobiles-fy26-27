@@ -280,14 +280,20 @@
     }
 
     .pending-item {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      align-items: center;
+      display: block;
       padding: 12px;
       margin: 8px 0;
       background: #f8f9fa;
       border-radius: 8px;
       border-left: 4px solid #ddd;
+    }
+
+    .pending-item-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
     }
 
     .pending-item.status-pending {
@@ -299,6 +305,23 @@
       border-left-color: #dc3545;
       background: #ffebee;
     }
+
+    .pending-item.status-issued {
+      border-left-color: #17a2b8;
+      background: #e8f4f8;
+    }
+
+    .pending-inv-row {
+      display: none;
+      gap: 10px;
+      align-items: flex-end;
+      margin-top: 10px;
+      flex-wrap: wrap;
+      padding-top: 10px;
+      border-top: 1px dashed #ccc;
+    }
+
+    .pending-inv-row.show { display: flex; }
 
     .pending-item-name {
       font-weight: 600;

@@ -73,6 +73,10 @@ function getModelConfig(modelName) {
 let currentDashboardData = null;
 let currentFilterStatus = null;
 
+// Inventory SKUs and locations (loaded at init for inline deduction)
+let accInvSkus = [];
+let accInvLocations = [];
+
 // ==========================================
 // PAGE INITIALIZATION
 // ==========================================
@@ -100,13 +104,14 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Initialize page
   initializeAccessoriesPage(user);
-  
+
   // Setup event listeners
   setupEventListeners();
-  
-  // Load dashboard
+
+  // Load dashboard and inventory data in parallel
   populateMonthOptions();
   loadDashboard();
+  loadInvData();
 });
 
 /**
@@ -621,6 +626,71 @@ function populateDetails(record, user) {
   }
 }
 
+// ==========================================
+// INVENTORY HELPERS (for inline deduction)
+// ==========================================
+
+async function loadInvData() {
+  try {
+    const sessionId = SessionManager.getSessionId();
+    const [skuRes, locRes] = await Promise.all([
+      API.inventoryCall('getInvSkus',      { sessionId }),
+      API.inventoryCall('getInvLocations', { sessionId })
+    ]);
+    if (skuRes.success)  accInvSkus       = skuRes.skus       || [];
+    if (locRes.success)  accInvLocations  = locRes.locations  || [];
+  } catch(e) { /* silently skip — inventory just won't populate */ }
+}
+
+function accSkuDisplayName(sku) {
+  if (!sku) return '';
+  return [sku.category, sku.type, sku.brand, sku.color].filter(Boolean).join(' / ');
+}
+
+function buildAccSkuDatalistOptions(filterLabel) {
+  const filtered = filterLabel
+    ? accInvSkus.filter(s =>
+        (s.category || '').toLowerCase() === filterLabel.toLowerCase() ||
+        (s.type     || '').toLowerCase() === filterLabel.toLowerCase()
+      )
+    : accInvSkus;
+  // Fall back to all SKUs if no match for the filter
+  const source = (filtered.length === 0 && filterLabel) ? accInvSkus : filtered;
+  return source.map(s =>
+    `<option value="${accSkuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
+  ).join('');
+}
+
+function resolveAccSkuFromSearch(inputEl, datalistId, hiddenId) {
+  const val = inputEl.value;
+  let foundId = '';
+  document.querySelectorAll('#' + datalistId + ' option').forEach(function(opt) {
+    if (opt.value === val) foundId = opt.dataset.skuId;
+  });
+  document.getElementById(hiddenId).value = foundId;
+}
+
+function onPendingItemChange(safeName) {
+  const radioName = 'pending_' + safeName;
+  const selected = document.querySelector('input[name="' + radioName + '"]:checked');
+  const itemDiv  = document.getElementById('pi-' + safeName);
+  const invRow   = document.getElementById('pi-inv-' + safeName);
+  if (!itemDiv) return;
+  itemDiv.classList.remove('status-pending', 'status-refused', 'status-issued');
+  if (selected) {
+    if (selected.value === 'pending') {
+      itemDiv.classList.add('status-pending');
+    } else if (selected.value === 'refused') {
+      itemDiv.classList.add('status-refused');
+    } else if (selected.value === 'issued') {
+      itemDiv.classList.add('status-issued');
+    }
+    if (invRow) {
+      invRow.classList.toggle('show', selected.value === 'issued');
+    }
+  }
+}
+
 /**
  * Populate pending items with radio buttons for Pending/Customer Refused
  * ONLY show accessories that were ordered (marked as "Yes")
@@ -684,80 +754,69 @@ function populatePendingItems(record) {
     }
     
     orderedAccessories.forEach(function(accessory) {
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'pending-item';
-      
-      // Check status
+      const safeName  = accessory.toLowerCase().replace(/ /g, '');
+      const radioName = 'pending_' + safeName;
       const isPending = pendingItemsStr.indexOf(accessory) !== -1;
       const isRefused = refusedItemsStr.indexOf(accessory) !== -1;
-      
-      
-      if (isPending) {
-        itemDiv.classList.add('status-pending');
-      } else if (isRefused) {
-        itemDiv.classList.add('status-refused');
-      }
-      
-      // Item name
-      const nameSpan = document.createElement('span');
-      nameSpan.className = 'pending-item-name';
-      nameSpan.textContent = accessory;
-      
-      // Radio options
-      const optionsDiv = document.createElement('div');
-      optionsDiv.className = 'pending-item-options';
-      
-      const radioName = 'pending_' + accessory.toLowerCase().replace(/ /g, '');
-      
-      // None option (default)
-      const noneLabel = document.createElement('label');
-      const noneRadio = document.createElement('input');
-      noneRadio.type = 'radio';
-      noneRadio.name = radioName;
-      noneRadio.value = 'none';
-      noneRadio.checked = !isPending && !isRefused;
-      noneLabel.appendChild(noneRadio);
-      noneLabel.appendChild(document.createTextNode('None'));
-      
-      // Pending option
-      const pendingLabel = document.createElement('label');
-      const pendingRadio = document.createElement('input');
-      pendingRadio.type = 'radio';
-      pendingRadio.name = radioName;
-      pendingRadio.value = 'pending';
-      pendingRadio.checked = isPending;
-      pendingLabel.appendChild(pendingRadio);
-      pendingLabel.appendChild(document.createTextNode('🔔 Pending'));
-      
-      // Customer Refused option
-      const refusedLabel = document.createElement('label');
-      const refusedRadio = document.createElement('input');
-      refusedRadio.type = 'radio';
-      refusedRadio.name = radioName;
-      refusedRadio.value = 'refused';
-      refusedRadio.checked = isRefused;
-      refusedLabel.appendChild(refusedRadio);
-      refusedLabel.appendChild(document.createTextNode('❌ Refused'));
-      
-      optionsDiv.appendChild(noneLabel);
-      optionsDiv.appendChild(pendingLabel);
-      optionsDiv.appendChild(refusedLabel);
-      
-      itemDiv.appendChild(nameSpan);
-      itemDiv.appendChild(optionsDiv);
+
+      // Pre-build inventory row elements
+      const dlId   = 'acc-sku-dl-'  + safeName;
+      const valId  = 'acc-sku-val-' + safeName;
+      const locId  = 'acc-loc-'     + safeName;
+      const qtyId  = 'acc-qty-'     + safeName;
+      const invRowId = 'pi-inv-'    + safeName;
+
+      const storeLocation = accInvLocations.find(function(l) { return l.name.toLowerCase() === 'store'; });
+      const locOptions = accInvLocations.map(function(l) {
+        const sel = (storeLocation && l.locationId === storeLocation.locationId) ? ' selected' : '';
+        return '<option value="' + l.locationId + '"' + sel + '>' + l.name + '</option>';
+      }).join('');
+      const dlOptions = buildAccSkuDatalistOptions(accessory);
+
+      // Status class
+      let statusClass = isPending ? 'status-pending' : (isRefused ? 'status-refused' : '');
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'pending-item ' + statusClass;
+      itemDiv.id = 'pi-' + safeName;
+      itemDiv.innerHTML = `
+        <div class="pending-item-top">
+          <span class="pending-item-name">${accessory}</span>
+          <div class="pending-item-options">
+            <label><input type="radio" name="${radioName}" value="none" ${!isPending && !isRefused ? 'checked' : ''}
+              onchange="onPendingItemChange('${safeName}')"> None</label>
+            <label><input type="radio" name="${radioName}" value="pending" ${isPending ? 'checked' : ''}
+              onchange="onPendingItemChange('${safeName}')"> 🔔 Pending</label>
+            <label><input type="radio" name="${radioName}" value="refused" ${isRefused ? 'checked' : ''}
+              onchange="onPendingItemChange('${safeName}')"> ❌ Refused</label>
+            <label><input type="radio" name="${radioName}" value="issued"
+              onchange="onPendingItemChange('${safeName}')"> 📦 Issue from Stock</label>
+          </div>
+        </div>
+        <div class="pending-inv-row" id="${invRowId}">
+          <div style="flex:2; min-width:180px;">
+            <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">${accessory} SKU</label>
+            <input type="text" list="${dlId}" placeholder="Type to search SKU…"
+              style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px; box-sizing:border-box;"
+              oninput="resolveAccSkuFromSearch(this,'${dlId}','${valId}')">
+            <datalist id="${dlId}">${dlOptions}</datalist>
+            <input type="hidden" id="${valId}" data-role="acc-sku">
+          </div>
+          <div style="flex:1; min-width:120px;">
+            <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">From Location</label>
+            <select id="${locId}"
+              style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
+              <option value="">-- Location --</option>${locOptions}
+            </select>
+          </div>
+          <div style="flex:0; min-width:80px;">
+            <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Qty</label>
+            <input type="number" id="${qtyId}" min="1" value="1"
+              style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
+          </div>
+        </div>
+      `;
       pendingContainer.appendChild(itemDiv);
-      
-      // Add change listener to update visual state
-      [noneRadio, pendingRadio, refusedRadio].forEach(function(radio) {
-        radio.addEventListener('change', function() {
-          itemDiv.classList.remove('status-pending', 'status-refused');
-          if (pendingRadio.checked) {
-            itemDiv.classList.add('status-pending');
-          } else if (refusedRadio.checked) {
-            itemDiv.classList.add('status-refused');
-          }
-        });
-      });
     });
   } else {
     pendingContainer.innerHTML = '<div style="color: #999; padding: 10px;">Model not found in configuration</div>';
@@ -845,46 +904,62 @@ async function updateRecord() {
   
   const modelConfig = getModelConfig(model);
   
+  // Collect inventory items to issue (accessory = 'issued' radio)
+  const issuedItems = []; // { skuId, qty, locationId, accessoryName }
+
   if (modelConfig) {
     const accessories = modelConfig.accessories;
     const allPendingOptions = accessories.concat(ADDITIONAL_PENDING_ITEMS);
-    
+
     allPendingOptions.forEach(function(accessory) {
-      const radioName = 'pending_' + accessory.toLowerCase().replace(/ /g, '');
+      const safeName  = accessory.toLowerCase().replace(/ /g, '');
+      const radioName = 'pending_' + safeName;
       const selectedRadio = document.querySelector('input[name="' + radioName + '"]:checked');
-      
+
       if (selectedRadio) {
         if (selectedRadio.value === 'pending') {
           pendingItems.push(accessory);
         } else if (selectedRadio.value === 'refused') {
           refusedItems.push(accessory);
+        } else if (selectedRadio.value === 'issued') {
+          // Collect inventory deduction data
+          const skuId     = (document.getElementById('acc-sku-val-' + safeName) || {}).value || '';
+          const locId     = (document.getElementById('acc-loc-'     + safeName) || {}).value || '';
+          const qty       = parseInt((document.getElementById('acc-qty-' + safeName) || {}).value) || 1;
+          if (!skuId) {
+            showMessage('Select a SKU for ' + accessory + ' (Issue from Stock)', 'error');
+            throw new Error('missing_sku');
+          }
+          if (!locId) {
+            showMessage('Select a location for ' + accessory + ' (Issue from Stock)', 'error');
+            throw new Error('missing_location');
+          }
+          issuedItems.push({ skuId, qty, locationId: locId, accessoryName: accessory });
+          // "Issued" counts as done — not pending, not refused
         }
       }
     });
   }
-  
+
   const pendingString = pendingItems.join(', ');
   const refusedString = refusedItems.join(', ');
-  
+
   // AUTO-DETERMINE FITTED STATUS based on pending/refused items
-  // PRIORITY: Pending > Refused > None
+  // PRIORITY: Pending > Refused > None/Issued
   let fittedStatus;
   if (pendingItems.length > 0) {
-    // If ANY item is pending → Partially Complete (HIGHEST PRIORITY)
     fittedStatus = 'No';
-  } else if (refusedItems.length > 0) {
-    // If ANY item is refused (and NO pending) → Complete
+  } else if (refusedItems.length > 0 || issuedItems.length > 0) {
     fittedStatus = 'Yes';
   } else {
-    // All items are "None" → Complete
     fittedStatus = 'Yes';
   }
-  
+
   const sessionId = SessionManager.getSessionId();
   const updateBtn = document.getElementById('updateBtn');
   updateBtn.disabled = true;
   updateBtn.textContent = '⏳ Updating...';
-  
+
   try {
     const response = await API.call('updateAccessoryData', {
       sessionId: sessionId,
@@ -897,16 +972,45 @@ async function updateRecord() {
       receipt1: document.getElementById('accessoryReceipt1').value,
       extra: document.getElementById('accessoryExtra').value
     });
-    
-    if (response.success) {
-      showMessage('✅ ' + response.message, 'success');
-      loadDashboard();
-      setTimeout(closeDetails, 2000);
-    } else {
+
+    if (!response.success) {
       showMessage('❌ ' + response.message, 'error');
+      return;
     }
+
+    // Deduct inventory for "issued" items (if any)
+    if (issuedItems.length > 0) {
+      const receiptNo    = document.getElementById('detailReceiptNo').textContent.trim();
+      const customerName = document.getElementById('detailCustomerName').textContent.trim();
+      const executiveName = document.getElementById('detailExecName').textContent.trim();
+      const deliveryDate = document.getElementById('detailDeliveryDate').textContent.trim();
+
+      const invRes = await API.inventoryCall('invIssueToBooking', {
+        sessionId: sessionId,
+        receiptNo,
+        customerName,
+        executiveName,
+        deliveryDate,
+        items: JSON.stringify(issuedItems),
+        remarks: 'Issued via Accessories page'
+      });
+
+      if (!invRes.success) {
+        showMessage('✅ Record saved, but inventory deduction failed: ' + (invRes.message || 'Unknown error'), 'error');
+        loadDashboard();
+        return;
+      }
+      showMessage('✅ Record saved & inventory deducted for: ' + issuedItems.map(function(i) { return i.accessoryName; }).join(', '), 'success');
+    } else {
+      showMessage('✅ ' + response.message, 'success');
+    }
+
+    loadDashboard();
+    setTimeout(closeDetails, 2000);
   } catch (error) {
-    showMessage('❌ Update failed. Please try again.', 'error');
+    if (error.message !== 'missing_sku' && error.message !== 'missing_location') {
+      showMessage('❌ Update failed. Please try again.', 'error');
+    }
   } finally {
     updateBtn.disabled = false;
     updateBtn.textContent = '💾 Update';
