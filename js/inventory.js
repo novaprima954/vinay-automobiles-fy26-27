@@ -121,6 +121,36 @@ function skuById(skuId) {
   return invSkus.find(s => s.skuId === skuId) || null;
 }
 
+// Build datalist <option> elements, optionally filtered by accessory label
+// Matching: sku.category OR sku.type matches the label (case-insensitive)
+function buildSkuDatalistOptions(filterLabel) {
+  const list = filterLabel
+    ? invSkus.filter(s =>
+        (s.category || '').toLowerCase() === filterLabel.toLowerCase() ||
+        (s.type     || '').toLowerCase() === filterLabel.toLowerCase()
+      )
+    : invSkus;
+  if (list.length === 0 && filterLabel) {
+    // Fall back to unfiltered so the user can still pick manually
+    return invSkus.map(s =>
+      `<option value="${skuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
+    ).join('');
+  }
+  return list.map(s =>
+    `<option value="${skuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
+  ).join('');
+}
+
+// Called oninput on the search text box — resolves display name → skuId into hidden field
+function resolveSkuFromSearch(inputEl, datalistId, hiddenId) {
+  const val = inputEl.value;
+  let foundId = '';
+  document.querySelectorAll('#' + datalistId + ' option').forEach(opt => {
+    if (opt.value === val) foundId = opt.dataset.skuId;
+  });
+  document.getElementById(hiddenId).value = foundId;
+}
+
 function populateLocationDropdowns() {
   const locOptions = invLocations.map(l =>
     `<option value="${l.locationId}">${l.name}</option>`
@@ -467,6 +497,8 @@ function renderOrderedAccessories(booking) {
 
 function addIssueSkuRow(accessoryName) {
   const id = ++issueSkuRowCount;
+  const dlId  = 'inv-sku-dl-issue-'  + id;
+  const valId = 'inv-sku-val-issue-' + id;
   const row = document.createElement('div');
   row.className = 'sku-issue-item';
   row.id = 'issue-row-' + id;
@@ -476,15 +508,20 @@ function addIssueSkuRow(accessoryName) {
     `<option value="${l.locationId}" ${storeLocation && l.locationId === storeLocation.locationId ? 'selected' : ''}>${l.name}</option>`
   ).join('');
 
+  const dlOptions = buildSkuDatalistOptions(accessoryName);
+  const hint = accessoryName ? `${accessoryName} SKUs` : 'Search SKU…';
+
   row.innerHTML = `
     <div>
       <input type="text" value="${accessoryName || ''}" placeholder="Type" readonly
         style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; background:#f0f0f0; color:#444;">
     </div>
-    <div>
-      <select data-role="sku" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
-        <option value="">-- Select SKU --</option>${buildSkuOptions()}
-      </select>
+    <div style="position:relative;">
+      <input type="text" list="${dlId}" placeholder="${hint}"
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; box-sizing:border-box;"
+        oninput="resolveSkuFromSearch(this,'${dlId}','${valId}')">
+      <datalist id="${dlId}">${dlOptions}</datalist>
+      <input type="hidden" id="${valId}" data-role="sku">
     </div>
     <div>
       <input type="number" min="1" value="1" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
@@ -501,15 +538,19 @@ function addIssueSkuRow(accessoryName) {
 
 function addOtcSkuRow() {
   const id = ++otcSkuRowCount;
+  const dlId  = 'inv-sku-dl-otc-'  + id;
+  const valId = 'inv-sku-val-otc-' + id;
   const row = document.createElement('div');
   row.className = 'sku-issue-item';
   row.id = 'otc-row-' + id;
   row.innerHTML = `
     <div>
       <label>Accessory</label>
-      <select style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
-        <option value="">-- Select --</option>${buildSkuOptions()}
-      </select>
+      <input type="text" list="${dlId}" placeholder="Search SKU…"
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; box-sizing:border-box;"
+        oninput="resolveSkuFromSearch(this,'${dlId}','${valId}')">
+      <datalist id="${dlId}">${buildSkuDatalistOptions()}</datalist>
+      <input type="hidden" id="${valId}" data-role="sku">
     </div>
     <div>
       <label>Qty</label>
@@ -658,15 +699,19 @@ async function lookupReturn() {
 
 function addReturnSkuRow() {
   const id = ++returnSkuRowCount;
+  const dlId  = 'inv-sku-dl-return-'  + id;
+  const valId = 'inv-sku-val-return-' + id;
   const row = document.createElement('div');
   row.className = 'sku-issue-item';
   row.id = 'return-row-' + id;
   row.innerHTML = `
     <div>
       <label>Accessory</label>
-      <select style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
-        <option value="">-- Select --</option>${buildSkuOptions()}
-      </select>
+      <input type="text" list="${dlId}" placeholder="Search SKU…"
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; box-sizing:border-box;"
+        oninput="resolveSkuFromSearch(this,'${dlId}','${valId}')">
+      <datalist id="${dlId}">${buildSkuDatalistOptions()}</datalist>
+      <input type="hidden" id="${valId}" data-role="sku">
     </div>
     <div>
       <label>Qty</label>
@@ -876,20 +921,23 @@ async function addLocation() {
 }
 
 async function addSku() {
-  const category = document.getElementById('newSkuCategory').value;
-  const type = document.getElementById('newSkuType').value;
-  const brand = document.getElementById('newSkuBrand').value;
-  const color = document.getElementById('newSkuColor').value;
-  const minStock = parseInt(document.getElementById('newSkuMinStock').value) || 0;
+  const category    = document.getElementById('newSkuCategory').value;
+  const type        = document.getElementById('newSkuType').value;
+  const brand       = document.getElementById('newSkuBrand').value;
+  const color       = document.getElementById('newSkuColor').value;
+  const minStock    = parseInt(document.getElementById('newSkuMinStock').value) || 0;
+  const customSkuId = (document.getElementById('newSkuCustomId').value || '').trim();
 
   if (!category || !type) { showMessage('Category and Type are required', 'error'); return; }
 
   const res = await API.inventoryCall('addInvSku', {
     sessionId: invSessionId,
-    category, type, brand, color, minStock
+    category, type, brand, color, minStock,
+    customSkuId: customSkuId || ''
   });
   if (res.success) {
     showMessage('Accessory SKU added', 'success');
+    document.getElementById('newSkuCustomId').value = '';
     await loadSkus();
     populateSkuDropdowns();
     renderSkuList();
