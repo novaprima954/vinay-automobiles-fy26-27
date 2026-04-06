@@ -103,7 +103,6 @@ function initApp() {
   populateBonusPeriods();
   setupRoleAccess();
   loadEmployees();
-  loadRecentPayments();
 }
 
 function setupRoleAccess() {
@@ -114,11 +113,6 @@ function setupRoleAccess() {
   if (currentUser && currentUser.role !== 'admin') {
     const addCard = document.querySelector('[onclick="toggleAddEmployeeForm()"]');
     if (addCard) addCard.closest('.card').style.display = 'none';
-  }
-  // Show delete button header only for admin
-  const delHead = document.getElementById('recentDeleteColHead');
-  if (delHead && currentUser && currentUser.role === 'admin') {
-    delHead.textContent = 'Delete';
   }
 }
 
@@ -166,23 +160,17 @@ function populateMonthSelects() {
 }
 
 function populateFYSelect() {
-  const sel = document.getElementById('rep_fy');
-  if (!sel) return;
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth() + 1; // 1-12
   // FY starts April: if Jan-Mar we're still in previous FY
   const fyStartYear = curMonth >= 4 ? curYear : curYear - 1;
   const currentFY = fyStartYear + '-' + String(fyStartYear + 1).slice(-2);
-  // Generate last 3 FYs including current
-  const fys = [];
-  for (let y = fyStartYear - 2; y <= fyStartYear; y++) {
-    fys.push(y + '-' + String(y + 1).slice(-2));
-  }
-  fys.reverse();
-  sel.innerHTML = fys.map(function (fy) {
-    return '<option value="' + fy + '"' + (fy === currentFY ? ' selected' : '') + '>' + fy + '</option>';
-  }).join('');
+  // Update display and hidden field
+  const displayEl = document.getElementById('rep_fy_display');
+  const hiddenEl = document.getElementById('rep_fy');
+  if (displayEl) displayEl.textContent = currentFY;
+  if (hiddenEl) hiddenEl.value = currentFY;
 }
 
 function populateBonusPeriods() {
@@ -249,10 +237,7 @@ function switchTab(tabName) {
     if (btn) btn.classList.toggle('active', t === tabName);
   });
 
-  // Load data when switching to payments tab
-  if (tabName === 'payments') {
-    loadRecentPayments();
-  }
+  // (reserved for future tab-switch actions)
 }
 
 // ==========================================
@@ -313,14 +298,42 @@ function renderEmployeeTable(employees) {
 
 function populateEmployeeDropdowns() {
   const active = salaryEmployees.filter(function (e) { return e.active === 'Yes'; });
+
+  // Incentive & Bonus selects — standard dropdowns
   const opts = '<option value="">-- Select Employee --</option>' +
     active.map(function (e) {
       return '<option value="' + escHtml(e.empCode) + '">' + escHtml(e.name) + ' (' + escHtml(e.empCode) + ')</option>';
     }).join('');
-  ['inc_emp', 'bon_emp', 'rep_emp'].forEach(function (id) {
+  ['inc_emp', 'bon_emp'].forEach(function (id) {
     const sel = document.getElementById(id);
     if (sel) sel.innerHTML = opts;
   });
+
+  // Employee history report — searchable datalist
+  const datalist = document.getElementById('rep_emp_list');
+  if (datalist) {
+    datalist.innerHTML = active.map(function (e) {
+      return '<option value="' + escHtml(e.name + ' (' + e.empCode + ')') + '">';
+    }).join('');
+  }
+
+  // Department dropdown for monthly summary filter
+  const depts = [];
+  salaryEmployees.forEach(function (e) { if (e.dept && depts.indexOf(e.dept) === -1) depts.push(e.dept); });
+  depts.sort();
+  const deptSel = document.getElementById('rep_dept');
+  if (deptSel) {
+    deptSel.innerHTML = '<option value="">All Departments</option>' +
+      depts.map(function (d) { return '<option value="' + escHtml(d) + '">' + escHtml(d) + '</option>'; }).join('');
+  }
+}
+
+function syncRepEmpFromSearch() {
+  const searchVal = document.getElementById('rep_emp_search').value;
+  const match = salaryEmployees.find(function (e) {
+    return searchVal === e.name + ' (' + e.empCode + ')';
+  });
+  document.getElementById('rep_emp').value = match ? match.empCode : '';
 }
 
 async function saveEmployee() {
@@ -723,7 +736,6 @@ async function addIncentiveRecord() {
       showMsg('incMsg', 'Incentive added successfully', 'success');
       document.getElementById('inc_amount').value = '';
       document.getElementById('inc_remarks').value = '';
-      loadRecentPayments();
     } else {
       showMsg('incMsg', 'Error: ' + (res.message || 'Failed'), 'error');
     }
@@ -767,7 +779,6 @@ async function addBonusRecord() {
       showMsg('bonMsg', 'Bonus added successfully', 'success');
       document.getElementById('bon_amount').value = '';
       document.getElementById('bon_remarks').value = '';
-      loadRecentPayments();
     } else {
       showMsg('bonMsg', 'Error: ' + (res.message || 'Failed'), 'error');
     }
@@ -776,74 +787,6 @@ async function addBonusRecord() {
   }
 }
 
-async function loadRecentPayments() {
-  const tbody = document.getElementById('recentPaymentsBody');
-  tbody.innerHTML = '<tr><td colspan="8" class="no-data">Loading...</td></tr>';
-
-  try {
-    const months = getLast12Months().slice(0, 3);
-    let allRecords = [];
-    for (let i = 0; i < months.length; i++) {
-      try {
-        const res = await API.getMonthlySalaryReport(months[i]);
-        if (res.success && res.records) {
-          const filtered = res.records.filter(function (r) {
-            return r.type === 'Incentive' || r.type === 'Bonus';
-          });
-          allRecords = allRecords.concat(filtered);
-        }
-      } catch (e) { /* skip month */ }
-    }
-
-    // Sort descending by enteredDate (if available) - take last 20
-    allRecords = allRecords.slice(0, 20);
-    renderRecentPayments(allRecords);
-  } catch (e) {
-    tbody.innerHTML = '<tr><td colspan="8" class="no-data">Error: ' + e.message + '</td></tr>';
-  }
-}
-
-function renderRecentPayments(records) {
-  const tbody = document.getElementById('recentPaymentsBody');
-  const isAdmin = currentUser && currentUser.role === 'admin';
-
-  if (!records || records.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" class="no-data">No recent incentive or bonus entries.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = records.map(function (rec) {
-    const period = rec.type === 'Bonus' ? (rec.period || rec.month) : monthLabel(rec.month);
-    const deleteBtn = isAdmin
-      ? '<button class="btn-danger" onclick="deletePaymentRecord(\'' + escHtml(rec.recordId) + '\')">&#10005;</button>'
-      : '';
-    return '<tr>' +
-      '<td><span style="background:' + (rec.type === 'Incentive' ? '#e8f5e9;color:#2e7d32' : '#e3f2fd;color:#1565c0') + ';padding:3px 8px;border-radius:10px;font-size:12px;font-weight:600">' + escHtml(rec.type) + '</span></td>' +
-      '<td>' + escHtml(rec.enteredDate || '') + '</td>' +
-      '<td>' + escHtml(rec.name) + '</td>' +
-      '<td>' + escHtml(period) + '</td>' +
-      '<td>' + formatCurrency(rec.amount) + '</td>' +
-      '<td>' + escHtml(rec.paymentMode || '') + '</td>' +
-      '<td>' + escHtml(rec.remarks || '') + '</td>' +
-      '<td>' + deleteBtn + '</td>' +
-      '</tr>';
-  }).join('');
-}
-
-async function deletePaymentRecord(recordId) {
-  if (!confirm('Are you sure you want to delete this record? This cannot be undone.')) return;
-
-  try {
-    const res = await API.deletePaymentRecord(recordId);
-    if (res.success) {
-      loadRecentPayments();
-    } else {
-      alert('Error: ' + (res.message || 'Failed to delete'));
-    }
-  } catch (e) {
-    alert('Error: ' + e.message);
-  }
-}
 
 // ==========================================
 // REPORTS TAB
@@ -950,7 +893,7 @@ async function generateEmployeeReport() {
           '<td>' + formatCurrency(r.amount) + '</td>' +
           '<td>' + escHtml(r.paymentMode || '') + '</td>' +
           '<td>' + escHtml(r.remarks || '') + '</td>' +
-          '<td>' + escHtml(r.enteredDate || '') + '</td>' +
+          '<td>' + escHtml((r.enteredDate || '').split(' ')[0]) + '</td>' +
           '</tr>';
       });
       html += '</tbody></table></div></div>';
@@ -968,7 +911,7 @@ async function generateEmployeeReport() {
           '<td>' + formatCurrency(r.amount) + '</td>' +
           '<td>' + escHtml(r.paymentMode || '') + '</td>' +
           '<td>' + escHtml(r.remarks || '') + '</td>' +
-          '<td>' + escHtml(r.enteredDate || '') + '</td>' +
+          '<td>' + escHtml((r.enteredDate || '').split(' ')[0]) + '</td>' +
           '</tr>';
       });
       html += '</tbody></table></div></div>';
@@ -1009,7 +952,15 @@ async function generateMonthlyReport() {
       return;
     }
 
-    const records = res.records || [];
+    const allRecords = res.records || [];
+
+    // Department filter
+    const deptFilter = document.getElementById('rep_dept') ? document.getElementById('rep_dept').value : '';
+    let records = allRecords;
+    if (deptFilter) {
+      const deptEmpCodes = salaryEmployees.filter(function (e) { return e.dept === deptFilter; }).map(function (e) { return e.empCode; });
+      records = allRecords.filter(function (r) { return deptEmpCodes.indexOf(r.empCode) !== -1; });
+    }
 
     const bankRecs = records.filter(function (r) { return r.type === 'Salary-Bank'; });
     const cashRecs = records.filter(function (r) { return r.type === 'Salary-Cash'; });
