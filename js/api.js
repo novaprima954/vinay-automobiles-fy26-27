@@ -835,5 +835,72 @@ const API = {
    */
   async inventoryCall(action, params = {}) {
     return await this.call(action, params);
+  },
+
+  // ==========================================
+  // SALARY MODULE
+  // ==========================================
+
+  /**
+   * Verify salary password
+   */
+  async verifySalaryPassword(password) {
+    return await this.call('verifySalaryPassword', { sessionId: SessionManager.getSessionId(), password });
+  },
+
+  /**
+   * Get all salary employees
+   */
+  async getSalaryEmployees() {
+    return await this.call('getSalaryEmployees', { sessionId: SessionManager.getSessionId() });
+  },
+
+  /**
+   * Add a salary employee
+   */
+  async addSalaryEmployee(data) {
+    return await this.call('addSalaryEmployee', { sessionId: SessionManager.getSessionId(), data: JSON.stringify(data) });
+  },
+
+  /**
+   * Update a salary employee
+   */
+  async updateSalaryEmployee(empCode, data) {
+    return await this.call('updateSalaryEmployee', { sessionId: SessionManager.getSessionId(), empCode, data: JSON.stringify(data) });
+  },
+
+  /**
+   * Save salary upload (batch of parsed salary records)
+   */
+  async saveSalaryUpload(month, records) {
+    return await this.call('saveSalaryUpload', { sessionId: SessionManager.getSessionId(), month, records: JSON.stringify(records) });
+  },
+
+  /**
+   * Add incentive or bonus payment record
+   */
+  async addPaymentRecord(data) {
+    return await this.call('addPaymentRecord', { sessionId: SessionManager.getSessionId(), data: JSON.stringify(data) });
+  },
+
+  /**
+   * Delete a payment record (admin only)
+   */
+  async deletePaymentRecord(recordId) {
+    return await this.call('deletePaymentRecord', { sessionId: SessionManager.getSessionId(), recordId });
+  },
+
+  /**
+   * Get employee salary report for a financial year
+   */
+  async getSalaryReport(empCode, fyYear) {
+    return await this.call('getSalaryReport', { sessionId: SessionManager.getSessionId(), empCode, fyYear });
+  },
+
+  /**
+   * Get monthly salary summary report
+   */
+  async getMonthlySalaryReport(month) {
+    return await this.call('getMonthlySalaryReport', { sessionId: SessionManager.getSessionId(), month });
   }
 };
