@@ -237,9 +237,10 @@
       <div class="pwd-lock-icon">🔒</div>
       <div class="pwd-title">Employee Tracker</div>
       <div class="pwd-subtitle">Enter password to access employee data</div>
-      <input type="password" id="salaryPwd" class="pwd-input" placeholder="Password"
-             onkeydown="if(event.key==='Enter') submitPassword()">
-      <button class="pwd-btn" onclick="submitPassword()">Unlock</button>
+      <form onsubmit="event.preventDefault(); submitPassword();" autocomplete="off">
+        <input type="password" id="salaryPwd" class="pwd-input" placeholder="Password" autocomplete="current-password">
+        <button type="submit" class="pwd-btn">Unlock</button>
+      </form>
       <div class="pwd-error" id="pwdError"></div>
     </div>
   </div>

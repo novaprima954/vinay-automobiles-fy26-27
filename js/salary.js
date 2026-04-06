@@ -37,10 +37,6 @@ document.addEventListener('DOMContentLoaded', function () {
     showPasswordOverlay();
   }
 
-  // Allow Enter key on password
-  document.getElementById('salaryPwd').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') submitPassword();
-  });
 });
 
 // ==========================================
@@ -49,11 +45,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
 function checkSalaryAuth() {
   try {
-    const raw = localStorage.getItem('salaryAuth');
+    // Clear any old localStorage entry (migration to sessionStorage)
+    localStorage.removeItem('salaryAuth');
+    const raw = sessionStorage.getItem('salaryAuth');
     if (!raw) return false;
     const auth = JSON.parse(raw);
-    const eightHours = 8 * 60 * 60 * 1000;
-    return auth && auth.timestamp && (Date.now() - auth.timestamp) < eightHours;
+    return !!(auth && auth.ok);
   } catch (e) {
     return false;
   }
@@ -83,7 +80,7 @@ async function submitPassword() {
   try {
     const response = await API.verifySalaryPassword(pwd);
     if (response.success) {
-      localStorage.setItem('salaryAuth', JSON.stringify({ timestamp: Date.now() }));
+      sessionStorage.setItem('salaryAuth', JSON.stringify({ ok: true }));
       showMainContent();
       initApp();
     } else {
@@ -876,8 +873,9 @@ async function generateEmployeeReport() {
     btn.innerHTML = 'Generate Report';
     btn.disabled = false;
 
-    if (!res.success) {
-      resultEl.innerHTML = '<div class="card"><div class="msg msg-error">Error: ' + (res.message || 'Failed') + '</div></div>';
+    if (!res || !res.success) {
+      const msg = (res && res.message) ? res.message : 'API call failed — please ensure the Apps Script is deployed with the latest code';
+      resultEl.innerHTML = '<div class="card"><div class="msg msg-error">&#10060; ' + escHtml(msg) + '</div></div>';
       return;
     }
 
@@ -1002,8 +1000,9 @@ async function generateMonthlyReport() {
     btn.innerHTML = 'Generate Report';
     btn.disabled = false;
 
-    if (!res.success) {
-      resultEl.innerHTML = '<div class="card"><div class="msg msg-error">Error: ' + (res.message || 'Failed') + '</div></div>';
+    if (!res || !res.success) {
+      const msg = (res && res.message) ? res.message : 'API call failed — please ensure the Apps Script is deployed with the latest code';
+      resultEl.innerHTML = '<div class="card"><div class="msg msg-error">&#10060; ' + escHtml(msg) + '</div></div>';
       return;
     }
 
