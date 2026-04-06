@@ -8227,6 +8227,13 @@ function genSalaryId_(prefix) {
   return prefix + Date.now() + Math.random().toString(36).substr(2,5).toUpperCase();
 }
 
+// Google Sheets auto-converts "2026-03" to a Date — convert back to YYYY-MM
+function fmtMonth_(v) {
+  if (!v && v !== 0) return '';
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Kolkata', 'yyyy-MM');
+  return String(v).trim();
+}
+
 function verifySalaryPassword(sessionId, password) {
   try {
     const session = validateSession(sessionId);
@@ -8310,13 +8317,17 @@ function saveSalaryUpload(sessionId, month, records) {
       var recordId = genSalaryId_('SAL');
       sheet.appendRow([
         recordId, rec.type||'Salary-Bank', month, month,
-        rec.empCode||'', rec.name||'', rec.uan||'', rec.paymentMode||'Bank',
+        rec.empCode||'', rec.name||'', rec.uan||'', rec.paymentMode||'EPF',
         rec.gross||0, rec.presentDays||0, rec.basic||0, rec.hra||0,
         rec.conveyance||0, rec.medical||0, rec.education||0, rec.wash||0,
         rec.ot||0, rec.netSalary||0, rec.esic||0, rec.epf||0,
         rec.pt||0, rec.otherDeduction||0, rec.netPay||0, rec.netPay||rec.amount||0,
         rec.remarks||'', dateStr, enteredBy
       ]);
+      // Force month columns (C=3, D=4) as plain text to prevent date auto-conversion
+      var newRow = sheet.getLastRow();
+      sheet.getRange(newRow, 3).setNumberFormat('@STRING@').setValue(month);
+      sheet.getRange(newRow, 4).setNumberFormat('@STRING@').setValue(month);
       saved++;
     }
     return { success: true, message: saved + ' records saved', saved: saved };
@@ -8333,12 +8344,18 @@ function addPaymentRecord(sessionId, data) {
     const enteredBy = session.user.name || session.user.username || '';
     const prefix = data.type === 'Incentive' ? 'INC' : 'BON';
     const recordId = genSalaryId_(prefix);
+    var recMonth = data.month || '';
+    var recPeriod = data.period || data.month || '';
     sheet.appendRow([
-      recordId, data.type, data.month||'', data.period||data.month||'',
-      data.empCode||'', data.name||'', data.uan||'', data.paymentMode||'Bank',
+      recordId, data.type, recMonth, recPeriod,
+      data.empCode||'', data.name||'', data.uan||'', data.paymentMode||'EPF',
       '','','','','','','','','','','','','','','',
       data.amount||0, data.remarks||'', dateStr, enteredBy
     ]);
+    // Force month columns as plain text
+    var newRow = sheet.getLastRow();
+    sheet.getRange(newRow, 3).setNumberFormat('@STRING@').setValue(recMonth);
+    sheet.getRange(newRow, 4).setNumberFormat('@STRING@').setValue(recPeriod);
     return { success: true, message: 'Record added', recordId: recordId };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
@@ -8371,10 +8388,11 @@ function getSalaryReport(sessionId, empCode, fyYear) {
     for (var m2 = 1; m2 <= 3; m2++) fyMonths.push((startY+1) + '-' + String(m2).padStart(2,'0'));
     const data = sheet.getDataRange().getValues();
     const records = data.slice(1).filter(function(r) {
-      return r[0] && String(r[4]) === String(empCode) && fyMonths.indexOf(String(r[2])) !== -1;
+      return r[0] && String(r[4]) === String(empCode) && fyMonths.indexOf(fmtMonth_(r[2])) !== -1;
     }).map(function(r) {
       return {
-        recordId: r[0], type: r[1], month: r[2], period: r[3], empCode: r[4], name: r[5],
+        recordId: r[0], type: r[1], month: fmtMonth_(r[2]), period: fmtMonth_(r[3]),
+        empCode: r[4], name: r[5],
         uan: r[6], paymentMode: r[7], gross: r[8]||0, presentDays: r[9]||0, basic: r[10]||0,
         hra: r[11]||0, conveyance: r[12]||0, medical: r[13]||0, education: r[14]||0,
         wash: r[15]||0, ot: r[16]||0, netSalary: r[17]||0, esic: r[18]||0, epf: r[19]||0,
@@ -8395,10 +8413,11 @@ function getMonthlySalaryReport(sessionId, month) {
     if (!sheet) return { success: false, message: 'Sheet not found' };
     const data = sheet.getDataRange().getValues();
     const records = data.slice(1).filter(function(r) {
-      return r[0] && String(r[2]) === String(month);
+      return r[0] && fmtMonth_(r[2]) === String(month);
     }).map(function(r) {
       return {
-        recordId: r[0], type: r[1], month: r[2], period: r[3], empCode: r[4], name: r[5],
+        recordId: r[0], type: r[1], month: fmtMonth_(r[2]), period: fmtMonth_(r[3]),
+        empCode: r[4], name: r[5],
         paymentMode: r[7], gross: r[8]||0, presentDays: r[9]||0, netSalary: r[17]||0,
         netPay: r[22]||0, amount: r[23]||0,
         esic: r[18]||0, epf: r[19]||0, pt: r[20]||0, otherDeduction: r[21]||0,
