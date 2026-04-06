@@ -170,15 +170,18 @@ function populateFYSelect() {
   if (!sel) return;
   const now = new Date();
   const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1; // 1-12
+  // FY starts April: if Jan-Mar we're still in previous FY
+  const fyStartYear = curMonth >= 4 ? curYear : curYear - 1;
+  const currentFY = fyStartYear + '-' + String(fyStartYear + 1).slice(-2);
   // Generate last 3 FYs including current
   const fys = [];
-  for (let y = curYear - 2; y <= curYear; y++) {
-    const label = y + '-' + String(y + 1).slice(-2);
-    fys.push(label);
+  for (let y = fyStartYear - 2; y <= fyStartYear; y++) {
+    fys.push(y + '-' + String(y + 1).slice(-2));
   }
   fys.reverse();
   sel.innerHTML = fys.map(function (fy) {
-    return '<option value="' + fy + '">' + fy + '</option>';
+    return '<option value="' + fy + '"' + (fy === currentFY ? ' selected' : '') + '>' + fy + '</option>';
   }).join('');
 }
 
