@@ -99,11 +99,14 @@ function populateAllDropdowns() {
 }
 
 function populateSkuDropdowns() {
+  // Stock In uses datalist (searchable by SKU ID or name)
+  const siDl = document.getElementById('siSkuDl');
+  if (siDl) siDl.innerHTML = buildSkuDatalistOptions();
+
+  // Transfer still uses a plain select
   const skuOptions = buildSkuOptions();
-  ['siSku', 'trSku'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) { el.innerHTML = '<option value="">-- Select Accessory --</option>' + skuOptions; }
-  });
+  const trEl = document.getElementById('trSku');
+  if (trEl) trEl.innerHTML = '<option value="">-- Select Accessory --</option>' + skuOptions;
 }
 
 function buildSkuOptions() {
@@ -278,11 +281,12 @@ function renderDashboard() {
 // ==========================================
 
 async function submitStockIn() {
-  const skuId = document.getElementById('siSku').value;
+  const skuId      = document.getElementById('siSku').value;
   const locationId = document.getElementById('siLocation').value;
-  const qty = parseInt(document.getElementById('siQty').value);
-  const date = document.getElementById('siDate').value;
-  const remarks = document.getElementById('siRemarks').value;
+  const qty        = parseInt(document.getElementById('siQty').value);
+  const date       = document.getElementById('siDate').value;
+  const remarks    = document.getElementById('siRemarks').value;
+  const invoiceNo  = document.getElementById('siInvoiceNo').value;
 
   if (!skuId || !locationId || !qty || qty < 1) {
     showMessage('Please fill Accessory, Location, and Quantity', 'error'); return;
@@ -291,7 +295,7 @@ async function submitStockIn() {
   showLoading(true);
   const res = await API.inventoryCall('invStockIn', {
     sessionId: invSessionId,
-    skuId, locationId, qty, date, remarks
+    skuId, locationId, qty, date, remarks, invoiceNo
   });
   showLoading(false);
 
@@ -301,6 +305,9 @@ async function submitStockIn() {
     renderDashboard();
     document.getElementById('siQty').value = '';
     document.getElementById('siRemarks').value = '';
+    document.getElementById('siInvoiceNo').value = '';
+    document.getElementById('siSkuSearch').value = '';
+    document.getElementById('siSku').value = '';
   } else {
     showMessage(res.message || 'Failed to record stock', 'error');
   }
@@ -784,20 +791,24 @@ async function loadHistory() {
 function renderHistory() {
   const tbody = document.getElementById('historyBody');
   if (invTransactions.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center; color:#999; padding:20px;">No transactions found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; color:#999; padding:20px;">No transactions found</td></tr>';
     return;
   }
   tbody.innerHTML = invTransactions.map(t => {
     const typeClass = 'txn-' + (t.type || '');
+    const ref = t.receiptNo || t.otcReceiptNo || (t.invoiceNo ? '🧾 ' + t.invoiceNo : '-');
     return `<tr>
       <td style="white-space:nowrap;">${t.date || ''}</td>
       <td><span class="txn-type-badge ${typeClass}">${t.type || ''}</span></td>
-      <td>${t.skuName || ''}</td>
+      <td style="font-size:12px;">${t.skuName || ''}<br><span style="color:#999; font-size:11px;">${t.skuId || ''}</span></td>
       <td>${t.fromLocation || '-'}</td>
       <td>${t.toLocation || '-'}</td>
       <td style="text-align:center; font-weight:700;">${t.qty || ''}</td>
-      <td style="font-family:monospace; font-size:12px;">${t.receiptNo || t.otcReceiptNo || '-'}</td>
+      <td style="font-family:monospace; font-size:12px;">${ref}</td>
       <td>${t.customerName || '-'}</td>
+      <td style="font-size:12px;">${t.variant || '-'}</td>
+      <td style="font-family:monospace; font-size:12px;">${t.frameNo || '-'}</td>
+      <td style="font-family:monospace; font-size:12px;">${t.invoiceNo || '-'}</td>
       <td>${t.enteredBy || ''}</td>
       <td style="font-size:12px; color:#666;">${t.remarks || ''}</td>
     </tr>`;
@@ -806,10 +817,11 @@ function renderHistory() {
 
 function exportHistoryCSV() {
   if (invTransactions.length === 0) { showMessage('No data to export', 'error'); return; }
-  let csv = 'Date,Type,Accessory,From Location,To Location,Qty,Receipt No,Customer,User,Remarks\n';
+  let csv = 'Date,Type,SKU ID,Accessory,From Location,To Location,Qty,Receipt No,Customer,Variant,Frame No,Invoice No,User,Remarks\n';
   invTransactions.forEach(t => {
-    csv += [t.date, t.type, t.skuName, t.fromLocation, t.toLocation, t.qty,
-      t.receiptNo || t.otcReceiptNo, t.customerName, t.enteredBy, t.remarks
+    csv += [t.date, t.type, t.skuId, t.skuName, t.fromLocation, t.toLocation, t.qty,
+      t.receiptNo || t.otcReceiptNo, t.customerName,
+      t.variant, t.frameNo, t.invoiceNo, t.enteredBy, t.remarks
     ].map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',') + '\n';
   });
   downloadCSV(csv, 'Inventory_History.csv');
