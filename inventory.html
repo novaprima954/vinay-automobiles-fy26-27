@@ -136,6 +136,8 @@
     /* Booking search results */
     .booking-result-item:hover { background: #f0f2ff; }
     .booking-result-item:last-child { border-bottom: none !important; }
+    /* SKU datalist input — wide enough to show full SKU text */
+    input[list] { min-width: 260px; }
     /* Account check warning */
     .acct-check-warning {
       margin-top: 10px; padding: 10px 14px;
@@ -275,9 +277,11 @@
           <div class="form-row">
             <div>
               <label>Accessory (SKU)</label>
-              <select id="siSku" onchange="onSkuChange('si')">
-                <option value="">-- Select Accessory --</option>
-              </select>
+              <input type="text" id="siSkuSearch" list="siSkuDl"
+                placeholder="Search by SKU ID or name…" style="width:100%; box-sizing:border-box;"
+                oninput="resolveSkuFromSearch(this,'siSkuDl','siSku')">
+              <datalist id="siSkuDl"></datalist>
+              <input type="hidden" id="siSku">
             </div>
             <div>
               <label>Location</label>
@@ -296,7 +300,11 @@
               <input type="date" id="siDate">
             </div>
           </div>
-          <div class="form-row single">
+          <div class="form-row">
+            <div>
+              <label>Invoice No (optional)</label>
+              <input type="text" id="siInvoiceNo" placeholder="Supplier invoice number">
+            </div>
             <div>
               <label>Remarks (optional)</label>
               <input type="text" id="siRemarks" placeholder="e.g. Purchased from supplier">
@@ -553,12 +561,15 @@
               <tr>
                 <th>Date</th>
                 <th>Type</th>
-                <th>Accessory</th>
+                <th>Accessory (SKU)</th>
                 <th>From</th>
                 <th>To</th>
                 <th>Qty</th>
                 <th>Reference</th>
                 <th>Customer</th>
+                <th>Variant</th>
+                <th>Frame No</th>
+                <th>Invoice No</th>
                 <th>User</th>
                 <th>Remarks</th>
               </tr>
