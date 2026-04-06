@@ -40,7 +40,11 @@ document.addEventListener('DOMContentLoaded', async function() {
   
   // Setup event listeners
   setupEventListeners();
-  
+
+  // Populate month options and load dashboard
+  populateAcctMonthOptions();
+  loadAccountCheckDashboard();
+
   // Load models from PriceMaster (non-blocking)
   loadModelsForEdit().catch(function(err) {
     console.error('Model loading error:', err);
@@ -268,11 +272,12 @@ async function searchRecords() {
 }
 
 function displaySearchResults(results) {
+  window._lastSearchResults = results;
   const tbody = document.getElementById('resultsBody');
   const resultsSection = document.getElementById('resultsSection');
-  
+
   if (!tbody) return;
-  
+
   tbody.innerHTML = '';
   
   results.forEach(function(record) {
@@ -845,6 +850,134 @@ function closeWhatsAppModal() {
   const modal = document.getElementById('whatsappModal');
   if (modal) {
     modal.remove();
+  }
+}
+
+// ==========================================
+// ACCOUNT CHECK DASHBOARD
+// ==========================================
+
+function populateAcctMonthOptions() {
+  const sel = document.getElementById('acctCheckMonth');
+  if (!sel) return;
+  const now = new Date();
+  let opts = '<option value="">All Months</option>';
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
+    opts += `<option value="${val}" ${i === 0 ? 'selected' : ''}>${label}</option>`;
+  }
+  sel.innerHTML = opts;
+}
+
+async function loadAccountCheckDashboard() {
+  const month = document.getElementById('acctCheckMonth')?.value || '';
+  const grid = document.getElementById('acctCardsGrid');
+  grid.innerHTML = '<div style="color:#999; font-size:13px;">Loading...</div>';
+  document.getElementById('acctPendingList').style.display = 'none';
+
+  try {
+    const res = await API.call('getPendingAccountCheck', {
+      sessionId: SessionManager.getSessionId(),
+      month
+    });
+    if (!res.success) { grid.innerHTML = '<div style="color:#dc3545; font-size:13px;">Failed to load</div>'; return; }
+
+    const stats = res.stats || {};
+    const execs = Object.keys(stats);
+    if (execs.length === 0) {
+      grid.innerHTML = '<div style="color:#28a745; font-size:13px; padding:8px;">✅ All bookings have Account Check completed for this period!</div>';
+      return;
+    }
+    grid.innerHTML = execs.map(exec => `
+      <div class="acct-exec-card" onclick="showPendingForExec('${exec.replace(/'/g, "\\'")}')">
+        <div class="exec-name">${exec}</div>
+        <div class="exec-count">${stats[exec].count}</div>
+        <div class="exec-label">Pending Account Check</div>
+      </div>
+    `).join('');
+
+    // Store stats for click handler
+    window._acctStats = stats;
+  } catch(e) {
+    grid.innerHTML = '<div style="color:#dc3545; font-size:13px;">Error loading dashboard</div>';
+  }
+}
+
+function showPendingForExec(execName) {
+  const stats = window._acctStats || {};
+  const records = (stats[execName] || {}).records || [];
+  const panel = document.getElementById('acctPendingList');
+  document.getElementById('acctPendingTitle').textContent = execName + ' — ' + records.length + ' pending';
+  const tbody = document.getElementById('acctPendingBody');
+  tbody.innerHTML = records.map(r => `
+    <tr onclick="searchAndLoadReceipt('${r.receiptNo.replace(/'/g, "\\'")}')">
+      <td><strong>${r.receiptNo}</strong></td>
+      <td>${r.customerName}</td>
+      <td style="font-size:12px;">${r.model}</td>
+      <td>${r.bookingDate}</td>
+      <td><span style="color:${r.accountCheck === 'Blank' ? '#999' : '#dc3545'};">${r.accountCheck}</span></td>
+    </tr>
+  `).join('');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function searchAndLoadReceipt(receiptNo) {
+  document.getElementById('acctPendingList').style.display = 'none';
+  // Set search fields and trigger search
+  setValue('searchBy', 'Receipt No');
+  handleSearchByChange();
+  setValue('searchValue', receiptNo);
+  await searchRecords();
+  // Auto-load the first result if only one
+  const results = window._lastSearchResults || [];
+  if (results.length === 1) loadRecord(results[0]);
+  setTimeout(() => {
+    document.getElementById('resultsSection')?.scrollIntoView({ behavior: 'smooth' });
+  }, 300);
+}
+
+// ==========================================
+// CANCEL BOOKING
+// ==========================================
+
+function confirmCancelBooking() {
+  const receiptNo = document.getElementById('selectedReceiptNo').value;
+  if (!receiptNo) return;
+  document.getElementById('cancelReceiptNoDisplay').textContent = receiptNo;
+  document.getElementById('cancelModal').style.display = 'flex';
+}
+
+async function executeCancelBooking() {
+  document.getElementById('cancelModal').style.display = 'none';
+  const receiptNo = document.getElementById('selectedReceiptNo').value;
+  if (!receiptNo) return;
+
+  const btn = document.getElementById('cancelBookingBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Cancelling...';
+
+  try {
+    const res = await API.call('cancelBooking', {
+      sessionId: SessionManager.getSessionId(),
+      receiptNo
+    });
+    if (res.success) {
+      showMessage('✅ Booking ' + receiptNo + ' has been cancelled', 'success');
+      document.getElementById('detailsSection').style.display = 'none';
+      document.getElementById('resultsSection').style.display = 'none';
+      loadAccountCheckDashboard();
+    } else {
+      showMessage('❌ ' + (res.message || 'Cancel failed'), 'error');
+      btn.disabled = false;
+      btn.textContent = '🚫 Cancel This Booking';
+    }
+  } catch(e) {
+    showMessage('❌ Cancel failed', 'error');
+    btn.disabled = false;
+    btn.textContent = '🚫 Cancel This Booking';
   }
 }
 
