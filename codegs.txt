@@ -8390,7 +8390,7 @@ function getMonthlySalaryReport(sessionId, month) {
   try {
     const session = validateSession(sessionId);
     if (!session.success) return { success: false, message: 'Not logged in' };
-    if (session.user.role !== 'admin') return { success: false, message: 'Admin only' };
+    if (session.user.role !== 'admin' && session.user.role !== 'accounts') return { success: false, message: 'Access denied' };
     const sheet = getSalarySheet_(CONFIG.SHEETS.SALARY_RECORDS);
     if (!sheet) return { success: false, message: 'Sheet not found' };
     const data = sheet.getDataRange().getValues();
