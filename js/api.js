@@ -441,6 +441,17 @@ const API = {
   },
   
   /**
+   * Get Operator Pending Counts (cards)
+   */
+  async getOperatorPendingCounts(month) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getOperatorPendingCounts', {
+      sessionId,
+      month
+    });
+  },
+
+  /**
    * Get Operator Pending List
    */
   async getOperatorPendingList(type, month) {
@@ -449,6 +460,41 @@ const API = {
       sessionId,
       type,
       month
+    });
+  },
+
+  /**
+   * Search Operator Records
+   */
+  async searchOperatorRecords(searchBy, searchValue) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('searchOperatorRecords', {
+      sessionId,
+      searchBy,
+      searchValue
+    });
+  },
+
+  /**
+   * Get Operator Record Details
+   */
+  async getOperatorRecordDetails(receiptNo) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getOperatorRecordDetails', {
+      sessionId,
+      receiptNo
+    });
+  },
+
+  /**
+   * Update Operator Status
+   */
+  async updateOperatorStatus(receiptNo, data) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('updateOperatorStatus', {
+      sessionId,
+      receiptNo,
+      data: JSON.stringify(data)
     });
   },
   
