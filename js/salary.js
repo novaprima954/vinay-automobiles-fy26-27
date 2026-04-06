@@ -830,12 +830,20 @@ async function generateEmployeeReport() {
 
     // Compute totals
     let totalSalary = 0, totalIncentive = 0, totalBonus = 0;
+    const salaryMonthsSet = {};
     records.forEach(function (r) {
-      if (r.type === 'Salary-Bank' || r.type === 'Salary-Cash') totalSalary += Number(r.netPay || 0);
-      else if (r.type === 'Incentive') totalIncentive += Number(r.amount || 0);
-      else if (r.type === 'Bonus') totalBonus += Number(r.amount || 0);
+      if (r.type === 'Salary-Bank' || r.type === 'Salary-Cash') {
+        totalSalary += Number(r.netPay || 0);
+        if (r.month) salaryMonthsSet[r.month] = true;
+      } else if (r.type === 'Incentive') {
+        totalIncentive += Number(r.amount || 0);
+      } else if (r.type === 'Bonus') {
+        totalBonus += Number(r.amount || 0);
+      }
     });
     const grandTotal = totalSalary + totalIncentive + totalBonus;
+    const numMonths = Object.keys(salaryMonthsSet).length;
+    const avgSalary = numMonths > 0 ? Math.round(grandTotal / numMonths) : 0;
 
     let html = '';
 
@@ -855,6 +863,11 @@ async function generateEmployeeReport() {
       html += '<div class="summary-card"><div class="s-label">Total Incentive</div><div class="s-value">' + formatCurrency(totalIncentive) + '</div></div>';
       html += '<div class="summary-card"><div class="s-label">Total Bonus</div><div class="s-value">' + formatCurrency(totalBonus) + '</div></div>';
       html += '<div class="summary-card"><div class="s-label">Grand Total</div><div class="s-value">' + formatCurrency(grandTotal) + '</div></div>';
+      html += '<div class="summary-card" style="background:linear-gradient(135deg,#11998e,#38ef7d)">' +
+        '<div class="s-label">Avg / Month</div>' +
+        '<div class="s-value">' + formatCurrency(avgSalary) + '</div>' +
+        (numMonths > 0 ? '<div style="font-size:11px;opacity:0.85;margin-top:4px;">over ' + numMonths + ' month' + (numMonths > 1 ? 's' : '') + '</div>' : '') +
+        '</div>';
       html += '</div>';
       html += '</div>';
     }
