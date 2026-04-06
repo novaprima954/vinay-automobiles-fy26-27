@@ -440,7 +440,10 @@ function renderAccessoriesDashboard(data) {
 function renderAdminDashboard(data) {
   dashboardData = data;
   document.getElementById('dashboardTitle').textContent = '📈 Admin Dashboard';
-  
+
+  const acc = data.accessories || {};
+  const op = data.operatorStatus || {};
+
   const content = document.getElementById('dashboardContent');
   content.innerHTML = `
     <!-- Sales Overview -->
@@ -448,7 +451,12 @@ function renderAdminDashboard(data) {
       <div class="section-header">📊 Sales Overview</div>
       <div class="stats-grid">
         <div class="stat-card blue">
-          <div class="stat-icon">🛒</div>
+          <div class="stat-icon">📋</div>
+          <div class="stat-label">Total Bookings</div>
+          <div class="stat-value">${data.totalBookings != null ? data.totalBookings : '—'}</div>
+        </div>
+        <div class="stat-card green">
+          <div class="stat-icon">✅</div>
           <div class="stat-label">Total Sales</div>
           <div class="stat-value">${data.totalSales}</div>
         </div>
@@ -457,7 +465,7 @@ function renderAdminDashboard(data) {
 
     <!-- Executive Comparison -->
     <div class="section">
-      <div class="section-header">👥 By Executive (Completed Sales)</div>
+      <div class="section-header">👥 By Executive (Account Check: Yes)</div>
       ${data.executiveList.map((exec, index) => `
         <div class="list-item">
           <div class="list-item-main">
@@ -465,12 +473,27 @@ function renderAdminDashboard(data) {
               ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
               ${exec.executive}
             </div>
-            <div class="list-item-subtitle">Total: ${exec.totalSales} sales</div>
+            <div class="list-item-subtitle">Total bookings: ${exec.totalSales}</div>
           </div>
           <div class="list-item-value">${exec.completedSales}</div>
         </div>
       `).join('')}
     </div>
+
+    <!-- Model-wise Sales -->
+    ${data.modelBreakdown && data.modelBreakdown.length > 0 ? `
+    <div class="section">
+      <div class="section-header">🏍️ Model-wise Sales (Account Check: Yes)</div>
+      <div class="accessories-grid">
+        ${data.modelBreakdown.map(m => `
+          <div class="accessory-item">
+            <div class="accessory-name">${m.model}</div>
+            <div class="accessory-count">${m.count}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+    ` : ''}
 
     <!-- Accounts Status -->
     <div class="section">
@@ -481,13 +504,11 @@ function renderAdminDashboard(data) {
           <div class="stat-label">Done</div>
           <div class="stat-value">${data.accountsYes}</div>
         </div>
-        
         <div class="stat-card orange">
           <div class="stat-icon">⏳</div>
           <div class="stat-label">Pending</div>
           <div class="stat-value">${data.accountsPending}</div>
         </div>
-        
         <div class="stat-card red">
           <div class="stat-icon">❌</div>
           <div class="stat-label">Issues</div>
@@ -505,13 +526,11 @@ function renderAdminDashboard(data) {
           <div class="stat-label">Fitted</div>
           <div class="stat-value">${data.accessoriesFitted}</div>
         </div>
-        
         <div class="stat-card orange">
           <div class="stat-icon">⏳</div>
           <div class="stat-label">Pending</div>
           <div class="stat-value">${data.accessoriesPending}</div>
         </div>
-        
         <div class="stat-card red">
           <div class="stat-icon">🔧</div>
           <div class="stat-label">Issues</div>
@@ -520,37 +539,71 @@ function renderAdminDashboard(data) {
       </div>
     </div>
 
+    <!-- Operator Status -->
+    <div class="section">
+      <div class="section-header">🏛️ Operator Status (of ${op.total || data.totalSales} sales)</div>
+      <div class="stats-grid">
+        <div class="stat-card ${op.dmsPending > 0 ? 'orange' : 'green'}">
+          <div class="stat-icon">${op.dmsPending > 0 ? '⏳' : '✅'}</div>
+          <div class="stat-label">DMS Pending</div>
+          <div class="stat-value">${op.dmsPending != null ? op.dmsPending : '—'}</div>
+        </div>
+        <div class="stat-card ${op.vahanPending > 0 ? 'orange' : 'green'}">
+          <div class="stat-icon">${op.vahanPending > 0 ? '⏳' : '✅'}</div>
+          <div class="stat-label">Vahan Pending</div>
+          <div class="stat-value">${op.vahanPending != null ? op.vahanPending : '—'}</div>
+        </div>
+        <div class="stat-card ${op.insurancePending > 0 ? 'orange' : 'green'}">
+          <div class="stat-icon">${op.insurancePending > 0 ? '⏳' : '✅'}</div>
+          <div class="stat-label">Insurance Pending</div>
+          <div class="stat-value">${op.insurancePending != null ? op.insurancePending : '—'}</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Accessories Breakdown -->
     <div class="section">
-      <div class="section-header">🔩 Accessories Breakdown (Click for model details)</div>
+      <div class="section-header">🔩 Accessories Breakdown (tap for model details)</div>
       <div class="accessories-grid">
         <div class="accessory-item" onclick="showAccessoryBreakdown('guard', 'Guard')">
           <div class="accessory-name">Guard</div>
-          <div class="accessory-count">${data.accessories.guard}</div>
+          <div class="accessory-count">${acc.guard || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('grip', 'Grip Cover')">
           <div class="accessory-name">Grip Cover</div>
-          <div class="accessory-count">${data.accessories.grip}</div>
+          <div class="accessory-count">${acc.grip || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('helmet', 'Helmet')">
           <div class="accessory-name">Helmet</div>
-          <div class="accessory-count">${data.accessories.helmet}</div>
+          <div class="accessory-count">${acc.helmet || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('seatCover', 'Seat Cover')">
           <div class="accessory-name">Seat Cover</div>
-          <div class="accessory-count">${data.accessories.seatCover}</div>
+          <div class="accessory-count">${acc.seatCover || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('matin', 'Matin')">
           <div class="accessory-name">Matin</div>
-          <div class="accessory-count">${data.accessories.matin}</div>
+          <div class="accessory-count">${acc.matin || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('tankCover', 'Tank Cover')">
           <div class="accessory-name">Tank Cover</div>
-          <div class="accessory-count">${data.accessories.tankCover}</div>
+          <div class="accessory-count">${acc.tankCover || 0}</div>
         </div>
         <div class="accessory-item" onclick="showAccessoryBreakdown('handleHook', 'Handle Hook')">
           <div class="accessory-name">Handle Hook</div>
-          <div class="accessory-count">${data.accessories.handleHook}</div>
+          <div class="accessory-count">${acc.handleHook || 0}</div>
+        </div>
+        <div class="accessory-item" onclick="showAccessoryBreakdown('raincover', 'Rain Cover')">
+          <div class="accessory-name">Rain Cover</div>
+          <div class="accessory-count">${acc.rainCover || 0}</div>
+        </div>
+        <div class="accessory-item" onclick="showAccessoryBreakdown('buzzer', 'Buzzer')">
+          <div class="accessory-name">Buzzer</div>
+          <div class="accessory-count">${acc.buzzer || 0}</div>
+        </div>
+        <div class="accessory-item" onclick="showAccessoryBreakdown('backrest', 'Back Rest')">
+          <div class="accessory-name">Back Rest</div>
+          <div class="accessory-count">${acc.backRest || 0}</div>
         </div>
       </div>
     </div>
@@ -564,13 +617,11 @@ function renderAdminDashboard(data) {
           <div class="stat-label">New Leads</div>
           <div class="stat-value">${data.crmNewLeads}</div>
         </div>
-        
         <div class="stat-card red">
           <div class="stat-icon">🔥</div>
           <div class="stat-label">Hot Leads</div>
           <div class="stat-value">${data.crmHotLeads}</div>
         </div>
-        
         <div class="stat-card green">
           <div class="stat-icon">✅</div>
           <div class="stat-label">Conversion Rate</div>
@@ -579,20 +630,26 @@ function renderAdminDashboard(data) {
       </div>
     </div>
   `;
-  
+
   content.style.display = 'block';
 }
 
 /**
- * Show accessory breakdown by model (for sales dashboard)
+ * Show accessory breakdown by model
+ * Uses admin API for admin role, sales API for sales role
  */
 async function showAccessoryBreakdown(type, name) {
   try {
-    const response = await API.getMyAccessoryBreakdown(type, currentFilter);
-    
+    let response;
+    if (currentUser && currentUser.role === 'admin') {
+      response = await API.getAdminAccessoryBreakdown(type, currentFilter);
+    } else {
+      response = await API.getMyAccessoryBreakdown(type, currentFilter);
+    }
+
     if (response.success && response.breakdown && response.breakdown.length > 0) {
       document.getElementById('modalTitle').textContent = name + ' - Model Breakdown';
-      
+
       const modalContent = document.getElementById('modalContent');
       modalContent.innerHTML = response.breakdown.map(item => `
         <div class="list-item">
@@ -602,7 +659,7 @@ async function showAccessoryBreakdown(type, name) {
           <div class="list-item-value">${item.count}</div>
         </div>
       `).join('');
-      
+
       document.getElementById('accessoryModal').classList.add('active');
     } else {
       showMessage('No data available', 'error');

@@ -149,10 +149,19 @@ const API = {
   /**
    * Get admin dashboard data
    */
-  async getAdminDashboard(filter) {
+  async getAdminDashboard(dateFilter) {
     const session = SessionManager.getSession();
     if (!session) throw new Error('No session');
-    return await this.call('getAdminDashboard', { sessionId: session.sessionId, filter });
+    return await this.call('getAdminDashboard', { sessionId: session.sessionId, dateFilter });
+  },
+
+  /**
+   * Get accessory breakdown by model (admin)
+   */
+  async getAdminAccessoryBreakdown(accessoryType, dateFilter) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return await this.call('getAccessoryBreakdown', { sessionId: session.sessionId, accessoryType, dateFilter });
   },
 
   /**
