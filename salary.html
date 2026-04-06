@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="HandheldFriendly" content="true">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Salary Tracker - Vinay Automobiles</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #f5f5f5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+    /* ========== PASSWORD OVERLAY ========== */
+    #passwordOverlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85); z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .pwd-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 20px; padding: 40px 35px; width: 90%; max-width: 380px;
+      text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    }
+    .pwd-lock-icon { font-size: 50px; margin-bottom: 15px; }
+    .pwd-title { color: white; font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .pwd-subtitle { color: rgba(255,255,255,0.75); font-size: 14px; margin-bottom: 25px; }
+    .pwd-input {
+      width: 100%; padding: 14px 16px; border: none; border-radius: 10px;
+      font-size: 16px; text-align: center; letter-spacing: 4px;
+      margin-bottom: 15px; background: white; color: #333; outline: none;
+    }
+    .pwd-btn {
+      width: 100%; padding: 14px; background: white; color: #764ba2;
+      border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+      cursor: pointer; transition: opacity 0.2s;
+    }
+    .pwd-btn:hover { opacity: 0.9; }
+    .pwd-error { color: #ffcccc; font-size: 14px; margin-top: 12px; min-height: 20px; }
+
+    /* ========== MAIN CONTENT ========== */
+    #mainContent { display: none; }
+
+    /* ========== HEADER ========== */
+    .salary-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; padding: 15px 20px;
+      position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      display: flex; align-items: center; gap: 15px;
+    }
+    .btn-back {
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      font-size: 18px; width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.3); }
+    .header-title { font-size: 20px; font-weight: 700; flex: 1; }
+    .header-user { font-size: 13px; opacity: 0.85; white-space: nowrap; }
+
+    /* ========== CONTAINER ========== */
+    .salary-container { max-width: 900px; margin: 0 auto; padding: 0 15px 30px; }
+
+    /* ========== TABS ========== */
+    .tab-bar {
+      display: flex; gap: 8px; padding: 16px 0 10px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch;
+    }
+    .tab-btn {
+      padding: 9px 16px; border-radius: 20px; border: 2px solid #764ba2;
+      background: white; color: #764ba2; font-size: 14px; font-weight: 600;
+      cursor: pointer; white-space: nowrap; transition: all 0.2s;
+    }
+    .tab-btn.active { background: linear-gradient(135deg,#667eea,#764ba2); color: white; border-color: transparent; }
+    .tab-btn:hover:not(.active) { background: #f0ebff; }
+
+    /* ========== TAB CONTENT ========== */
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ========== CARDS ========== */
+    .card {
+      background: white; border-radius: 12px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 16px;
+    }
+    .card-title { font-size: 16px; font-weight: 700; color: #333; margin-bottom: 14px; }
+
+    /* ========== FORMS ========== */
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    @media (max-width: 600px) { .form-grid { grid-template-columns: 1fr; } }
+    .form-group { display: flex; flex-direction: column; gap: 5px; }
+    .form-group label { font-size: 13px; font-weight: 600; color: #555; }
+    .form-group input, .form-group select, .form-group textarea {
+      border: 2px solid #e0e0e0; border-radius: 10px; padding: 12px;
+      font-size: 15px; width: 100%; outline: none; transition: border-color 0.2s;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      border-color: #764ba2;
+    }
+    .form-group.full-width { grid-column: 1 / -1; }
+
+    /* ========== BUTTONS ========== */
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea, #764ba2); color: white;
+      border: none; border-radius: 10px; padding: 12px 24px;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.2s;
+    }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-secondary {
+      background: #f0f0f0; color: #333; border: none;
+      border-radius: 10px; padding: 12px 24px;
+      font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s;
+    }
+    .btn-secondary:hover { background: #e0e0e0; }
+    .btn-danger {
+      background: #f44336; color: white; border: none;
+      border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    .btn-danger:hover { background: #d32f2f; }
+    .btn-edit {
+      background: #667eea; color: white; border: none;
+      border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer;
+    }
+    .btn-edit:hover { background: #764ba2; }
+    .btn-toggle {
+      padding: 10px 18px; border-radius: 10px; border: 2px solid #764ba2;
+      background: white; color: #764ba2; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-toggle.active { background: linear-gradient(135deg,#667eea,#764ba2); color: white; border-color: transparent; }
+
+    /* ========== TABLES ========== */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th { background: linear-gradient(135deg,#667eea,#764ba2); color: white; padding: 10px 8px; text-align: left; white-space: nowrap; }
+    td { padding: 9px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+    tr:hover td { background: #faf8ff; }
+    .no-data { text-align: center; color: #888; padding: 25px; font-style: italic; }
+
+    /* ========== MESSAGES ========== */
+    .msg { padding: 12px 16px; border-radius: 10px; margin: 10px 0; font-size: 14px; font-weight: 500; }
+    .msg-success { background: #e8f5e9; color: #2e7d32; border: 1px solid #c8e6c9; }
+    .msg-error { background: #ffebee; color: #c62828; border: 1px solid #ffcdd2; }
+    .msg-info { background: #e3f2fd; color: #1565c0; border: 1px solid #bbdefb; }
+
+    /* ========== COLLAPSIBLE ========== */
+    .collapsible-header {
+      display: flex; align-items: center; justify-content: space-between;
+      cursor: pointer; user-select: none;
+    }
+    .collapsible-body { display: none; margin-top: 16px; }
+    .collapsible-body.open { display: block; }
+
+    /* ========== SUMMARY CARDS ========== */
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+    .summary-card {
+      background: linear-gradient(135deg,#667eea,#764ba2);
+      color: white; border-radius: 12px; padding: 16px; text-align: center;
+    }
+    .summary-card .s-label { font-size: 12px; opacity: 0.85; margin-bottom: 6px; }
+    .summary-card .s-value { font-size: 20px; font-weight: 700; }
+
+    /* ========== UPLOAD ========== */
+    .upload-type-btns { display: flex; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
+    .upload-type-btn {
+      flex: 1; min-width: 140px; padding: 16px; border-radius: 12px;
+      border: 2px solid #e0e0e0; background: white; cursor: pointer;
+      text-align: center; transition: all 0.2s;
+    }
+    .upload-type-btn.active { border-color: #764ba2; background: #f0ebff; }
+    .upload-type-btn .utype-icon { font-size: 28px; display: block; margin-bottom: 6px; }
+    .upload-type-btn .utype-label { font-size: 15px; font-weight: 700; color: #333; }
+    .upload-type-btn .utype-desc { font-size: 12px; color: #777; margin-top: 4px; }
+
+    /* ========== MATCH STATUS ========== */
+    .status-matched { color: #2e7d32; font-weight: 600; font-size: 12px; }
+    .status-unmatched { color: #e65100; font-weight: 600; font-size: 12px; }
+    .match-input {
+      border: 1px solid #ffb74d; border-radius: 6px; padding: 5px 8px;
+      font-size: 12px; width: 100px; background: #fff8e1;
+    }
+
+    /* ========== MODAL ========== */
+    .modal-overlay {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.6); z-index: 5000;
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-box {
+      background: white; border-radius: 16px; padding: 24px;
+      width: 100%; max-width: 600px; max-height: 90vh;
+      overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .modal-header h3 { font-size: 18px; font-weight: 700; color: #333; }
+    .modal-close { background: none; border: none; font-size: 22px; cursor: pointer; color: #666; }
+
+    /* ========== SUB-TABS ========== */
+    .sub-tab-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+    .sub-tab-btn {
+      padding: 8px 16px; border-radius: 8px; border: 2px solid #ddd;
+      background: white; color: #666; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .sub-tab-btn.active { border-color: #764ba2; background: #764ba2; color: white; }
+
+    /* ========== SPINNER ========== */
+    .spinner-inline {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.4); border-top-color: white;
+      border-radius: 50%; animation: spin 0.7s linear infinite; vertical-align: middle; margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ========== TOTALS ROW ========== */
+    .totals-row td { font-weight: 700; background: #f0ebff; border-top: 2px solid #764ba2; }
+
+    /* ========== EMPLOYEE INFO CARD ========== */
+    .emp-info-card {
+      background: #f0ebff; border-radius: 12px; padding: 16px; margin-bottom: 16px;
+      display: flex; flex-wrap: wrap; gap: 12px;
+    }
+    .emp-info-item { flex: 1; min-width: 130px; }
+    .emp-info-label { font-size: 11px; color: #764ba2; font-weight: 600; text-transform: uppercase; }
+    .emp-info-value { font-size: 15px; color: #333; font-weight: 600; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- ========== PASSWORD OVERLAY ========== -->
+  <div id="passwordOverlay">
+    <div class="pwd-card">
+      <div class="pwd-lock-icon">🔒</div>
+      <div class="pwd-title">Salary Tracker</div>
+      <div class="pwd-subtitle">Enter password to access salary data</div>
+      <input type="password" id="salaryPwd" class="pwd-input" placeholder="Password"
+             onkeydown="if(event.key==='Enter') submitPassword()">
+      <button class="pwd-btn" onclick="submitPassword()">Unlock</button>
+      <div class="pwd-error" id="pwdError"></div>
+    </div>
+  </div>
+
+  <!-- ========== MAIN CONTENT ========== -->
+  <div id="mainContent">
+
+    <!-- Header -->
+    <div class="salary-header">
+      <button class="btn-back" onclick="goBack()">&#8592;</button>
+      <div class="header-title">&#128176; Salary Tracker</div>
+      <div class="header-user" id="headerUser"></div>
+    </div>
+
+    <div class="salary-container">
+
+      <!-- Tab Bar -->
+      <div class="tab-bar">
+        <button class="tab-btn active" id="empTabBtn" onclick="switchTab('employees')">&#128101; Employees</button>
+        <button class="tab-btn" id="uploadTabBtn" onclick="switchTab('upload')">&#128228; Salary Upload</button>
+        <button class="tab-btn" id="paymentTabBtn" onclick="switchTab('payments')">&#128184; Incentive &amp; Bonus</button>
+        <button class="tab-btn" id="reportsTabBtn" onclick="switchTab('reports')">&#128202; Reports</button>
+      </div>
+
+      <!-- ==================== TAB: EMPLOYEES ==================== -->
+      <div class="tab-content active" id="tab-employees">
+
+        <!-- Add Employee Card (collapsible) -->
+        <div class="card">
+          <div class="collapsible-header" onclick="toggleAddEmployeeForm()">
+            <span class="card-title" style="margin-bottom:0">&#10133; Add Employee</span>
+            <span id="addEmpToggleIcon">&#9660;</span>
+          </div>
+          <div class="collapsible-body" id="addEmpForm">
+            <div id="addEmpMsg"></div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Employee Code*</label>
+                <input type="text" id="ae_empCode" placeholder="e.g. EMP001">
+              </div>
+              <div class="form-group">
+                <label>DMS Code</label>
+                <input type="text" id="ae_dmsCode" placeholder="DMS code">
+              </div>
+              <div class="form-group">
+                <label>Name*</label>
+                <input type="text" id="ae_name" placeholder="Full name">
+              </div>
+              <div class="form-group">
+                <label>Mobile</label>
+                <input type="text" id="ae_mobile" maxlength="10" placeholder="10 digit mobile">
+              </div>
+              <div class="form-group">
+                <label>Department</label>
+                <input type="text" id="ae_dept" placeholder="e.g. Sales">
+              </div>
+              <div class="form-group">
+                <label>Job Role</label>
+                <input type="text" id="ae_jobRole" placeholder="e.g. Sales Executive">
+              </div>
+              <div class="form-group">
+                <label>Aadhaar (12 digits)</label>
+                <input type="text" id="ae_aadhaar" maxlength="12" placeholder="12 digit Aadhaar">
+              </div>
+              <div class="form-group">
+                <label>Date of Birth</label>
+                <input type="date" id="ae_dob">
+              </div>
+              <div class="form-group">
+                <label>Payment Type*</label>
+                <select id="ae_paymentType" onchange="toggleUanField('ae_uan_group', this.value)">
+                  <option value="Bank">Bank</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+              <div class="form-group" id="ae_uan_group">
+                <label>UAN (12 digits)</label>
+                <input type="text" id="ae_uan" maxlength="12" placeholder="12 digit UAN">
+              </div>
+              <div class="form-group">
+                <label>Active</label>
+                <select id="ae_active">
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                </select>
+              </div>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" onclick="saveEmployee()">Save Employee</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Employee List Card -->
+        <div class="card">
+          <div class="card-title">Employee List</div>
+          <div id="empTableMsg"></div>
+          <div class="table-wrap">
+            <table id="empTable">
+              <thead>
+                <tr>
+                  <th>Emp Code</th>
+                  <th>Name</th>
+                  <th>Dept</th>
+                  <th>Job Role</th>
+                  <th>Payment Type</th>
+                  <th>UAN</th>
+                  <th>Active</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="empTableBody">
+                <tr><td colspan="8" class="no-data">Loading employees...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TAB: SALARY UPLOAD ==================== -->
+      <div class="tab-content" id="tab-upload">
+        <div class="card">
+          <div class="card-title">Salary Upload</div>
+          <div id="uploadMsg"></div>
+
+          <!-- Step 1: Month -->
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Step 1 — Select Month*</label>
+            <select id="uploadMonth" style="max-width:250px"></select>
+          </div>
+
+          <!-- Step 2: File Type -->
+          <div style="margin-bottom:16px">
+            <label style="font-size:13px; font-weight:600; color:#555; display:block; margin-bottom:8px">Step 2 — Select File Type</label>
+            <div class="upload-type-btns">
+              <div class="upload-type-btn active" id="epfBtn" onclick="switchUploadType('EPF')">
+                <span class="utype-icon">&#128203;</span>
+                <span class="utype-label">EPF (Bank)</span>
+                <div class="utype-desc">Formal staff with UAN, ESIC, EPF deductions</div>
+              </div>
+              <div class="upload-type-btn" id="refBtn" onclick="switchUploadType('Ref')">
+                <span class="utype-icon">&#128196;</span>
+                <span class="utype-label">Ref (Cash)</span>
+                <div class="utype-desc">Cash-paid staff, basic net pay</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 3: File Upload -->
+          <div class="form-group" style="margin-bottom:16px">
+            <label>Step 3 — Upload File (.xlsx / .xls)</label>
+            <input type="file" id="salaryFile" accept=".xlsx,.xls">
+          </div>
+          <button class="btn-primary" onclick="parseUploadedFile()">&#128194; Parse File</button>
+        </div>
+
+        <!-- Preview Section -->
+        <div id="uploadPreviewSection" style="display:none">
+          <div class="card">
+            <div class="card-title">Preview — <span id="previewTitle"></span></div>
+            <div id="previewMsg"></div>
+            <div class="table-wrap">
+              <table id="previewTable">
+                <thead id="previewTableHead"></thead>
+                <tbody id="previewTableBody"></tbody>
+              </table>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" onclick="confirmSaveUpload()">&#9989; Confirm &amp; Save</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TAB: INCENTIVE & BONUS ==================== -->
+      <div class="tab-content" id="tab-payments">
+        <div class="card">
+          <div style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap;">
+            <button class="btn-toggle active" id="incBtn" onclick="switchPaymentType('Incentive')">&#128176; Incentive</button>
+            <button class="btn-toggle" id="bonBtn" onclick="switchPaymentType('Bonus')">&#127873; Bonus</button>
+          </div>
+
+          <!-- Incentive Form -->
+          <div id="incentiveForm">
+            <div class="card-title">Add Incentive</div>
+            <div id="incMsg"></div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Month*</label>
+                <select id="inc_month"></select>
+              </div>
+              <div class="form-group">
+                <label>Employee*</label>
+                <select id="inc_emp"><option value="">-- Select Employee --</option></select>
+              </div>
+              <div class="form-group">
+                <label>Amount*</label>
+                <input type="number" id="inc_amount" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label>Payment Mode*</label>
+                <select id="inc_mode">
+                  <option value="Bank">Bank</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+              <div class="form-group full-width">
+                <label>Remarks</label>
+                <input type="text" id="inc_remarks" placeholder="Optional remarks">
+              </div>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" onclick="addIncentiveRecord()">Add Incentive</button>
+            </div>
+          </div>
+
+          <!-- Bonus Form -->
+          <div id="bonusForm" style="display:none">
+            <div class="card-title">Add Bonus</div>
+            <div id="bonMsg"></div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Period*</label>
+                <select id="bon_period"></select>
+              </div>
+              <div class="form-group">
+                <label>Employee*</label>
+                <select id="bon_emp"><option value="">-- Select Employee --</option></select>
+              </div>
+              <div class="form-group">
+                <label>Amount*</label>
+                <input type="number" id="bon_amount" placeholder="0" min="0">
+              </div>
+              <div class="form-group">
+                <label>Payment Mode*</label>
+                <select id="bon_mode">
+                  <option value="Bank">Bank</option>
+                  <option value="Cash">Cash</option>
+                </select>
+              </div>
+              <div class="form-group full-width">
+                <label>Remarks</label>
+                <input type="text" id="bon_remarks" placeholder="Optional remarks">
+              </div>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" onclick="addBonusRecord()">Add Bonus</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Entries -->
+        <div class="card">
+          <div class="card-title">Recent Incentive &amp; Bonus Entries</div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Type</th>
+                  <th>Date</th>
+                  <th>Employee</th>
+                  <th>Month/Period</th>
+                  <th>Amount</th>
+                  <th>Mode</th>
+                  <th>Remarks</th>
+                  <th id="recentDeleteColHead"></th>
+                </tr>
+              </thead>
+              <tbody id="recentPaymentsBody">
+                <tr><td colspan="8" class="no-data">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ==================== TAB: REPORTS ==================== -->
+      <div class="tab-content" id="tab-reports">
+        <div class="sub-tab-bar">
+          <button class="sub-tab-btn active" id="repEmpBtn" onclick="switchReportType('employee')">&#128100; Employee History</button>
+          <button class="sub-tab-btn" id="repMonBtn" onclick="switchReportType('monthly')">&#128197; Monthly Summary</button>
+        </div>
+
+        <!-- Employee History Sub-tab -->
+        <div id="repEmpSection">
+          <div class="card">
+            <div class="card-title">Employee Salary Report</div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Employee*</label>
+                <select id="rep_emp"><option value="">-- Select Employee --</option></select>
+              </div>
+              <div class="form-group">
+                <label>Financial Year*</label>
+                <select id="rep_fy"></select>
+              </div>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" id="repEmpBtn2" onclick="generateEmployeeReport()">Generate Report</button>
+            </div>
+          </div>
+          <div id="repEmpResult"></div>
+        </div>
+
+        <!-- Monthly Summary Sub-tab -->
+        <div id="repMonSection" style="display:none">
+          <div class="card">
+            <div class="card-title">Monthly Salary Summary</div>
+            <div class="form-group" style="max-width:250px">
+              <label>Month*</label>
+              <select id="rep_month"></select>
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn-primary" id="repMonBtn2" onclick="generateMonthlyReport()">Generate Report</button>
+            </div>
+          </div>
+          <div id="repMonResult"></div>
+        </div>
+      </div>
+
+    </div><!-- /salary-container -->
+  </div><!-- /mainContent -->
+
+  <!-- ========== EDIT EMPLOYEE MODAL ========== -->
+  <div class="modal-overlay" id="editEmpModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>Edit Employee</h3>
+        <button class="modal-close" onclick="closeEditModal()">&times;</button>
+      </div>
+      <div id="editEmpMsg"></div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Employee Code*</label>
+          <input type="text" id="ee_empCode" readonly style="background:#f5f5f5">
+        </div>
+        <div class="form-group">
+          <label>DMS Code</label>
+          <input type="text" id="ee_dmsCode">
+        </div>
+        <div class="form-group">
+          <label>Name*</label>
+          <input type="text" id="ee_name">
+        </div>
+        <div class="form-group">
+          <label>Mobile</label>
+          <input type="text" id="ee_mobile" maxlength="10">
+        </div>
+        <div class="form-group">
+          <label>Department</label>
+          <input type="text" id="ee_dept">
+        </div>
+        <div class="form-group">
+          <label>Job Role</label>
+          <input type="text" id="ee_jobRole">
+        </div>
+        <div class="form-group">
+          <label>Aadhaar</label>
+          <input type="text" id="ee_aadhaar" maxlength="12">
+        </div>
+        <div class="form-group">
+          <label>Date of Birth</label>
+          <input type="date" id="ee_dob">
+        </div>
+        <div class="form-group">
+          <label>Payment Type*</label>
+          <select id="ee_paymentType" onchange="toggleUanField('ee_uan_group', this.value)">
+            <option value="Bank">Bank</option>
+            <option value="Cash">Cash</option>
+          </select>
+        </div>
+        <div class="form-group" id="ee_uan_group">
+          <label>UAN (12 digits)</label>
+          <input type="text" id="ee_uan" maxlength="12">
+        </div>
+        <div class="form-group">
+          <label>Active</label>
+          <select id="ee_active">
+            <option value="Yes">Yes</option>
+            <option value="No">No</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:20px; display:flex; gap:10px;">
+        <button class="btn-primary" onclick="updateEmployee()">Update</button>
+        <button class="btn-secondary" onclick="closeEditModal()">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SheetJS for Excel parsing -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/salary.js"></script>
+</body>
+</html>
