@@ -167,69 +167,50 @@ function populateMonthOptions() {
 }
 
 /**
- * Load dashboard data
+ * Load dashboard data — single API call returns both monthly stats and today's delivery count.
+ * Shows cached data instantly (if available) then updates from fresh API response.
  */
 async function loadDashboard() {
   const month = document.getElementById('monthSelector').value;
   const sessionId = SessionManager.getSessionId();
-  
-  
+  const cacheKey = 'acc_dashboard_' + month;
+
+  // Show today's date label immediately (no API needed)
+  const today = new Date();
+  const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
+  document.getElementById('todayDeliveryDate').textContent = today.toLocaleDateString('en-US', dateOptions);
+
+  // Show stale cache instantly while fresh data loads in background
+  try {
+    const cached = JSON.parse(localStorage.getItem(cacheKey) || 'null');
+    if (cached && cached.ts && (Date.now() - cached.ts) < 5 * 60 * 1000) {
+      updateDashboardCards(cached.data);
+    }
+  } catch (e) { /* ignore cache errors */ }
+
   try {
     const response = await API.call('getAccessoryDashboardData', {
       sessionId: sessionId,
       month: month
     });
-    
+
     if (response.success) {
       currentDashboardData = response.data;
       updateDashboardCards(response.data);
+      // Persist for next page load
+      try {
+        localStorage.setItem(cacheKey, JSON.stringify({ data: response.data, ts: Date.now() }));
+      } catch (e) { /* ignore storage errors */ }
     } else {
       showMessage(response.message, 'error');
     }
   } catch (error) {
     showMessage('Failed to load dashboard', 'error');
   }
-  
-  // Load today's delivery count
-  loadTodayDeliveryCount();
 }
 
 /**
- * Load Today's Delivery count
- */
-async function loadTodayDeliveryCount() {
-  const sessionId = SessionManager.getSessionId();
-  const today = new Date();
-  const todayString = today.toISOString().split('T')[0]; // YYYY-MM-DD format
-  
-  try {
-    const response = await API.call('searchAccessoryRecords', {
-      sessionId: sessionId,
-      searchBy: 'Delivery Date',
-      searchValue: '',
-      dateFilter: 'single',
-      singleDate: todayString,
-      fromDate: '',
-      toDate: ''
-    });
-    
-    if (response.success) {
-      const count = response.results ? response.results.length : 0;
-      document.getElementById('todayDeliveryCount').textContent = count;
-      
-      // Format date display
-      const dateOptions = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-      const dateString = today.toLocaleDateString('en-US', dateOptions);
-      document.getElementById('todayDeliveryDate').textContent = dateString;
-    }
-  } catch (error) {
-    console.error('Failed to load today\'s delivery count:', error);
-    document.getElementById('todayDeliveryCount').textContent = '0';
-  }
-}
-
-/**
- * Update dashboard cards
+ * Update dashboard cards — handles both monthly counts and today's delivery count
  */
 function updateDashboardCards(data) {
   document.getElementById('yesCount').textContent = data.yes || 0;
@@ -237,15 +218,18 @@ function updateDashboardCards(data) {
   document.getElementById('blankCount').textContent = data.blank || 0;
   document.getElementById('partialCount').textContent = data.partial || 0;
   document.getElementById('totalCount').textContent = data.total || 0;
-  
-  // Clear active state from all cards including today delivery card
+
+  // Today's delivery count now comes from the same API call — no extra round trip
+  if (data.todayDelivery != null) {
+    document.getElementById('todayDeliveryCount').textContent = data.todayDelivery;
+  }
+
+  // Clear active state from all cards
   document.querySelectorAll('.stat-card').forEach(function(card) {
     card.classList.remove('active');
   });
   const todayCard = document.getElementById('todayDeliveryCard');
-  if (todayCard) {
-    todayCard.classList.remove('active');
-  }
+  if (todayCard) todayCard.classList.remove('active');
   document.getElementById('exportBtn').style.display = 'none';
   currentFilterStatus = null;
 }
