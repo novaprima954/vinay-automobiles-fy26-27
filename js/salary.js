@@ -26,8 +26,11 @@ document.addEventListener('DOMContentLoaded', function () {
   // Display user in header
   document.getElementById('headerUser').textContent = currentUser.name || '';
 
-  // Check salary password auth
-  if (checkSalaryAuth()) {
+  // Accounts role: skip password, go straight in
+  if (currentUser.role === 'accounts') {
+    showMainContent();
+    initApp();
+  } else if (checkSalaryAuth()) {
     showMainContent();
     initApp();
   } else {
@@ -218,11 +221,10 @@ function showMsg(elId, text, type) {
 function toggleUanField(groupId, paymentType) {
   const group = document.getElementById(groupId);
   if (!group) return;
-  if (paymentType === 'Bank') {
+  if (paymentType === 'EPF') {
     group.style.display = 'flex';
   } else {
     group.style.display = 'none';
-    // clear UAN
     const input = group.querySelector('input');
     if (input) input.value = '';
   }
@@ -507,7 +509,7 @@ function parseEPFSheet(workbook) {
       uan: String(r[1] || '').trim(),
       name: name,
       type: 'Salary-Bank',
-      paymentMode: 'Bank',
+      paymentMode: 'EPF',
       gross: Number(r[3]) || 0,
       presentDays: Number(r[4]) || 0,
       basic: Number(r[5]) || 0,
@@ -558,7 +560,7 @@ function parseRefSheet(workbook) {
       empCode: String(r[0] || '').trim(),
       name: name,
       type: 'Salary-Cash',
-      paymentMode: 'Cash',
+      paymentMode: 'REF',
       gross: Number(r[2]) || 0,
       presentDays: Number(r[3]) || 0,
       netPay: netPay,
@@ -601,9 +603,8 @@ function renderUploadPreview(records, type, month) {
     tbody.innerHTML = records.map(function (rec, i) {
       const statusCell = rec.matchStatus === 'matched'
         ? '<span class="status-matched">\u2705 ' + escHtml(rec.empCode) + ' \u2014 ' + escHtml(rec.matchedName) + '</span>'
-        : '<span class="status-unmatched">\u26a0\ufe0f Not in master</span><br>' +
-          '<input type="text" class="match-input" data-idx="' + i + '" placeholder="Enter Emp Code" value="' + escHtml(rec.empCode) + '" onchange="updateRecordEmpCode(' + i + ', this.value)">';
-      return '<tr>' +
+        : '<span class="status-unmatched">\u26a0\ufe0f Not in master — add employee first</span>';
+      return '<tr' + (rec.matchStatus !== 'matched' ? ' style="background:#fff3e0"' : '') + '>' +
         '<td>' + (i + 1) + '</td>' +
         '<td>' + escHtml(rec.uan) + '</td>' +
         '<td>' + escHtml(rec.name) + '</td>' +
@@ -625,9 +626,8 @@ function renderUploadPreview(records, type, month) {
     tbody.innerHTML = records.map(function (rec, i) {
       const statusCell = rec.matchStatus === 'matched'
         ? '<span class="status-matched">\u2705 ' + escHtml(rec.empCode) + ' \u2014 ' + escHtml(rec.matchedName) + '</span>'
-        : '<span class="status-unmatched">\u26a0\ufe0f Not in master</span><br>' +
-          '<input type="text" class="match-input" data-idx="' + i + '" placeholder="Enter Emp Code" value="' + escHtml(rec.empCode) + '" onchange="updateRecordEmpCode(' + i + ', this.value)">';
-      return '<tr>' +
+        : '<span class="status-unmatched">\u26a0\ufe0f Not in master — add employee first</span>';
+      return '<tr' + (rec.matchStatus !== 'matched' ? ' style="background:#fff3e0"' : '') + '>' +
         '<td>' + (i + 1) + '</td>' +
         '<td>' + escHtml(rec.empCode) + '</td>' +
         '<td>' + escHtml(rec.name) + '</td>' +
@@ -652,19 +652,11 @@ async function confirmSaveUpload() {
   const month = document.getElementById('uploadMonth').value;
   if (!month) { showMsg('previewMsg', 'No month selected', 'error'); return; }
 
-  // Collect empCodes from manual inputs (for unmatched)
-  const inputs = document.querySelectorAll('.match-input');
-  inputs.forEach(function (inp) {
-    const idx = parseInt(inp.getAttribute('data-idx'), 10);
-    if (!isNaN(idx) && uploadedRecords[idx]) {
-      uploadedRecords[idx].empCode = inp.value.trim();
-    }
-  });
-
-  // Validate all have empCode
-  const missing = uploadedRecords.filter(function (r) { return !r.empCode; });
-  if (missing.length > 0) {
-    showMsg('previewMsg', 'Please enter employee code for all unmatched rows (' + missing.length + ' missing)', 'error');
+  // Block if any records are unmatched — employee must exist in master first
+  const unmatched = uploadedRecords.filter(function (r) { return r.matchStatus !== 'matched'; });
+  if (unmatched.length > 0) {
+    const names = unmatched.map(function (r) { return r.name; }).join(', ');
+    showMsg('previewMsg', '\u26a0\ufe0f Cannot save: ' + unmatched.length + ' employee(s) not found in master — add them first: ' + names, 'error');
     return;
   }
 
@@ -789,9 +781,6 @@ async function loadRecentPayments() {
   tbody.innerHTML = '<tr><td colspan="8" class="no-data">Loading...</td></tr>';
 
   try {
-    // We load last 3 months of Incentive/Bonus by calling monthly report for recent months
-    // Instead, we use a generic approach: get recent payment records via getMonthlySalaryReport
-    // Since there's no dedicated endpoint for "all incentive+bonus", we fetch recent months
     const months = getLast12Months().slice(0, 3);
     let allRecords = [];
     for (let i = 0; i < months.length; i++) {
@@ -1033,8 +1022,8 @@ async function generateMonthlyReport() {
     const grandTotal = totalBank + totalCash + totalInc + totalBon;
 
     let html = '<div class="card"><div class="summary-grid">';
-    html += '<div class="summary-card"><div class="s-label">Bank Salary</div><div class="s-value">' + formatCurrency(totalBank) + '</div></div>';
-    html += '<div class="summary-card"><div class="s-label">Cash Salary</div><div class="s-value">' + formatCurrency(totalCash) + '</div></div>';
+    html += '<div class="summary-card"><div class="s-label">EPF Salary</div><div class="s-value">' + formatCurrency(totalBank) + '</div></div>';
+    html += '<div class="summary-card"><div class="s-label">REF Salary</div><div class="s-value">' + formatCurrency(totalCash) + '</div></div>';
     html += '<div class="summary-card"><div class="s-label">Incentive</div><div class="s-value">' + formatCurrency(totalInc) + '</div></div>';
     html += '<div class="summary-card"><div class="s-label">Bonus</div><div class="s-value">' + formatCurrency(totalBon) + '</div></div>';
     html += '<div class="summary-card"><div class="s-label">Grand Total</div><div class="s-value">' + formatCurrency(grandTotal) + '</div></div>';
@@ -1042,7 +1031,7 @@ async function generateMonthlyReport() {
 
     // Bank salary table
     if (bankRecs.length > 0) {
-      html += '<div class="card"><div class="card-title">Bank Salary (EPF Staff)</div><div class="table-wrap"><table>';
+      html += '<div class="card"><div class="card-title">EPF Salary</div><div class="table-wrap"><table>';
       html += '<thead><tr><th>Emp Code</th><th>Name</th><th>Days</th><th>Gross</th><th>ESIC</th><th>EPF</th><th>PT</th><th>Net Pay</th></tr></thead>';
       html += '<tbody>';
       let tDays = 0, tGross = 0, tEsic = 0, tEpf = 0, tPt = 0, tNet = 0;
@@ -1076,7 +1065,7 @@ async function generateMonthlyReport() {
 
     // Cash salary table
     if (cashRecs.length > 0) {
-      html += '<div class="card"><div class="card-title">Cash Salary (Ref Staff)</div><div class="table-wrap"><table>';
+      html += '<div class="card"><div class="card-title">REF Salary</div><div class="table-wrap"><table>';
       html += '<thead><tr><th>Emp Code</th><th>Name</th><th>Days</th><th>Pay Rate</th><th>Net Pay</th></tr></thead>';
       html += '<tbody>';
       let tDays = 0, tGross = 0, tNet = 0;
