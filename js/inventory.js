@@ -122,7 +122,11 @@ function skuById(skuId) {
 }
 
 // Build datalist <option> elements, optionally filtered by accessory label
-// Matching: sku.category OR sku.type matches the label (case-insensitive)
+// value format: "SKUID — Category / Type / Brand / Color"  (searchable by SKU ID or name)
+function skuDatalistValue(s) {
+  return s.skuId + ' — ' + skuDisplayName(s);
+}
+
 function buildSkuDatalistOptions(filterLabel) {
   const list = filterLabel
     ? invSkus.filter(s =>
@@ -130,14 +134,10 @@ function buildSkuDatalistOptions(filterLabel) {
         (s.type     || '').toLowerCase() === filterLabel.toLowerCase()
       )
     : invSkus;
-  if (list.length === 0 && filterLabel) {
-    // Fall back to unfiltered so the user can still pick manually
-    return invSkus.map(s =>
-      `<option value="${skuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
-    ).join('');
-  }
-  return list.map(s =>
-    `<option value="${skuDisplayName(s)}" data-sku-id="${s.skuId}"></option>`
+  // Fall back to all SKUs if filter matches nothing
+  const source = (list.length === 0 && filterLabel) ? invSkus : list;
+  return source.map(s =>
+    `<option value="${skuDatalistValue(s)}" data-sku-id="${s.skuId}"></option>`
   ).join('');
 }
 
