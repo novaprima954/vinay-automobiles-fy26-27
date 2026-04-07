@@ -83,16 +83,16 @@ function displayRecords(records) {
   let html = '';
   
   records.forEach(function(record) {
-    html += '<div class="record-item" onclick="openScanner(\'' + record.receiptNo + '\')">';
-    html += '  <div style="display: flex; gap: 15px; align-items: center;">';
-    html += '    <div class="scan-icon">ðŸ“·</div>';
-    html += '    <div style="flex: 1;">';
-    html += '      <div class="record-header">';
-    html += '        <div class="record-receipt">' + record.receiptNo + '</div>';
-    html += '        <div class="record-date">' + record.bookingDate + '</div>';
-    html += '      </div>';
-    html += '      <div class="record-customer">' + record.customerName + '</div>';
-    html += '      <div class="record-mobile">ðŸ“± ' + record.mobileNo + '</div>';
+    html += '<div class=”record-item” onclick=”openScanner(\'' + record.receiptNo + '\')”>';
+    html += '  <div style=”display: flex; gap: 15px; align-items: center;”>';
+    html += '    <div class=”scan-icon”>📷</div>';
+    html += '    <div style=”flex: 1;”>';
+    html += '      <div class=”record-customer” style=”font-size:16px;font-weight:700;color:#333;margin-bottom:3px;”>' + record.customerName + '</div>';
+    if (record.variant) {
+      html += '      <div style=”font-size:13px;color:#667eea;font-weight:600;margin-bottom:3px;”>' + record.variant + '</div>';
+    }
+    html += '      <div class=”record-mobile” style=”margin-bottom:3px;”>📱 ' + record.mobileNo + '</div>';
+    html += '      <div style=”font-size:12px;color:#999;”>Receipt: ' + record.receiptNo + ' &nbsp;·&nbsp; ' + record.bookingDate + '</div>';
     html += '    </div>';
     html += '  </div>';
     html += '</div>';
@@ -315,19 +315,17 @@ async function processImageWithOCR(imageDataUrl) {
     // Extract Engine Number (E:)
     const engineMatch = text.match(/E[:\s]*([A-Z0-9]+)/i);
     if (engineMatch && engineMatch[1]) {
-      const engineNumber = engineMatch[1].trim();
+      const engineNumber = engineMatch[1].trim().toUpperCase();
       engineInput.value = engineNumber;
       engineBadge.style.display = 'inline-block';
-      console.log('âœ… Engine Number extracted:', engineNumber);
     }
-    
+
     // Extract Frame Number (F:)
     const frameMatch = text.match(/F[:\s]*([A-Z0-9]+)/i);
     if (frameMatch && frameMatch[1]) {
-      const frameNumber = frameMatch[1].trim();
+      const frameNumber = frameMatch[1].trim().toUpperCase();
       frameInput.value = frameNumber;
       frameBadge.style.display = 'inline-block';
-      console.log('âœ… Frame Number extracted:', frameNumber);
     }
     
     // Hide processing status
@@ -350,8 +348,8 @@ async function processImageWithOCR(imageDataUrl) {
  * Save vehicle numbers
  */
 async function saveVehicleNumbers() {
-  const engineNumber = document.getElementById('engineNumber').value.trim();
-  const frameNumber = document.getElementById('frameNumber').value.trim();
+  const engineNumber = document.getElementById('engineNumber').value.trim().toUpperCase();
+  const frameNumber = document.getElementById('frameNumber').value.trim().toUpperCase();
   const saveBtn = document.getElementById('saveBtn');
   
   // Validate
