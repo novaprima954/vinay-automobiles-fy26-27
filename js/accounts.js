@@ -817,7 +817,9 @@ async function handleUpdate(e) {
   // These are set by the "Calculate from PriceMaster" button
   if (window.lastPriceVerification) {
     data.priceMaster = window.lastPriceVerification.calculatedTotal || '';  // Column BE
-    data.priceMatched = window.lastPriceVerification.matched ? 'Yes' : 'No';  // Column BF
+    const _pvMatched = window.lastPriceVerification.matched;
+    const _pvNote = window.lastPriceVerification.note || '';
+    data.priceMatched = _pvMatched ? 'Yes' : (_pvNote ? 'No \u2014 ' + _pvNote : 'No');  // Column BF
   }
   
   console.log('💾 Updating account record:');
@@ -1168,9 +1170,17 @@ function displayPriceBreakdown(calculation) {
     html += `<span style="color: ${color};">⚠️ ${excessOrShort}</span>`;
     html += `<div style="font-size: 13px; margin-top: 5px; color: #666;">After Discount vs Amount Collected: ₹${Math.abs(diff).toLocaleString()}</div>`;
   }
-  
+
   html += '</div></div>';
-  
+
+  // Note field when not matched
+  if (!matched) {
+    html += '<div style="margin-top: 14px;">';
+    html += '<label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📝 Reason for mismatch <span style="font-weight:400;color:#999;">(optional)</span></label>';
+    html += '<textarea id="priceMatchedNote" rows="2" style="width:100%;padding:10px;border:2px solid #ffc107;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box;" placeholder="e.g. Customer discount given, error in receipt..."></textarea>';
+    html += '</div>';
+  }
+
   // Save button - save afterDiscount value
   html += '<button type="button" onclick="savePriceVerification(' + afterDiscount + ', ' + matched + ')" class="btn-primary" style="width: 100%; margin-top: 15px; padding: 12px; font-size: 15px;">';
   html += '💾 Save Verification';
@@ -1189,17 +1199,22 @@ async function savePriceVerification(calculatedTotal, matched) {
     alert('Receipt number not found');
     return;
   }
-  
+
+  // Read optional note when not matched
+  const noteEl = document.getElementById('priceMatchedNote');
+  const note = noteEl ? noteEl.value.trim() : '';
+
   // Store verification data for use in handleUpdate
   window.lastPriceVerification = {
     calculatedTotal: calculatedTotal,
-    matched: matched
+    matched: matched,
+    note: note
   };
-  
+
   console.log('💾 Stored price verification:', window.lastPriceVerification);
-  
+
   try {
-    const response = await API.savePriceVerification(currentReceiptNo, calculatedTotal, matched);
+    const response = await API.savePriceVerification(currentReceiptNo, calculatedTotal, matched, note);
     
     if (response.success) {
       alert('✅ Price verification saved successfully!\n\nRemember to click "Update Record" to save all changes.');

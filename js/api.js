@@ -554,13 +554,14 @@ const API = {
   /**
    * Save Price Verification
    */
-  async savePriceVerification(receiptNo, calculatedTotal, matched) {
+  async savePriceVerification(receiptNo, calculatedTotal, matched, note) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('savePriceVerification', {
       sessionId,
       receiptNo,
       calculatedTotal,
-      matched
+      matched,
+      note: note || ''
     });
   },
 
