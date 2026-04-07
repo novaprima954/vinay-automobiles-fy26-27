@@ -431,9 +431,21 @@ async function handleSubmit(e) {
   try {
     const submitBtn = document.getElementById('submitBtn');
     submitBtn.disabled = true;
-    submitBtn.textContent = '💾 Saving...';
-    
+    submitBtn.textContent = '🔍 Checking...';
+
     const sessionId = SessionManager.getSessionId();
+
+    // Block duplicate receipt numbers before saving
+    const dupCheck = await API.checkDuplicateReceipt(sessionId, data.receiptNo);
+    if (dupCheck.isDuplicate) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '💾 Save Sales Entry';
+      showMessage('❌ Receipt No ' + data.receiptNo + ' already exists. Duplicate entry not allowed.', 'error');
+      document.getElementById('receiptNo').focus();
+      return;
+    }
+
+    submitBtn.textContent = '💾 Saving...';
     const response = await API.saveSales(sessionId, data);
     
     submitBtn.disabled = false;
