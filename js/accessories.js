@@ -53,20 +53,21 @@ const ADDITIONAL_PENDING_ITEMS = ['Mirror', 'Side Stand', 'Center Stand'];
  */
 function getModelConfig(modelName) {
   if (!modelName) return null;
-  
+
   // Try exact match first
   if (MODEL_VARIANTS[modelName]) {
     return MODEL_VARIANTS[modelName];
   }
-  
-  // Try case-insensitive match
-  const modelLower = modelName.toLowerCase();
+
+  // Normalise: lowercase + collapse all whitespace for fuzzy match
+  const normalise = function(s) { return s.toLowerCase().replace(/\s+/g, ''); };
+  const modelNorm = normalise(modelName);
   for (const key in MODEL_VARIANTS) {
-    if (key.toLowerCase() === modelLower) {
+    if (normalise(key) === modelNorm) {
       return MODEL_VARIANTS[key];
     }
   }
-  
+
   return null;
 }
 
