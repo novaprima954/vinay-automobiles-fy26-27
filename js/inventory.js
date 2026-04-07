@@ -42,8 +42,8 @@ document.addEventListener('DOMContentLoaded', async function () {
   invSessionId = session.sessionId;
   document.getElementById('currentUser').textContent = invUser.name + ' (' + invUser.role + ')';
 
-  // Show masters tab for admin only
-  if (invUser.role === 'admin') {
+  // Show masters tab for admin and accessories
+  if (invUser.role === 'admin' || invUser.role === 'accessories') {
     document.getElementById('mastersTab').style.display = '';
   }
 
