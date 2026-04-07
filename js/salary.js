@@ -109,8 +109,8 @@ function setupRoleAccess() {
   if (currentUser && currentUser.role === 'accounts') {
     document.getElementById('reportsTabBtn').style.display = 'none';
   }
-  // Only admin can add/edit employees
-  if (currentUser && currentUser.role !== 'admin') {
+  // Only admin and accounts can add/edit employees
+  if (currentUser && currentUser.role !== 'admin' && currentUser.role !== 'accounts') {
     const addCard = document.querySelector('[onclick="toggleAddEmployeeForm()"]');
     if (addCard) addCard.closest('.card').style.display = 'none';
   }
