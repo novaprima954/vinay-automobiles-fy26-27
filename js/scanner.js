@@ -70,35 +70,54 @@ async function loadPendingRecords() {
 function displayRecords(records) {
   const listContainer = document.getElementById('recordsList');
   const emptyState = document.getElementById('emptyState');
-  
+
   if (!records || records.length === 0) {
     listContainer.style.display = 'none';
     emptyState.style.display = 'block';
     return;
   }
-  
+
   listContainer.style.display = 'block';
   emptyState.style.display = 'none';
-  
-  let html = '';
-  
+
+  // Clear and build individual cards
+  listContainer.innerHTML = '';
+
   records.forEach(function(record) {
-    html += '<div class=”record-item” onclick=”openScanner(\'' + record.receiptNo + '\')”>';
-    html += '  <div style=”display: flex; gap: 15px; align-items: center;”>';
-    html += '    <div class=”scan-icon”>📷</div>';
-    html += '    <div style=”flex: 1;”>';
-    html += '      <div class=”record-customer” style=”font-size:16px;font-weight:700;color:#333;margin-bottom:3px;”>' + record.customerName + '</div>';
-    if (record.variant) {
-      html += '      <div style=”font-size:13px;color:#667eea;font-weight:600;margin-bottom:3px;”>' + record.variant + '</div>';
-    }
-    html += '      <div class=”record-mobile” style=”margin-bottom:3px;”>📱 ' + record.mobileNo + '</div>';
-    html += '      <div style=”font-size:12px;color:#999;”>Receipt: ' + record.receiptNo + ' &nbsp;·&nbsp; ' + record.bookingDate + '</div>';
-    html += '    </div>';
-    html += '  </div>';
-    html += '</div>';
+    const card = document.createElement('div');
+    card.className = 'record-item';
+    card.style.cssText = 'background:#fff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.10);margin-bottom:12px;padding:15px;cursor:pointer;transition:box-shadow 0.2s,transform 0.2s;';
+
+    card.innerHTML =
+      '<div style=”display:flex;gap:15px;align-items:center;”>' +
+        '<div class=”scan-icon”>📷</div>' +
+        '<div style=”flex:1;”>' +
+          '<div style=”font-size:16px;font-weight:700;color:#333;margin-bottom:3px;”>' + (record.customerName || '-') + '</div>' +
+          (record.variant ? '<div style=”font-size:13px;color:#667eea;font-weight:600;margin-bottom:3px;”>' + record.variant + '</div>' : '') +
+          '<div style=”font-size:13px;color:#666;margin-bottom:3px;”>📱 ' + (record.mobileNo || '-') + '</div>' +
+          '<div style=”font-size:12px;color:#999;”>Receipt: ' + (record.receiptNo || '-') + ' &nbsp;·&nbsp; ' + (record.bookingDate || '') + '</div>' +
+        '</div>' +
+        '<div style=”color:#667eea;font-size:20px;”>›</div>' +
+      '</div>';
+
+    // Hover effect
+    card.addEventListener('mouseenter', function() {
+      card.style.boxShadow = '0 4px 16px rgba(102,126,234,0.25)';
+      card.style.transform = 'translateY(-2px)';
+    });
+    card.addEventListener('mouseleave', function() {
+      card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.10)';
+      card.style.transform = 'translateY(0)';
+    });
+
+    // Click — use data stored in closure, no string escaping needed
+    var receiptNo = String(record.receiptNo || '');
+    card.addEventListener('click', function() {
+      openScanner(receiptNo);
+    });
+
+    listContainer.appendChild(card);
   });
-  
-  listContainer.innerHTML = html;
 }
 
 /**
