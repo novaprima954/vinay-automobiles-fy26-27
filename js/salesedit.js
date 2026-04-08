@@ -861,12 +861,12 @@ function populateAcctMonthOptions() {
   const sel = document.getElementById('acctCheckMonth');
   if (!sel) return;
   const now = new Date();
-  let opts = '<option value="">All Months</option>';
+  let opts = '<option value="" selected>All Months</option>';
   for (let i = 0; i < 12; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
     const label = d.toLocaleString('default', { month: 'long', year: 'numeric' });
-    opts += `<option value="${val}" ${i === 0 ? 'selected' : ''}>${label}</option>`;
+    opts += `<option value="${val}">${label}</option>`;
   }
   sel.innerHTML = opts;
 }
