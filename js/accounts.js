@@ -140,9 +140,10 @@ function populateMonthOptions() {
     const option = document.createElement('option');
     option.value = value;
     option.textContent = label;
-    if (i === 0) option.selected = true;
     select.appendChild(option);
   }
+  // Default to All Months so no records are hidden by month filter
+  select.value = '';
 }
 
 /**
