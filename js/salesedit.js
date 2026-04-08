@@ -892,7 +892,7 @@ async function loadAccountCheckDashboard() {
     }
     grid.innerHTML = execs.map(exec => `
       <div class="acct-exec-card" onclick="showPendingForExec('${exec.replace(/'/g, "\\'")}')">
-        <div class="exec-name">${exec}</div>
+        <div class="exec-name">${exec || '⚠️ (No Name)'}</div>
         <div class="exec-count">${stats[exec].count}</div>
         <div class="exec-label">Pending Account Check</div>
       </div>

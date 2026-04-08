@@ -16,8 +16,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   currentUser = session.user;
-  document.getElementById('currentUser').textContent = currentUser.name;
-  document.getElementById('executiveName').value = currentUser.name;
+  const execDisplayName = currentUser.name || currentUser.username || '';
+  document.getElementById('currentUser').textContent = execDisplayName;
+  document.getElementById('executiveName').value = execDisplayName;
   
   // Set today's date as default
   const today = new Date().toISOString().split('T')[0];
@@ -582,7 +583,7 @@ function closeWhatsAppModal() {
  */
 function resetForm() {
   document.getElementById('salesForm').reset();
-  document.getElementById('executiveName').value = currentUser.name;
+  document.getElementById('executiveName').value = currentUser.name || currentUser.username || '';
   document.getElementById('accessoryFields').innerHTML = '';
   priceMasterDetails = null;
   updateTotals();
