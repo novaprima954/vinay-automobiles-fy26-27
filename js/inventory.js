@@ -777,14 +777,25 @@ async function loadHistory() {
   const fromDate = document.getElementById('histFrom').value;
   const toDate = document.getElementById('histTo').value;
 
-  const res = await API.inventoryCall('getInvTransactions', {
-    sessionId: invSessionId,
-    type, locationId, fromDate, toDate
-  });
+  // Show loading state
+  const tbody = document.getElementById('historyBody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; color:#999; padding:20px;">⏳ Loading transactions...</td></tr>';
 
-  if (res.success) {
-    invTransactions = res.transactions || [];
-    renderHistory();
+  try {
+    const res = await API.inventoryCall('getInvTransactions', {
+      sessionId: invSessionId,
+      type, locationId, fromDate, toDate
+    });
+
+    if (res.success) {
+      invTransactions = res.transactions || [];
+      renderHistory();
+    } else {
+      if (tbody) tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; color:#e74c3c; padding:20px;">❌ ' + (res.message || 'Failed to load transactions') + '</td></tr>';
+    }
+  } catch (err) {
+    console.error('loadHistory error:', err);
+    if (tbody) tbody.innerHTML = '<tr><td colspan="13" style="text-align:center; color:#e74c3c; padding:20px;">❌ Network error: ' + (err.message || 'Unknown error') + '</td></tr>';
   }
 }
 
