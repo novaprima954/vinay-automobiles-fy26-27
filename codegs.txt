@@ -189,7 +189,7 @@ function handleRequest(e) {
         result = calculatePrice(params.sessionId, params.receiptNo);
         break;
       case 'savePriceVerification':
-        result = savePriceVerification(params.sessionId, params.receiptNo, params.calculatedTotal, params.matched);
+        result = savePriceVerification(params.sessionId, params.receiptNo, params.calculatedTotal, params.matched, params.note);
         break;
       case 'getMyAccessoryBreakdown':
         result = getMyAccessoryBreakdown(params.sessionId, params.accessoryType, params.dateFilter);
@@ -554,7 +554,15 @@ function saveSales(sessionId, salesData) {
     }
     
     const sheet = getSheet(CONFIG.SHEETS.DATA);
-    
+
+    // Block duplicate receipt numbers
+    const existingData = sheet.getDataRange().getValues();
+    for (let i = 1; i < existingData.length; i++) {
+      if (String(existingData[i][0]).trim() === String(salesData.receiptNo).trim()) {
+        return { success: false, message: 'Receipt No ' + salesData.receiptNo + ' already exists. Duplicate entry not allowed.' };
+      }
+    }
+
     // Handle "Other" financier name
     let financierName = salesData.financierName || '';
     
@@ -579,7 +587,7 @@ function saveSales(sessionId, salesData) {
     // Build row data - EXACTLY 42 columns (A through AP)
     const rowData = [
       salesData.receiptNo || '',                    // 0:  A - Receipt No
-      salesData.executiveName || '',                // 1:  B - Executive Name
+      salesData.executiveName || user.name || user.username || '', // 1: B - Executive Name
       salesData.bookingDate || new Date(),          // 2:  C - Date
       salesData.customerName || '',                 // 3:  D - Customer Name
       salesData.mobileNo || '',                     // 4:  E - Mobile No
@@ -962,40 +970,45 @@ function getAccountsDashboard(sessionId, month) {
     if (!validation.success) {
       return validation;
     }
-    
+
     const user = validation.user;
     if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
     }
-    
+
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data = sheet.getDataRange().getValues();
-    
-    // Parse month (format: YYYY-MM)
-    const [year, monthNum] = month.split('-');
-    
+
+    // Parse month (format: YYYY-MM), empty = All Months
+    const parts = month ? month.split('-') : [];
+    const filterYear  = parts[0] ? parseInt(parts[0]) : null;
+    const filterMonth = parts[1] ? parseInt(parts[1]) : null;
+
     let yesCount = 0;
     let noCount = 0;
     let blankCount = 0;
-    
+
     // Count records for the selected month (skip header)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
+      if (!row[0]) continue;
       const bookingDate = row[2]; // Column C: Date
       const accountCheck = row[21]; // Column V: Account Check
-      
-      // Check if record is in the selected month
-      if (bookingDate) {
+
+      // Month filter (skip if month specified and doesn't match)
+      if (filterYear && filterMonth && bookingDate) {
         const recordDate = new Date(bookingDate);
-        if (recordDate.getFullYear() == year && (recordDate.getMonth() + 1) == monthNum) {
-          if (accountCheck === 'Yes') {
-            yesCount++;
-          } else if (accountCheck === 'No') {
-            noCount++;
-          } else {
-            blankCount++;
-          }
+        if (recordDate.getFullYear() !== filterYear || (recordDate.getMonth() + 1) !== filterMonth) {
+          continue;
         }
+      }
+
+      if (accountCheck === 'Yes') {
+        yesCount++;
+      } else if (accountCheck === 'No') {
+        noCount++;
+      } else {
+        blankCount++;
       }
     }
     
@@ -1026,52 +1039,57 @@ function getAccountsByStatus(sessionId, month, status) {
     if (!validation.success) {
       return validation;
     }
-    
+
     const user = validation.user;
     if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
     }
-    
+
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data = sheet.getDataRange().getValues();
-    
-    // Parse month
-    const [year, monthNum] = month.split('-');
-    
+
+    // Parse month (format: YYYY-MM), empty = All Months
+    const parts = month ? month.split('-') : [];
+    const filterYear  = parts[0] ? parseInt(parts[0]) : null;
+    const filterMonth = parts[1] ? parseInt(parts[1]) : null;
+
     const results = [];
-    
+
     // Filter records (skip header)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
+      if (!row[0]) continue;
       const bookingDate = row[2]; // Column C
       const accountCheck = row[21]; // Column V
-      
-      if (bookingDate) {
+
+      // Month filter
+      if (filterYear && filterMonth && bookingDate) {
         const recordDate = new Date(bookingDate);
-        if (recordDate.getFullYear() == year && (recordDate.getMonth() + 1) == monthNum) {
-          let matches = false;
-          
-          if (status === 'yes' && accountCheck === 'Yes') {
-            matches = true;
-          } else if (status === 'no' && accountCheck === 'No') {
-            matches = true;
-          } else if (status === 'blank' && (!accountCheck || accountCheck === '')) {
-            matches = true;
-          }
-          
-          if (matches) {
-            results.push({
-              receiptNo: row[0],
-              executiveName: row[1],
-              bookingDate: formatDate(row[2]),
-              customerName: row[3],
-              mobileNo: row[4],
-              model: row[5],
-              variant: row[6],
-              accountCheck: accountCheck || 'Blank'
-            });
-          }
+        if (recordDate.getFullYear() !== filterYear || (recordDate.getMonth() + 1) !== filterMonth) {
+          continue;
         }
+      }
+
+      let matches = false;
+      if (status === 'yes' && accountCheck === 'Yes') {
+        matches = true;
+      } else if (status === 'no' && accountCheck === 'No') {
+        matches = true;
+      } else if (status === 'blank' && accountCheck !== 'Yes' && accountCheck !== 'No') {
+        matches = true;
+      }
+
+      if (matches) {
+        results.push({
+          receiptNo: row[0],
+          executiveName: row[1],
+          bookingDate: formatDate(row[2]),
+          customerName: row[3],
+          mobileNo: row[4],
+          model: row[5],
+          variant: row[6],
+          accountCheck: accountCheck || 'Blank'
+        });
       }
     }
     
@@ -1701,15 +1719,15 @@ function getPriceMasterDetails(sessionId, model, variant) {
 /**
  * Save price verification result
  */
-function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched) {
+function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched, note) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) {
       return validation;
     }
-    
+
     const user = validation.user;
-    
+
     // Only accounts and admin can save
     if (user.role !== 'accounts' && user.role !== 'admin') {
       return {
@@ -1731,8 +1749,9 @@ function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched) {
         // Save to Column BE (57): PriceMaster calculated value
         sheet.getRange(targetRow, 57).setValue(calculatedTotal);
         
-        // Save to Column BF (58): Price Matched
-        sheet.getRange(targetRow, 58).setValue(matched ? 'Yes' : 'No');
+        // Save to Column BF (58): Price Matched (with optional note when No)
+        const priceMatchedValue = matched ? 'Yes' : (note ? 'No \u2014 ' + note : 'No');
+        sheet.getRange(targetRow, 58).setValue(priceMatchedValue);
         
         SpreadsheetApp.flush();
         
@@ -1807,11 +1826,10 @@ function getCRMDashboard(sessionId) {
         continue;
       }
       
-      totalLeads++;
-      
       // Admin sees all, sales sees only their own
       if (user.role === 'admin' || assignedTo === user.name) {
-        
+        totalLeads++;
+
         if (status === 'New') myNew++;
         if (status === 'Hot Lead') myHot++;
         if (status === 'Converted') converted++;
@@ -2963,18 +2981,24 @@ function getAdminDashboard(sessionId, dateFilter) {
     // Filter by date range
     const filteredData = filterByDateRange(data, dateFilter, 2);
     
-    let totalSales = filteredData.length - 1; // Exclude header
+    let totalBookings = filteredData.length - 1; // All rows (excluding header)
+    let totalSales = 0;       // Only where Account Check = Yes
     let accountsYes = 0;
     let accountsPending = 0;
     let accountsIssues = 0;
     let accessoriesFitted = 0;
     let accessoriesPending = 0;
     let accessoriesIssues = 0;
-    
-    // Executive stats (by Account Check = Yes)
+
+    // Operator pending counts (for account-checked rows)
+    let dmsPending = 0;
+    let vahanPending = 0;
+    let insurancePending = 0;
+
+    // Executive stats
     const executiveStats = {};
-    
-    // Accessories breakdown
+
+    // Accessories breakdown (Account Check = Yes only)
     const accessories = {
       guard: 0,
       grip: 0,
@@ -2983,44 +3007,41 @@ function getAdminDashboard(sessionId, dateFilter) {
       matin: 0,
       tankCover: 0,
       handleHook: 0,
-      rainCover: 0, 
-      buzzer: 0, 
+      rainCover: 0,
+      buzzer: 0,
       backRest: 0,
     };
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+
+    // Model breakdown (Account Check = Yes only)
+    const modelCounts = {};
+
     // Process data (skip header)
     for (let i = 1; i < filteredData.length; i++) {
       const row = filteredData[i];
       const executive = row[1];
-      const bookingDate = new Date(row[2]);
       const accountCheck = row[21];
       const accessoryFitted = row[36];
-      
-      bookingDate.setHours(0, 0, 0, 0);
-      const daysAgo = Math.floor((today - bookingDate) / (1000 * 60 * 60 * 24));
-      
+      const model = row[5];
+
       // Accounts status
       if (accountCheck === 'Yes') {
         accountsYes++;
+        totalSales++;
       } else if (accountCheck === 'No') {
         accountsIssues++;
       } else {
         accountsPending++;
       }
-      
-      // Accessories status
+
+      // Accessories status - consistent with accounts (explicit Yes/No/blank)
       if (accessoryFitted === 'Yes') {
         accessoriesFitted++;
+      } else if (accessoryFitted === 'No') {
+        accessoriesIssues++;
       } else {
         accessoriesPending++;
-        if (daysAgo > 7) {
-          accessoriesIssues++;
-        }
       }
-      
+
       // Executive stats
       if (!executiveStats[executive]) {
         executiveStats[executive] = {
@@ -3032,8 +3053,8 @@ function getAdminDashboard(sessionId, dateFilter) {
       if (accountCheck === 'Yes') {
         executiveStats[executive].completedSales++;
       }
-      
-      // FIXED: Count accessories only when Account Check = Yes AND accessory = Yes
+
+      // Count accessories, model, operator only when Account Check = Yes
       if (accountCheck === 'Yes') {
         if (row[12] === 'Yes') accessories.guard++;
         if (row[13] === 'Yes') accessories.grip++;
@@ -3046,15 +3067,29 @@ function getAdminDashboard(sessionId, dateFilter) {
         if (row[62] === 'Yes') accessories.buzzer++;
         if (row[63] === 'Yes') accessories.backRest++;
 
+        // Model breakdown
+        if (model) {
+          modelCounts[model] = (modelCounts[model] || 0) + 1;
+        }
+
+        // Operator pending for account-checked rows
+        if (row[42] !== 'Yes') dmsPending++;
+        if (row[45] !== 'Yes') insurancePending++;
+        if (row[48] !== 'Yes') vahanPending++;
       }
     }
-    
+
     // Convert executive stats to sorted array (by completed sales)
     const executiveList = Object.keys(executiveStats).map(exec => ({
       executive: exec,
       totalSales: executiveStats[exec].totalSales,
       completedSales: executiveStats[exec].completedSales
     })).sort((a, b) => b.completedSales - a.completedSales);
+
+    // Convert model counts to sorted array
+    const modelBreakdown = Object.keys(modelCounts).map(function(m) {
+      return { model: m, count: modelCounts[m] };
+    }).sort(function(a, b) { return b.count - a.count; });
     
     // Get CRM stats
     const crmSheet = getSheet('CRM_Leads');
@@ -3076,6 +3111,7 @@ function getAdminDashboard(sessionId, dateFilter) {
     return {
       success: true,
       dashboard: {
+        totalBookings: totalBookings,
         totalSales: totalSales,
         accountsYes: accountsYes,
         accountsPending: accountsPending,
@@ -3083,8 +3119,15 @@ function getAdminDashboard(sessionId, dateFilter) {
         accessoriesFitted: accessoriesFitted,
         accessoriesPending: accessoriesPending,
         accessoriesIssues: accessoriesIssues,
+        operatorStatus: {
+          total: totalSales,
+          dmsPending: dmsPending,
+          vahanPending: vahanPending,
+          insurancePending: insurancePending
+        },
         executiveList: executiveList,
         accessories: accessories,
+        modelBreakdown: modelBreakdown,
         crmNewLeads: newLeads,
         crmHotLeads: hotLeads,
         crmConversionRate: conversionRate
@@ -4074,15 +4117,15 @@ function calculatePrice(sessionId, receiptNo) {
 /**
  * Save price verification result
  */
-function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched) {
+function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched, note) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) {
       return validation;
     }
-    
+
     const user = validation.user;
-    
+
     // Only accounts and admin can save
     if (user.role !== 'accounts' && user.role !== 'admin') {
       return {
@@ -4416,36 +4459,48 @@ function getAccessoryDashboardData(sessionId, month) {
     
     // Parse month (format: YYYY-MM)
     const [year, monthNum] = month.split('-');
-    
+
     let yesCount = 0;
     let accountsYesAccessoryBlankCount = 0;
     let blankCount = 0;
     let partialCount = 0;
-    
-    // Count records for the selected month (skip header)
+    let todayDeliveryCount = 0;
+
+    // Today's date (midnight) for same-day comparison
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    // Single pass: count monthly stats AND today's deliveries together
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const deliveryDate = row[11]; // Column L: Delivery Date
       const accountCheck = row[21]; // Column V: Account Check
       const accessoryFitted = row[36]; // Column AK: Accessory Fitted
-      
-      // Check if record is in the selected month (by delivery date)
-      if (deliveryDate) {
-        const recordDate = new Date(deliveryDate);
-        if (recordDate.getFullYear() == year && (recordDate.getMonth() + 1) == monthNum) {
-          if (accessoryFitted === 'Yes') {
-            yesCount++;
-          } else if (accountCheck === 'Yes' && (!accessoryFitted || accessoryFitted === '')) {
-            accountsYesAccessoryBlankCount++;
-          } else if (!accessoryFitted || accessoryFitted === '') {
-            blankCount++;
-          } else if (accessoryFitted === 'No') {
-            partialCount++;
-          }
+
+      if (!deliveryDate) continue;
+      const recordDate = new Date(deliveryDate);
+
+      // Today's delivery count (all statuses)
+      if (recordDate >= todayStart && recordDate <= todayEnd) {
+        todayDeliveryCount++;
+      }
+
+      // Monthly stats
+      if (recordDate.getFullYear() == year && (recordDate.getMonth() + 1) == monthNum) {
+        if (accessoryFitted === 'Yes') {
+          yesCount++;
+        } else if (accountCheck === 'Yes' && (!accessoryFitted || accessoryFitted === '')) {
+          accountsYesAccessoryBlankCount++;
+        } else if (!accessoryFitted || accessoryFitted === '') {
+          blankCount++;
+        } else if (accessoryFitted === 'No') {
+          partialCount++;
         }
       }
     }
-    
+
     return {
       success: true,
       data: {
@@ -4453,7 +4508,8 @@ function getAccessoryDashboardData(sessionId, month) {
         accountsYesAccessoryBlank: accountsYesAccessoryBlankCount,
         blank: blankCount,
         partial: partialCount,
-        total: yesCount + accountsYesAccessoryBlankCount + blankCount + partialCount
+        total: yesCount + accountsYesAccessoryBlankCount + blankCount + partialCount,
+        todayDelivery: todayDeliveryCount
       }
     };
     
@@ -5363,6 +5419,7 @@ function getPendingVehicleRecords(params) {
           bookingDate: formatDate(bookingDate),
           customerName: customerName,
           mobileNo: mobileNo,
+          variant: String(row[6] || ''),
           engineNumber: engineNumber || '',
           frameNumber: frameNumber || ''
         });
@@ -7615,6 +7672,10 @@ function updateInvStock(skuId, locationId, qtyDelta) {
 //          refTxnId | remarks | enteredBy | variant | frameNo | invoiceNo
 function logInvTransaction(type, skuId, skuName, fromLoc, toLoc, qty, receiptNo, customerName, executiveName, otcReceiptNo, saleAmount, refTxnId, remarks, user, variant, frameNo, invoiceNo) {
   const sheet = getSheet('InvTransactions');
+  // Add header row if sheet is brand new (no rows yet)
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['TxnId','Date','Type','SkuId','SkuName','FromLocation','ToLocation','Qty','ReceiptNo','CustomerName','ExecutiveName','OtcReceiptNo','SaleAmount','RefTxnId','Remarks','EnteredBy','Variant','FrameNo','InvoiceNo']);
+  }
   const date = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
   sheet.appendRow([
     generateTxnId(), date, type, skuId, skuName,
@@ -8057,10 +8118,22 @@ const user = validation.user;
     const data = sheet.getDataRange().getValues();
     const transactions = [];
     
-    for (let i = 1; i < data.length; i++) {
+    for (let i = 0; i < data.length; i++) {
       const row = data[i];
       if (!row[0]) continue;
-      const rowDate = String(row[1]).substring(0, 10);
+      // Skip header row (TxnId column header)
+      if (String(row[0]).toString().toLowerCase() === 'txnid') continue;
+      // Handle date: Google Sheets may return a Date object instead of string
+      const rawDate = row[1];
+      let rowDate = '';
+      let displayDate = '';
+      if (rawDate instanceof Date) {
+        rowDate = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+        displayDate = Utilities.formatDate(rawDate, Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+      } else {
+        rowDate = String(rawDate).substring(0, 10);
+        displayDate = String(rawDate).substring(0, 16);
+      }
       if (type && row[2] !== type) continue;
       if (fromDate && rowDate < fromDate) continue;
       if (toDate && rowDate > toDate) continue;
@@ -8070,7 +8143,7 @@ const user = validation.user;
         if (row[5] !== locName && row[6] !== locName) continue;
       }
       transactions.push({
-        txnId: row[0], date: row[1], type: row[2],
+        txnId: row[0], date: displayDate, type: row[2],
         skuId: row[3], skuName: row[4],
         fromLocation: row[5], toLocation: row[6], qty: row[7],
         receiptNo: row[8], customerName: row[9], executiveName: row[10],
@@ -8196,7 +8269,9 @@ function getPendingAccountCheck(params, sessionId) {
       // Role: sales sees only own
       if (user.role === 'sales') {
         const userName = (user.name || user.username || '').trim();
-        if (executive.toLowerCase() !== userName.toLowerCase()) continue;
+        const userAlias = (user.username || '').trim();
+        const execLower = executive.toLowerCase();
+        if (execLower !== userName.toLowerCase() && execLower !== userAlias.toLowerCase()) continue;
       }
 
       if (!stats[executive]) stats[executive] = { count: 0, records: [] };
@@ -8268,7 +8343,7 @@ function addSalaryEmployee(sessionId, data) {
   try {
     const session = validateSession(sessionId);
     if (!session.success) return { success: false, message: 'Not logged in' };
-    if (session.user.role !== 'admin') return { success: false, message: 'Admin only' };
+    if (session.user.role !== 'admin' && session.user.role !== 'accounts') return { success: false, message: 'Access denied' };
     const sheet = getSalarySheet_(CONFIG.SHEETS.SALARY_EMPLOYEES);
     if (!sheet) return { success: false, message: 'SalaryEmployees sheet not found' };
     const existing = sheet.getDataRange().getValues();
