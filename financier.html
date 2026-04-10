@@ -367,6 +367,48 @@
       gap: 10px;
     }
 
+    /* ---- TABS ---- */
+    .tab-nav {
+      display: flex;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+      overflow: hidden;
+    }
+
+    .fin-tab {
+      flex: 1;
+      padding: 14px 20px;
+      border: none;
+      background: transparent;
+      font-size: 15px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      transition: all 0.2s;
+      border-bottom: 3px solid transparent;
+    }
+
+    .fin-tab:hover { background: #f8f9fa; color: #333; }
+
+    .fin-tab.active {
+      color: #667eea;
+      border-bottom: 3px solid #667eea;
+      background: #f5f6ff;
+    }
+
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ---- PAYOUT FORM ---- */
+    .payout-form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
     /* ---- RESPONSIVE ---- */
     @media (max-width: 768px) {
       body {
@@ -417,80 +459,151 @@
       <p>HP Finance Tracking</p>
     </div>
 
-    <!-- Filter Section -->
-    <div class="card">
-      <div class="filter-row">
-        <div class="form-group">
-          <label for="filterCustomer">Customer Name</label>
-          <input type="text" id="filterCustomer" placeholder="Search by customer name...">
-        </div>
-        <div class="form-group">
-          <label for="filterRefCustomer">Ref Customer</label>
-          <select id="filterRefCustomer">
-            <option value="">-- All --</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label for="filterFinancier">Financier / HP Company</label>
-          <select id="filterFinancier">
-            <option value="">-- All --</option>
-          </select>
-        </div>
-        <div class="btn-group-filter">
-          <button class="btn btn-primary" onclick="applyFilters()">&#128269; Apply Filters</button>
-          <button class="btn btn-secondary" onclick="clearFilters()">&#8635; Clear</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Page Message -->
     <div id="pageMessage" class="page-message"></div>
 
-    <!-- Data Table -->
-    <div class="card" style="padding: 0; overflow: hidden;">
-      <div style="padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
-        <h2 style="color: #333; font-size: 18px; margin: 0;">HP Finance Records</h2>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
-          <select id="sortDiff" onchange="sortRecords()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;">
-            <option value="all">Sort: All Records</option>
-            <option value="positive">Difference &gt; 0 (Pending)</option>
-            <option value="zero">Difference = 0 (Balanced)</option>
-            <option value="negative">Difference &lt; 0 (Excess)</option>
-            <option value="nodata">No Data</option>
-          </select>
-          <button class="btn btn-secondary" onclick="exportToExcel()" style="font-size:13px;padding:8px 16px;">&#128202; Export Excel</button>
-          <button class="btn btn-primary" id="saveAllBtn" onclick="saveAllRows()" style="font-size:13px;padding:8px 16px;">&#128190; Save All</button>
+    <!-- Tab Nav -->
+    <div class="tab-nav">
+      <button id="tab-finance" class="fin-tab active" onclick="switchTab('finance')">&#128196; HP Finance</button>
+      <button id="tab-payout" class="fin-tab" onclick="switchTab('payout')">&#128179; Payout</button>
+    </div>
+
+    <!-- ===== PANEL: HP FINANCE ===== -->
+    <div id="panel-finance" class="tab-panel active">
+
+      <!-- Filter Section -->
+      <div class="card">
+        <div class="filter-row">
+          <div class="form-group">
+            <label for="filterCustomer">Customer Name</label>
+            <input type="text" id="filterCustomer" placeholder="Search by customer name...">
+          </div>
+          <div class="form-group">
+            <label for="filterRefCustomer">Ref Customer</label>
+            <select id="filterRefCustomer">
+              <option value="">-- All --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="filterFinancier">Financier / HP Company</label>
+            <select id="filterFinancier">
+              <option value="">-- All --</option>
+            </select>
+          </div>
+          <div class="btn-group-filter">
+            <button class="btn btn-primary" onclick="applyFilters()">&#128269; Apply Filters</button>
+            <button class="btn btn-secondary" onclick="clearFilters()">&#8635; Clear</button>
+          </div>
         </div>
       </div>
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Sr No</th>
-              <th>Invoice No</th>
-              <th>Invoice Date</th>
-              <th>Customer</th>
-              <th>Mobile</th>
-              <th>Model</th>
-              <th>Ref Customer</th>
-              <th>Financier</th>
-              <th>Disbursal Amt</th>
-              <th>Received Amt</th>
-              <th>Received Date</th>
-              <th>DO Date</th>
-              <th>DO No</th>
-              <th>Difference</th>
-              <th>Save</th>
-            </tr>
-          </thead>
-          <tbody id="financierBody">
-            <tr>
-              <td colspan="15" style="text-align:center;padding:40px;color:#666;">Loading...</td>
-            </tr>
-          </tbody>
-        </table>
+
+      <!-- Data Table -->
+      <div class="card" style="padding: 0; overflow: hidden;">
+        <div style="padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+          <h2 style="color: #333; font-size: 18px; margin: 0;">HP Finance Records</h2>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <select id="sortDiff" onchange="sortRecords()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;">
+              <option value="all">Sort: All Records</option>
+              <option value="positive">Difference &gt; 0 (Pending)</option>
+              <option value="zero">Difference = 0 (Balanced)</option>
+              <option value="negative">Difference &lt; 0 (Excess)</option>
+              <option value="nodata">No Data</option>
+            </select>
+            <button class="btn btn-secondary" onclick="exportToExcel()" style="font-size:13px;padding:8px 16px;">&#128202; Export Excel</button>
+            <button class="btn btn-primary" id="saveAllBtn" onclick="saveAllRows()" style="font-size:13px;padding:8px 16px;">&#128190; Save All</button>
+          </div>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Sr No</th><th>Invoice No</th><th>Invoice Date</th><th>Customer</th>
+                <th>Mobile</th><th>Model</th><th>Ref Customer</th><th>Financier</th>
+                <th>Disbursal Amt</th><th>Received Amt</th><th>Received Date</th>
+                <th>DO Date</th><th>DO No</th><th>Difference</th><th>Save</th>
+              </tr>
+            </thead>
+            <tbody id="financierBody">
+              <tr><td colspan="15" style="text-align:center;padding:40px;color:#666;">Loading...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
+
+    </div><!-- /panel-finance -->
+
+    <!-- ===== PANEL: PAYOUT ===== -->
+    <div id="panel-payout" class="tab-panel">
+
+      <!-- Add Payout Form -->
+      <div class="card">
+        <h3 style="margin:0 0 18px;color:#333;font-size:16px;font-weight:700;">&#43; Add Payout Entry</h3>
+        <div class="payout-form-grid">
+          <div class="form-group">
+            <label for="payInvoiceAmount">Invoice Amount (&#8377;)</label>
+            <input type="number" id="payInvoiceAmount" placeholder="0" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label for="payPayoutAmount">Payout Amount (&#8377;)</label>
+            <input type="number" id="payPayoutAmount" placeholder="0" min="0" step="0.01">
+          </div>
+          <div class="form-group">
+            <label for="payPayoutMonth">Payout Month</label>
+            <input type="month" id="payPayoutMonth">
+          </div>
+          <div class="form-group">
+            <label for="payNotes">Notes (optional)</label>
+            <input type="text" id="payNotes" placeholder="Any notes...">
+          </div>
+        </div>
+        <div style="display:flex;gap:10px;">
+          <button class="btn btn-primary" id="paySubmitBtn" onclick="savePayout()">&#128190; Save Payout</button>
+          <button class="btn btn-secondary" onclick="clearPayoutForm()">&#8635; Clear</button>
+        </div>
+        <div id="payoutFormMsg" class="page-message" style="margin-top:14px;margin-bottom:0;"></div>
+      </div>
+
+      <!-- Filter Payouts -->
+      <div class="card">
+        <div class="filter-row">
+          <div class="form-group">
+            <label for="payFilterMonth">Filter by Month</label>
+            <input type="month" id="payFilterMonth">
+          </div>
+          <div class="btn-group-filter">
+            <button class="btn btn-primary" onclick="loadPayouts()">&#128269; Apply</button>
+            <button class="btn btn-secondary" onclick="clearPayoutFilter()">&#8635; Clear</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Payout Records Table -->
+      <div class="card" style="padding:0;overflow:hidden;">
+        <div style="padding:16px 24px;border-bottom:1px solid #f0f0f0;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+          <h2 style="color:#333;font-size:18px;margin:0;">Payout Records</h2>
+          <button class="btn btn-secondary" onclick="exportPayoutExcel()" style="font-size:13px;padding:8px 16px;">&#128202; Export Excel</button>
+        </div>
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date Added</th>
+                <th>Invoice Amount</th>
+                <th>Payout Amount</th>
+                <th>Payout Month</th>
+                <th>Notes</th>
+                <th>Entered By</th>
+              </tr>
+            </thead>
+            <tbody id="payoutBody">
+              <tr><td colspan="7" style="text-align:center;padding:30px;color:#999;">Select the Payout tab to load records</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /panel-payout -->
 
   </div><!-- /.container -->
 
