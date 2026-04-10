@@ -280,6 +280,7 @@ case 'invReturn':          result = invReturn(params, params.sessionId); break;
 case 'getInvTransactions': result = getInvTransactions(params, params.sessionId); break;
 case 'cancelBooking':          result = cancelBooking(params, params.sessionId); break;
 case 'getPendingAccountCheck': result = getPendingAccountCheck(params, params.sessionId); break;
+case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);              break;
 case 'verifySalaryPassword': result = verifySalaryPassword(params.sessionId, params.password); break;
 case 'getSalaryEmployees': result = getSalaryEmployees(params.sessionId); break;
 case 'addSalaryEmployee': result = addSalaryEmployee(params.sessionId, JSON.parse(params.data)); break;
@@ -8396,6 +8397,42 @@ function cancelBooking(params, sessionId) {
       }
     }
     return { success: false, message: 'Record not found: ' + receiptNo };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Return unique executive names from column B of Data sheet.
+ * Sales role: returns only their own name.
+ * Admin/accounts: returns all unique names.
+ */
+function getExecutiveNames(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data = sheet.getDataRange().getValues();
+    const nameSet = new Set();
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+      const name = String(row[1] || '').trim();
+      if (!name) continue;
+
+      if (user.role === 'sales') {
+        const userName  = (user.name     || '').trim().toLowerCase();
+        const userAlias = (user.username || '').trim().toLowerCase();
+        if (name.toLowerCase() !== userName && name.toLowerCase() !== userAlias) continue;
+      }
+
+      nameSet.add(name);
+    }
+
+    const names = Array.from(nameSet).sort();
+    return { success: true, names };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
