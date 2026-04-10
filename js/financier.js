@@ -143,11 +143,11 @@ function renderTable(data) {
   data.forEach(function(record, idx) {
     const ds = diffStyle(record.disbursalAmount, record.amountReceived);
     const dt = diffText(record.disbursalAmount, record.amountReceived);
-    const invoiceEsc = (record.invoiceNo || '').replace(/"/g, '&quot;');
+    const invoiceEsc = String(record.invoiceNo || '').replace(/"/g, '&quot;');
 
     html += '<tr id="frow-' + idx + '" data-invoice="' + invoiceEsc + '">';
     html += '<td style="white-space:nowrap;">' + (record.srNo || '—') + '</td>';
-    html += '<td style="white-space:nowrap;font-weight:600;">' + (record.invoiceNo || '—') + '</td>';
+    html += '<td style="white-space:nowrap;font-weight:600;">' + (record.invoiceNo !== '' && record.invoiceNo !== null && record.invoiceNo !== undefined ? String(record.invoiceNo) : '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.invoiceDate || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.customerName || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.mobileNo || '—') + '</td>';
