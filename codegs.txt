@@ -20,7 +20,8 @@ const CONFIG = {
 
   },
   SESSION_DURATION: 9 * 60 * 60 * 1000, // 9 hours
-  SALARY_PASSWORD: 'advait55'
+  SALARY_PASSWORD: 'advait55',
+  DISBURSEMENT_REPORT_PASSWORD: 'advait66&'
 };
 
 // ==========================================
@@ -241,7 +242,8 @@ case 'saveFinancierData':      result = saveFinancierData(params, params.session
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'savePayout':             result = savePayout(params, params.sessionId);             break;
 case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
-case 'getFinancierReport':     result = getFinancierReport(params.sessionId);             break;
+case 'getFinancierReport':          result = getFinancierReport(params.sessionId);                           break;
+case 'getDisbursementComparison':   result = getDisbursementComparison(params.sessionId, params.password);   break;
 case 'getVehicleMileageDashboard':
   result = getVehicleMileageDashboard(params.sessionId);
   break;
@@ -7189,6 +7191,67 @@ function getFinancierReport(sessionId) {
     });
 
     return { success: true, report: result };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Disbursement Comparison Report — admin only, password protected
+ * Joins Data sheet (col BI = frame, col AG = disbursed) with
+ * HSRP sheet (col G = frame, col N = disbursal) by Frame Number.
+ * Returns: customerName, variant, frameNo, dataDisbursed, hsrpDisbursed, difference
+ */
+function getDisbursementComparison(sessionId, password) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin') return { success: false, message: 'Access denied — admin only' };
+    if (password !== CONFIG.DISBURSEMENT_REPORT_PASSWORD) return { success: false, message: 'Incorrect password' };
+
+    // --- Read HSRP: build map of frameNo → hsrpDisbursed ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+    const hsrpMap   = {}; // { frameNo: disbursalAmount }
+    for (let i = 1; i < hsrpData.length; i++) {
+      const row    = hsrpData[i];
+      const frame  = String(row[6] || '').trim();   // col G: Frame No
+      const disb   = parseFloat(row[13]);            // col N: Disbursal Amount
+      if (frame) hsrpMap[frame] = isNaN(disb) ? '' : disb;
+    }
+
+    // --- Read Data sheet ---
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const data      = dataSheet.getDataRange().getValues();
+    const rows      = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row      = data[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+
+      const frame        = String(row[60] || '').trim();  // col BI: Frame Number
+      if (!frame) continue;
+
+      const customerName  = String(row[3]  || '').trim(); // col D
+      const variant       = String(row[6]  || '').trim(); // col G
+      const dataDisbursed = parseFloat(row[32]);           // col AG: Disbursed Amount
+      const dataDisb      = isNaN(dataDisbursed) ? '' : dataDisbursed;
+      const hsrpDisb      = hsrpMap.hasOwnProperty(frame) ? hsrpMap[frame] : null; // null = not found in HSRP
+      const diff          = (dataDisb !== '' && hsrpDisb !== null && hsrpDisb !== '')
+                            ? (parseFloat(hsrpDisb) - parseFloat(dataDisb)) : null;
+
+      rows.push({
+        customerName,
+        variant,
+        frameNo:       frame,
+        dataDisbursed: dataDisb,
+        hsrpDisbursed: hsrpDisb,
+        difference:    diff,
+        matched:       diff !== null && diff === 0
+      });
+    }
+
+    return { success: true, rows };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
