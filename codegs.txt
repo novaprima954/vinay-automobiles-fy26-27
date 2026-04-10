@@ -7058,12 +7058,13 @@ function savePayout(params, sessionId) {
     const sheet = getSheet('financierpayout');
     // Add header if sheet is brand new
     if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['PayoutId', 'CreatedDate', 'InvoiceAmount', 'PayoutAmount', 'PayoutMonth', 'Notes', 'EnteredBy']);
+      sheet.appendRow(['PayoutId', 'CreatedDate', 'InvoiceAmount', 'PayoutAmount', 'PayoutMonth', 'Notes', 'EnteredBy', 'HPCompany']);
     }
 
     const payoutId   = 'PAY-' + Date.now();
     const created    = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
     const enteredBy  = user.name || user.username || '';
+    const { invoiceAmount, payoutAmount, hpCompany, payoutMonth, notes } = params;
 
     sheet.appendRow([
       payoutId,
@@ -7072,7 +7073,8 @@ function savePayout(params, sessionId) {
       payoutAmount  !== '' && payoutAmount  !== null && payoutAmount  !== undefined ? payoutAmount  : '',
       payoutMonth   || '',
       notes         || '',
-      enteredBy
+      enteredBy,
+      hpCompany     || ''
     ]);
 
     return { success: true, message: 'Payout saved successfully' };
@@ -7120,7 +7122,8 @@ function getPayouts(params, sessionId) {
         payoutAmount:  row[3] !== '' && row[3] !== null && row[3] !== undefined ? row[3] : '',
         payoutMonth:   row[4] || '',
         notes:         row[5] || '',
-        enteredBy:     row[6] || ''
+        enteredBy:     row[6] || '',
+        hpCompany:     row[7] || ''
       });
     }
 
