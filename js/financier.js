@@ -397,6 +397,165 @@ function exportToExcel() {
 }
 
 // ==========================================
+// TAB SWITCHING
+// ==========================================
+
+function switchTab(tab) {
+  document.querySelectorAll('.fin-tab').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById('panel-' + tab).classList.add('active');
+  if (tab === 'payout') loadPayouts();
+}
+
+// ==========================================
+// PAYOUT — LOAD & RENDER
+// ==========================================
+
+let payoutRecords = [];
+
+async function loadPayouts() {
+  const session = SessionManager.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const month = (document.getElementById('payFilterMonth') || {}).value || '';
+  const tbody = document.getElementById('payoutBody');
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#666;">Loading...</td></tr>';
+
+  try {
+    const res = await API.call('getPayouts', { sessionId: session.sessionId, month });
+    if (res.success) {
+      payoutRecords = res.payouts || [];
+      renderPayouts(payoutRecords);
+    } else {
+      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#dc3545;">Error: ' + (res.message || 'Failed to load') + '</td></tr>';
+    }
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#dc3545;">Error: ' + err.message + '</td></tr>';
+  }
+}
+
+function renderPayouts(data) {
+  const tbody = document.getElementById('payoutBody');
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#999;">No payout records found</td></tr>';
+    return;
+  }
+  let html = '';
+  data.forEach(function(p, idx) {
+    html += '<tr>';
+    html += '<td style="color:#999;font-size:12px;">' + (idx + 1) + '</td>';
+    html += '<td style="white-space:nowrap;font-size:12px;">' + (p.createdDate || '—') + '</td>';
+    html += '<td style="font-weight:600;">' + (p.invoiceAmount !== '' && p.invoiceAmount !== null ? formatCurrency(p.invoiceAmount) : '—') + '</td>';
+    html += '<td style="font-weight:600;color:#166534;">' + (p.payoutAmount !== '' && p.payoutAmount !== null ? formatCurrency(p.payoutAmount) : '—') + '</td>';
+    html += '<td style="white-space:nowrap;">' + (p.payoutMonth || '—') + '</td>';
+    html += '<td style="color:#555;font-size:13px;">' + (p.notes || '—') + '</td>';
+    html += '<td style="font-size:12px;color:#999;">' + (p.enteredBy || '—') + '</td>';
+    html += '</tr>';
+  });
+  tbody.innerHTML = html;
+}
+
+function clearPayoutFilter() {
+  document.getElementById('payFilterMonth').value = '';
+  loadPayouts();
+}
+
+// ==========================================
+// PAYOUT — SAVE
+// ==========================================
+
+async function savePayout() {
+  const session = SessionManager.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const invoiceAmountRaw = document.getElementById('payInvoiceAmount').value.trim();
+  const payoutAmountRaw  = document.getElementById('payPayoutAmount').value.trim();
+  const payoutMonth      = document.getElementById('payPayoutMonth').value.trim();
+  const notes            = document.getElementById('payNotes').value.trim();
+
+  // Validate
+  if (!invoiceAmountRaw && !payoutAmountRaw && !payoutMonth) {
+    showPayoutMsg('Please fill in at least Invoice Amount, Payout Amount or Payout Month.', 'error');
+    return;
+  }
+  let invoiceAmount = '';
+  let payoutAmount  = '';
+  if (invoiceAmountRaw !== '') {
+    invoiceAmount = parseFloat(invoiceAmountRaw);
+    if (isNaN(invoiceAmount)) { showPayoutMsg('Invoice Amount must be a valid number.', 'error'); return; }
+  }
+  if (payoutAmountRaw !== '') {
+    payoutAmount = parseFloat(payoutAmountRaw);
+    if (isNaN(payoutAmount)) { showPayoutMsg('Payout Amount must be a valid number.', 'error'); return; }
+  }
+
+  const btn = document.getElementById('paySubmitBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+
+  try {
+    const res = await API.call('savePayout', {
+      sessionId: session.sessionId,
+      invoiceAmount, payoutAmount, payoutMonth, notes
+    });
+    if (res.success) {
+      showPayoutMsg('Payout saved successfully!', 'success');
+      clearPayoutForm();
+      loadPayouts();
+    } else {
+      showPayoutMsg('Error: ' + (res.message || 'Failed to save'), 'error');
+    }
+  } catch (err) {
+    showPayoutMsg('Error: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '💾 Save Payout';
+  }
+}
+
+function clearPayoutForm() {
+  document.getElementById('payInvoiceAmount').value = '';
+  document.getElementById('payPayoutAmount').value  = '';
+  document.getElementById('payPayoutMonth').value   = '';
+  document.getElementById('payNotes').value         = '';
+  const msg = document.getElementById('payoutFormMsg');
+  msg.style.display = 'none';
+}
+
+function showPayoutMsg(text, type) {
+  const el = document.getElementById('payoutFormMsg');
+  el.textContent = text;
+  el.className = 'page-message ' + type;
+  el.style.display = 'block';
+  if (type === 'success') setTimeout(function() { el.style.display = 'none'; }, 4000);
+}
+
+// ==========================================
+// PAYOUT — EXPORT EXCEL
+// ==========================================
+
+function exportPayoutExcel() {
+  if (!payoutRecords || payoutRecords.length === 0) { showMessage('No payout data to export.', 'error'); return; }
+  const wsData = [['#', 'Date Added', 'Invoice Amount', 'Payout Amount', 'Payout Month', 'Notes', 'Entered By']];
+  payoutRecords.forEach(function(p, idx) {
+    wsData.push([
+      idx + 1,
+      p.createdDate || '',
+      p.invoiceAmount !== '' && p.invoiceAmount !== null ? parseFloat(p.invoiceAmount) || '' : '',
+      p.payoutAmount  !== '' && p.payoutAmount  !== null ? parseFloat(p.payoutAmount)  || '' : '',
+      p.payoutMonth || '',
+      p.notes || '',
+      p.enteredBy || ''
+    ]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [4, 18, 16, 16, 14, 30, 16].map(function(w) { return { wch: w }; });
+  XLSX.utils.book_append_sheet(wb, ws, 'Payouts');
+  XLSX.writeFile(wb, 'Payout_Records_' + new Date().toISOString().split('T')[0] + '.xlsx');
+  showMessage('Payout Excel exported.', 'success');
+}
+
+// ==========================================
 // HELPERS
 // ==========================================
 
