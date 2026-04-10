@@ -6137,6 +6137,7 @@ function uploadV301File(sessionId, base64Data, fileName) {
       const frameNo = values[4] || '';        // Column E
       const customerName = values[6] || '';   // Column G
       const mobileNo = values[8] || '';       // Column I
+      const hpCompany = values[9] || '';      // Column J - HP Company
       const refCustomer = values[12] || '';   // Column M
       
       // Skip if invoice number already exists
@@ -6152,7 +6153,7 @@ function uploadV301File(sessionId, base64Data, fileName) {
       maxSrNo++;
       
       // Build row for HSRP sheet
-      // Columns: Sr No, Invoice No, Invoice Date, Status, Mobile No, Customer Name, Frame No, Registration No, Ref Customer, Model Name, Order Date, Fitment Date
+      // Columns: Sr No, Invoice No, Invoice Date, Status, Mobile No, Customer Name, Frame No, Registration No, Ref Customer, Model Name, Order Date, Fitment Date, HP Company
       const newRow = [
           maxSrNo,                  // A: Sr No
           invoiceNo,                // B: Invoice No
@@ -6165,7 +6166,8 @@ function uploadV301File(sessionId, base64Data, fileName) {
           (customerName.toUpperCase().includes('SEVA MOTORS') ? 'SEVA MOTORS' : (refCustomer || 'Vinay Automobiles')),  // I: Ref Customer
           modelName,                // J: Model Name
           '',                       // K: Order Date (blank initially, set during Step 2)
-          ''                        // L: Fitment Date (blank)
+          '',                       // L: Fitment Date (blank)
+          hpCompany                 // M: HP Company (stored, not displayed)
       ];
       
       rowsToAdd.push(newRow);
@@ -6180,7 +6182,7 @@ function uploadV301File(sessionId, base64Data, fileName) {
     // Append rows to sheet
     if (rowsToAdd.length > 0) {
       const startRow = hsrpSheet.getLastRow() + 1;
-      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 12).setValues(rowsToAdd);
+      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 13).setValues(rowsToAdd);
       SpreadsheetApp.flush();
     }
     
@@ -6471,7 +6473,8 @@ function getHSRPData(sessionId) {
         refCustomer: row[8],
         modelName: row[9],
         orderDate: formatDateTimeIST(row[10]),      // Date + Time (IST)
-        fitmentDate: formatDateOnly(row[11])        // Date only, no time
+        fitmentDate: formatDateOnly(row[11]),       // Date only, no time
+        hpCompany: row[12] || ''                   // Stored but not displayed
       });
     }
     
@@ -6664,7 +6667,8 @@ function searchHSRPData(sessionId, searchBy, searchValue, dateFilter, customDate
           refCustomer: row[8],
           modelName: row[9],
           orderDate: formatDateTimeIST(row[10]),
-          fitmentDate: formatDateOnly(row[11])
+          fitmentDate: formatDateOnly(row[11]),
+          hpCompany: row[12] || ''             // Stored but not displayed
         });
       }
     }
