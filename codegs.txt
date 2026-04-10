@@ -239,6 +239,8 @@ function handleRequest(e) {
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
+case 'savePayout':             result = savePayout(params, params.sessionId);             break;
+case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
 case 'getVehicleMileageDashboard':
   result = getVehicleMileageDashboard(params.sessionId);
   break;
@@ -7033,6 +7035,98 @@ function batchSaveFinancierData(params, sessionId) {
     const msg = 'Saved ' + saved + ' record' + (saved !== 1 ? 's' : '') +
                 (notFound.length ? '. Not found: ' + notFound.join(', ') : '');
     return { success: true, message: msg };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+// ==========================================
+// PAYOUT FUNCTIONS
+// ==========================================
+
+/**
+ * Save a standalone payout entry to financierpayout sheet
+ * Columns: PayoutId | CreatedDate | InvoiceAmount | PayoutAmount | PayoutMonth | Notes | EnteredBy
+ */
+function savePayout(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+
+    const { invoiceAmount, payoutAmount, payoutMonth, notes } = params;
+
+    const sheet = getSheet('financierpayout');
+    // Add header if sheet is brand new
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['PayoutId', 'CreatedDate', 'InvoiceAmount', 'PayoutAmount', 'PayoutMonth', 'Notes', 'EnteredBy']);
+    }
+
+    const payoutId   = 'PAY-' + Date.now();
+    const created    = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const enteredBy  = user.name || user.username || '';
+
+    sheet.appendRow([
+      payoutId,
+      created,
+      invoiceAmount !== '' && invoiceAmount !== null && invoiceAmount !== undefined ? invoiceAmount : '',
+      payoutAmount  !== '' && payoutAmount  !== null && payoutAmount  !== undefined ? payoutAmount  : '',
+      payoutMonth   || '',
+      notes         || '',
+      enteredBy
+    ]);
+
+    return { success: true, message: 'Payout saved successfully' };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Fetch payout entries, optionally filtered by month (yyyy-MM)
+ */
+function getPayouts(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+
+    const month = (params.month || '').toString().trim();
+
+    const sheet = getSheet('financierpayout');
+    const data  = sheet.getDataRange().getValues();
+
+    const payouts = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      // Skip header
+      if (String(row[0]).toLowerCase() === 'payoutid') continue;
+
+      // Month filter
+      const rowMonth = String(row[4] || '').trim();
+      if (month && !rowMonth.startsWith(month)) continue;
+
+      // Format created date
+      let createdDate = '';
+      if (row[1] instanceof Date) {
+        createdDate = Utilities.formatDate(row[1], Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+      } else {
+        createdDate = String(row[1] || '').substring(0, 16);
+      }
+
+      payouts.push({
+        payoutId:      row[0],
+        createdDate:   createdDate,
+        invoiceAmount: row[2] !== '' && row[2] !== null && row[2] !== undefined ? row[2] : '',
+        payoutAmount:  row[3] !== '' && row[3] !== null && row[3] !== undefined ? row[3] : '',
+        payoutMonth:   row[4] || '',
+        notes:         row[5] || '',
+        enteredBy:     row[6] || ''
+      });
+    }
+
+    // Latest first
+    payouts.reverse();
+    return { success: true, payouts };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
