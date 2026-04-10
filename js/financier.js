@@ -492,6 +492,24 @@ function showReportDetail(idx) {
   document.getElementById('rStatPayout').textContent    = formatCurrency(item.totalPayout);
   document.getElementById('rStatPct').textContent       = item.percentage + '%';
 
+  // Ref Customer breakdown
+  const refEl = document.getElementById('rRefBreakdown');
+  if (refEl) {
+    const breakdown = item.refBreakdown || {};
+    const keys = Object.keys(breakdown).sort();
+    if (keys.length === 0) {
+      refEl.innerHTML = '<span style="color:#999;font-size:13px;">No ref customer data</span>';
+    } else {
+      refEl.innerHTML = keys.map(function(k) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;' +
+          'padding:8px 14px;margin:4px 0;background:#f8f9fa;border-radius:8px;border-left:4px solid #667eea;">' +
+          '<span style="font-size:13px;font-weight:600;color:#333;">' + k + '</span>' +
+          '<span style="font-size:14px;font-weight:700;color:#667eea;background:#eef0fd;' +
+          'padding:2px 10px;border-radius:20px;">' + breakdown[k] + '</span></div>';
+      }).join('');
+    }
+  }
+
   const panel = document.getElementById('reportDetailPanel');
   panel.style.display = 'block';
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
