@@ -448,8 +448,19 @@
 
     <!-- Data Table -->
     <div class="card" style="padding: 0; overflow: hidden;">
-      <div style="padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;">
+      <div style="padding: 16px 24px; border-bottom: 1px solid #f0f0f0; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
         <h2 style="color: #333; font-size: 18px; margin: 0;">HP Finance Records</h2>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+          <select id="sortDiff" onchange="sortRecords()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;">
+            <option value="all">Sort: All Records</option>
+            <option value="positive">Difference &gt; 0 (Pending)</option>
+            <option value="zero">Difference = 0 (Balanced)</option>
+            <option value="negative">Difference &lt; 0 (Excess)</option>
+            <option value="nodata">No Data</option>
+          </select>
+          <button class="btn btn-secondary" onclick="exportToExcel()" style="font-size:13px;padding:8px 16px;">&#128202; Export Excel</button>
+          <button class="btn btn-primary" id="saveAllBtn" onclick="saveAllRows()" style="font-size:13px;padding:8px 16px;">&#128190; Save All</button>
+        </div>
       </div>
       <div class="table-wrapper">
         <table class="data-table">
@@ -484,6 +495,7 @@
   </div><!-- /.container -->
 
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
