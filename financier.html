@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Financier Details - Vinay Automobiles</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* ---- HEADER ---- */
+    .header {
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      margin-bottom: 24px;
+      text-align: center;
+      position: relative;
+    }
+
+    .back-btn {
+      position: absolute;
+      top: 50%;
+      left: 20px;
+      transform: translateY(-50%);
+      background: #f0f0f0;
+      border: none;
+      color: #333;
+      font-size: 15px;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s;
+    }
+
+    .back-btn:hover {
+      background: #e0e0e0;
+    }
+
+    .header h1 {
+      color: #333;
+      font-size: 30px;
+      margin-bottom: 6px;
+    }
+
+    .header p {
+      color: #666;
+      font-size: 15px;
+    }
+
+    /* ---- CARDS ---- */
+    .card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    /* ---- FILTER SECTION ---- */
+    .filter-row {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      align-items: flex-end;
+    }
+
+    .form-group {
+      flex: 1;
+      min-width: 180px;
+    }
+
+    .form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: #333;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: #667eea;
+    }
+
+    .btn-group-filter {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .btn {
+      padding: 10px 22px;
+      border: none;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+
+    .btn-secondary {
+      background: #6c757d;
+      color: white;
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background: #5a6268;
+    }
+
+    /* ---- PAGE MESSAGE ---- */
+    .page-message {
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      font-weight: 500;
+      display: none;
+    }
+
+    .page-message.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .page-message.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    /* ---- TABLE ---- */
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #e0e0e0;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      min-width: 1200px;
+    }
+
+    .data-table thead th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 13px 12px;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .data-table tbody tr {
+      border-bottom: 1px solid #f0f0f0;
+      transition: background 0.15s;
+    }
+
+    .data-table tbody tr:nth-child(even) {
+      background: #f8f9fa;
+    }
+
+    .data-table tbody tr:hover {
+      background: #eef0ff;
+    }
+
+    .data-table tbody td {
+      padding: 11px 12px;
+      color: #333;
+      white-space: nowrap;
+    }
+
+    /* ---- EDIT BUTTON ---- */
+    .btn-edit {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.2s;
+      line-height: 1;
+    }
+
+    .btn-edit:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 8px rgba(102, 126, 234, 0.5);
+    }
+
+    /* ---- MODAL ---- */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+      max-width: 500px;
+      width: 95%;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h2 {
+      margin: 0;
+      color: #333;
+      font-size: 20px;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 28px;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      width: 32px;
+      height: 32px;
+      line-height: 32px;
+      text-align: center;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+
+    .modal-close:hover {
+      color: #333;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-body .invoice-info {
+      background: #f8f9fa;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 20px;
+      font-size: 14px;
+      color: #333;
+    }
+
+    .modal-body .invoice-info span {
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .modal-form-group {
+      margin-bottom: 16px;
+    }
+
+    .modal-form-group label {
+      display: block;
+      margin-bottom: 6px;
+      color: #333;
+      font-weight: 600;
+      font-size: 13px;
+    }
+
+    .modal-form-group input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .modal-form-group input:focus {
+      border-color: #667eea;
+    }
+
+    .modal-error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      margin-top: 12px;
+      display: none;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      border-top: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    /* ---- RESPONSIVE ---- */
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+
+      .header {
+        padding: 20px 16px;
+      }
+
+      .header h1 {
+        font-size: 22px;
+      }
+
+      .back-btn {
+        position: static;
+        transform: none;
+        margin-bottom: 12px;
+        display: inline-block;
+      }
+
+      .filter-row {
+        flex-direction: column;
+      }
+
+      .form-group {
+        min-width: 100%;
+      }
+
+      .btn-group-filter {
+        flex-direction: row;
+        justify-content: flex-start;
+      }
+
+      .card {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <!-- Header -->
+    <div class="header">
+      <button class="back-btn" onclick="window.location.href='home.html'">&#8592; Back</button>
+      <h1>&#128196; Financier Details</h1>
+      <p>HP Finance Tracking</p>
+    </div>
+
+    <!-- Filter Section -->
+    <div class="card">
+      <div class="filter-row">
+        <div class="form-group">
+          <label for="filterCustomer">Customer Name</label>
+          <input type="text" id="filterCustomer" placeholder="Search by customer name...">
+        </div>
+        <div class="form-group">
+          <label for="filterRefCustomer">Ref Customer</label>
+          <input type="text" id="filterRefCustomer" placeholder="Search by ref customer...">
+        </div>
+        <div class="form-group">
+          <label for="filterFinancier">Financier / HP Company</label>
+          <input type="text" id="filterFinancier" placeholder="Search by financier...">
+        </div>
+        <div class="btn-group-filter">
+          <button class="btn btn-primary" onclick="applyFilters()">&#128269; Apply Filters</button>
+          <button class="btn btn-secondary" onclick="clearFilters()">&#8635; Clear</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Message -->
+    <div id="pageMessage" class="page-message"></div>
+
+    <!-- Data Table -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 20px 24px 16px; border-bottom: 1px solid #f0f0f0;">
+        <h2 style="color: #333; font-size: 18px; margin: 0;">HP Finance Records</h2>
+      </div>
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Sr No</th>
+              <th>Invoice No</th>
+              <th>Invoice Date</th>
+              <th>Customer</th>
+              <th>Mobile</th>
+              <th>Model</th>
+              <th>Ref Customer</th>
+              <th>Financier</th>
+              <th>Disbursal Amt</th>
+              <th>Received Amt</th>
+              <th>Received Date</th>
+              <th>DO Date</th>
+              <th>DO No</th>
+              <th>Difference</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="financierBody">
+            <tr>
+              <td colspan="15" style="text-align:center;padding:40px;color:#666;">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /.container -->
+
+  <!-- Edit Modal -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>&#9998; Edit Financier Details</h2>
+        <button class="modal-close" onclick="closeModal()" title="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Read-only Invoice No -->
+        <div class="invoice-info">
+          Invoice No: <span id="modalInvoiceNo">—</span>
+        </div>
+
+        <!-- Disbursal Amount -->
+        <div class="modal-form-group">
+          <label for="editDisbursalAmount">Disbursal Amount (&#8377;)</label>
+          <input type="number" id="editDisbursalAmount" placeholder="Enter disbursal amount" min="0" step="0.01">
+        </div>
+
+        <!-- Amount Received -->
+        <div class="modal-form-group">
+          <label for="editAmountReceived">Amount Received (&#8377;)</label>
+          <input type="number" id="editAmountReceived" placeholder="Enter amount received" min="0" step="0.01">
+        </div>
+
+        <!-- Received Date -->
+        <div class="modal-form-group">
+          <label for="editReceivedDate">Received Date</label>
+          <input type="date" id="editReceivedDate">
+        </div>
+
+        <!-- DO Date -->
+        <div class="modal-form-group">
+          <label for="editDoDate">DO Date</label>
+          <input type="date" id="editDoDate">
+        </div>
+
+        <!-- DO Number -->
+        <div class="modal-form-group">
+          <label for="editDoNumber">DO Number</label>
+          <input type="text" id="editDoNumber" placeholder="Enter DO number">
+        </div>
+
+        <!-- Modal Error -->
+        <div id="modalError" class="modal-error"></div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" id="saveBtn" onclick="saveFinancierData()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/financier.js"></script>
+</body>
+</html>
