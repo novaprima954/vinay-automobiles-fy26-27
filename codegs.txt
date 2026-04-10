@@ -241,6 +241,7 @@ case 'saveFinancierData':      result = saveFinancierData(params, params.session
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'savePayout':             result = savePayout(params, params.sessionId);             break;
 case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
+case 'getFinancierReport':     result = getFinancierReport(params.sessionId);             break;
 case 'getVehicleMileageDashboard':
   result = getVehicleMileageDashboard(params.sessionId);
   break;
@@ -7129,6 +7130,65 @@ function getPayouts(params, sessionId) {
     // Latest first
     payouts.reverse();
     return { success: true, payouts };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Financier Report: aggregate HSRP disbursal + payout by HP Company
+ * Returns per-financier: count, totalDisbursed, totalPayout, percentage
+ */
+function getFinancierReport(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+
+    // --- Aggregate from HSRP sheet (col M = HP Company, col N = Disbursal Amount) ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+    const stats = {}; // { hpCompany: { count, totalDisbursed, totalPayout } }
+
+    for (let i = 1; i < hsrpData.length; i++) {
+      const row = hsrpData[i];
+      if (!row[1]) continue; // skip rows without invoice no
+      const hp = String(row[12] || '').trim();
+      if (!hp) continue;
+      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0 };
+      stats[hp].count++;
+      const disb = parseFloat(row[13]);
+      if (!isNaN(disb)) stats[hp].totalDisbursed += disb;
+    }
+
+    // --- Aggregate from financierpayout sheet (col H = HPCompany, col D = PayoutAmount) ---
+    const paySheet = getSheet('financierpayout');
+    const payData  = paySheet.getDataRange().getValues();
+
+    for (let i = 0; i < payData.length; i++) {
+      const row = payData[i];
+      if (!row[0]) continue;
+      if (String(row[0]).toLowerCase() === 'payoutid') continue;
+      const hp  = String(row[7] || '').trim(); // col H: HPCompany
+      if (!hp) continue;
+      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0 };
+      const payout = parseFloat(row[3]); // col D: PayoutAmount
+      if (!isNaN(payout)) stats[hp].totalPayout += payout;
+    }
+
+    // Build result array sorted by count desc
+    const result = Object.keys(stats).sort().map(function(hp) {
+      const s = stats[hp];
+      const pct = s.totalDisbursed > 0 ? ((s.totalPayout / s.totalDisbursed) * 100).toFixed(1) : '0.0';
+      return {
+        hpCompany:      hp,
+        count:          s.count,
+        totalDisbursed: s.totalDisbursed,
+        totalPayout:    s.totalPayout,
+        percentage:     parseFloat(pct)
+      };
+    });
+
+    return { success: true, report: result };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
