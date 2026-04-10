@@ -7053,7 +7053,7 @@ function savePayout(params, sessionId) {
     const user = validation.user;
     if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
 
-    const { invoiceAmount, payoutAmount, payoutMonth, notes } = params;
+    const { invoiceAmount, payoutAmount, hpCompany, payoutMonth, notes } = params;
 
     const sheet = getSheet('financierpayout');
     // Add header if sheet is brand new
@@ -7064,7 +7064,6 @@ function savePayout(params, sessionId) {
     const payoutId   = 'PAY-' + Date.now();
     const created    = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
     const enteredBy  = user.name || user.username || '';
-    const { invoiceAmount, payoutAmount, hpCompany, payoutMonth, notes } = params;
 
     sheet.appendRow([
       payoutId,
