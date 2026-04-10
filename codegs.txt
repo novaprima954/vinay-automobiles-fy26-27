@@ -7156,10 +7156,12 @@ function getFinancierReport(sessionId) {
       if (!row[1]) continue; // skip rows without invoice no
       const hp = String(row[12] || '').trim();
       if (!hp) continue;
-      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0 };
+      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0, refBreakdown: {} };
       stats[hp].count++;
       const disb = parseFloat(row[13]);
       if (!isNaN(disb)) stats[hp].totalDisbursed += disb;
+      const refCust = String(row[8] || '').trim() || 'Unknown'; // col I: Ref Customer
+      stats[hp].refBreakdown[refCust] = (stats[hp].refBreakdown[refCust] || 0) + 1;
     }
 
     // --- Aggregate from financierpayout sheet (col H = HPCompany, col D = PayoutAmount) ---
@@ -7186,7 +7188,8 @@ function getFinancierReport(sessionId) {
         count:          s.count,
         totalDisbursed: s.totalDisbursed,
         totalPayout:    s.totalPayout,
-        percentage:     parseFloat(pct)
+        percentage:     parseFloat(pct),
+        refBreakdown:   s.refBreakdown
       };
     });
 
@@ -7236,6 +7239,7 @@ function getDisbursementComparison(sessionId, password) {
       const variant       = String(row[6]  || '').trim(); // col G
       const dataDisbursed = parseFloat(row[32]);           // col AG: Disbursed Amount
       const dataDisb      = isNaN(dataDisbursed) ? '' : dataDisbursed;
+      if (dataDisb === '') continue; // skip rows with no disbursement amount in Data sheet
       const hsrpDisb      = hsrpMap.hasOwnProperty(frame) ? hsrpMap[frame] : null; // null = not found in HSRP
       const diff          = (dataDisb !== '' && hsrpDisb !== null && hsrpDisb !== '')
                             ? (parseFloat(hsrpDisb) - parseFloat(dataDisb)) : null;
