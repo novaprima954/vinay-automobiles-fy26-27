@@ -420,7 +420,70 @@ function switchTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
-  if (tab === 'payout') loadPayouts();
+  if (tab === 'payout')  loadPayouts();
+  if (tab === 'reports') loadFinancierReport();
+}
+
+// ==========================================
+// REPORTS — FINANCIER DETAILS
+// ==========================================
+
+let reportData = [];
+
+async function loadFinancierReport() {
+  const session = SessionManager.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const listEl = document.getElementById('reportFinancierList');
+  listEl.innerHTML = '<div style="color:#999;font-size:13px;grid-column:1/-1;">Loading...</div>';
+  document.getElementById('reportDetailPanel').style.display = 'none';
+
+  try {
+    const res = await API.call('getFinancierReport', { sessionId: session.sessionId });
+    if (res.success) {
+      reportData = res.report || [];
+      renderReportList(reportData);
+    } else {
+      listEl.innerHTML = '<div style="color:#dc3545;font-size:13px;grid-column:1/-1;">Error: ' + (res.message || 'Failed to load') + '</div>';
+    }
+  } catch (err) {
+    listEl.innerHTML = '<div style="color:#dc3545;font-size:13px;grid-column:1/-1;">Error: ' + err.message + '</div>';
+  }
+}
+
+function renderReportList(data) {
+  const listEl = document.getElementById('reportFinancierList');
+  if (!data || data.length === 0) {
+    listEl.innerHTML = '<div style="color:#999;font-size:13px;grid-column:1/-1;">No financier data found.</div>';
+    return;
+  }
+  listEl.innerHTML = data.map(function(item, idx) {
+    return '<div onclick="showReportDetail(' + idx + ')" style="' +
+      'background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);' +
+      'color:white;border-radius:12px;padding:20px 16px;text-align:center;cursor:pointer;' +
+      'transition:transform 0.2s,box-shadow 0.2s;box-shadow:0 4px 12px rgba(102,126,234,0.3);" ' +
+      'onmouseenter="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 8px 24px rgba(102,126,234,0.45)\'" ' +
+      'onmouseleave="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'0 4px 12px rgba(102,126,234,0.3)\'">' +
+      '<div style="font-size:15px;font-weight:700;margin-bottom:8px;">' + item.hpCompany + '</div>' +
+      '<div style="font-size:24px;font-weight:800;line-height:1;">' + item.count + '</div>' +
+      '<div style="font-size:11px;opacity:0.85;margin-top:4px;">financings</div>' +
+    '</div>';
+  }).join('');
+}
+
+function showReportDetail(idx) {
+  const item = reportData[idx];
+  if (!item) return;
+
+  document.getElementById('reportDetailTitle').textContent = '🏦 ' + item.hpCompany;
+  document.getElementById('rStatCount').textContent     = item.count;
+  document.getElementById('rStatDisbursed').textContent = formatCurrency(item.totalDisbursed);
+  document.getElementById('rStatPayout').textContent    = formatCurrency(item.totalPayout);
+  document.getElementById('rStatPct').textContent       = item.percentage + '%';
+
+  const panel = document.getElementById('reportDetailPanel');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ==========================================
