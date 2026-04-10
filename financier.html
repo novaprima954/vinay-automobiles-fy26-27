@@ -112,19 +112,8 @@
       border-color: #667eea;
     }
 
-    .form-group select[multiple] {
-      padding: 6px 8px;
-      min-height: 80px;
-    }
-
-    .form-group select[multiple] option {
-      padding: 5px 8px;
-      border-radius: 4px;
-    }
-
-    .form-group select[multiple] option:checked {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
+    .form-group select {
+      cursor: pointer;
     }
 
     .btn-group-filter {
@@ -437,17 +426,15 @@
         </div>
         <div class="form-group">
           <label for="filterRefCustomer">Ref Customer</label>
-          <select id="filterRefCustomer" multiple size="3">
-            <option value="">Loading...</option>
+          <select id="filterRefCustomer">
+            <option value="">-- All --</option>
           </select>
-          <div style="font-size:11px;color:#999;margin-top:3px;">Hold Ctrl / Cmd to select multiple</div>
         </div>
         <div class="form-group">
           <label for="filterFinancier">Financier / HP Company</label>
-          <select id="filterFinancier" multiple size="3">
-            <option value="">Loading...</option>
+          <select id="filterFinancier">
+            <option value="">-- All --</option>
           </select>
-          <div style="font-size:11px;color:#999;margin-top:3px;">Hold Ctrl / Cmd to select multiple</div>
         </div>
         <div class="btn-group-filter">
           <button class="btn btn-primary" onclick="applyFilters()">&#128269; Apply Filters</button>
@@ -482,7 +469,7 @@
               <th>DO Date</th>
               <th>DO No</th>
               <th>Difference</th>
-              <th>Action</th>
+              <th>Save</th>
             </tr>
           </thead>
           <tbody id="financierBody">
@@ -496,60 +483,6 @@
 
   </div><!-- /.container -->
 
-  <!-- Edit Modal -->
-  <div id="editModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2>&#9998; Edit Financier Details</h2>
-        <button class="modal-close" onclick="closeModal()" title="Close">&times;</button>
-      </div>
-
-      <div class="modal-body">
-        <!-- Read-only Invoice No -->
-        <div class="invoice-info">
-          Invoice No: <span id="modalInvoiceNo">—</span>
-        </div>
-
-        <!-- Disbursal Amount -->
-        <div class="modal-form-group">
-          <label for="editDisbursalAmount">Disbursal Amount (&#8377;)</label>
-          <input type="number" id="editDisbursalAmount" placeholder="Enter disbursal amount" min="0" step="0.01">
-        </div>
-
-        <!-- Amount Received -->
-        <div class="modal-form-group">
-          <label for="editAmountReceived">Amount Received (&#8377;)</label>
-          <input type="number" id="editAmountReceived" placeholder="Enter amount received" min="0" step="0.01">
-        </div>
-
-        <!-- Received Date -->
-        <div class="modal-form-group">
-          <label for="editReceivedDate">Received Date</label>
-          <input type="date" id="editReceivedDate">
-        </div>
-
-        <!-- DO Date -->
-        <div class="modal-form-group">
-          <label for="editDoDate">DO Date</label>
-          <input type="date" id="editDoDate">
-        </div>
-
-        <!-- DO Number -->
-        <div class="modal-form-group">
-          <label for="editDoNumber">DO Number</label>
-          <input type="text" id="editDoNumber" placeholder="Enter DO number">
-        </div>
-
-        <!-- Modal Error -->
-        <div id="modalError" class="modal-error"></div>
-      </div>
-
-      <div class="modal-footer">
-        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-        <button class="btn btn-primary" id="saveBtn" onclick="saveFinancierData()">Save</button>
-      </div>
-    </div>
-  </div>
 
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
