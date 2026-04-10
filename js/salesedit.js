@@ -44,6 +44,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Populate month options and load dashboard
   populateAcctMonthOptions();
   loadAccountCheckDashboard();
+  loadExecutiveNames();
 
   // Load models from PriceMaster (non-blocking)
   loadModelsForEdit().catch(function(err) {
@@ -850,6 +851,28 @@ function closeWhatsAppModal() {
   const modal = document.getElementById('whatsappModal');
   if (modal) {
     modal.remove();
+  }
+}
+
+// ==========================================
+// EXECUTIVE NAMES DROPDOWN
+// ==========================================
+
+async function loadExecutiveNames() {
+  try {
+    const res = await API.call('getExecutiveNames', { sessionId: SessionManager.getSessionId() });
+    if (!res.success || !res.names) return;
+    const sel = document.getElementById('executiveDropdown');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">-- Select Executive --</option>';
+    res.names.forEach(function(name) {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+  } catch(e) {
+    console.error('loadExecutiveNames error:', e);
   }
 }
 
