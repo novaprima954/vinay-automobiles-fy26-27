@@ -466,6 +466,7 @@
     <div class="tab-nav">
       <button id="tab-finance" class="fin-tab active" onclick="switchTab('finance')">&#128196; HP Finance</button>
       <button id="tab-payout" class="fin-tab" onclick="switchTab('payout')">&#128179; Payout</button>
+      <button id="tab-reports" class="fin-tab" onclick="switchTab('reports')">&#128202; Reports</button>
     </div>
 
     <!-- ===== PANEL: HP FINANCE ===== -->
@@ -611,6 +612,48 @@
       </div>
 
     </div><!-- /panel-payout -->
+
+    <!-- ===== PANEL: REPORTS ===== -->
+    <div id="panel-reports" class="tab-panel">
+
+      <!-- Financier Details Report -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
+          <h3 style="margin:0;color:#333;font-size:17px;font-weight:700;">&#127970; Financier Details</h3>
+          <button class="btn btn-primary" onclick="loadFinancierReport()" style="font-size:13px;padding:8px 16px;">&#8635; Refresh</button>
+        </div>
+        <div id="reportFinancierList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
+          <div style="color:#999;font-size:13px;grid-column:1/-1;">Select the Reports tab to load data.</div>
+        </div>
+      </div>
+
+      <!-- Detail Panel (shown on click) -->
+      <div id="reportDetailPanel" class="card" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+          <h3 id="reportDetailTitle" style="margin:0;color:#333;font-size:17px;font-weight:700;"></h3>
+          <button onclick="document.getElementById('reportDetailPanel').style.display='none'" style="background:none;border:1px solid #ddd;border-radius:6px;padding:5px 12px;cursor:pointer;color:#666;font-size:13px;">&#10005; Close</button>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px;">
+          <div class="report-stat-box" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border-radius:12px;padding:22px 18px;text-align:center;">
+            <div id="rStatCount" style="font-size:36px;font-weight:800;line-height:1.1;">—</div>
+            <div style="font-size:13px;margin-top:6px;opacity:0.9;">No. of Financings</div>
+          </div>
+          <div class="report-stat-box" style="background:linear-gradient(135deg,#f093fb,#f5576c);color:white;border-radius:12px;padding:22px 18px;text-align:center;">
+            <div id="rStatDisbursed" style="font-size:28px;font-weight:800;line-height:1.1;">—</div>
+            <div style="font-size:13px;margin-top:6px;opacity:0.9;">Total Disbursed</div>
+          </div>
+          <div class="report-stat-box" style="background:linear-gradient(135deg,#43e97b,#38f9d7);color:white;border-radius:12px;padding:22px 18px;text-align:center;">
+            <div id="rStatPayout" style="font-size:28px;font-weight:800;line-height:1.1;">—</div>
+            <div style="font-size:13px;margin-top:6px;opacity:0.9;">Total Payout</div>
+          </div>
+          <div class="report-stat-box" style="background:linear-gradient(135deg,#f7971e,#ffd200);color:white;border-radius:12px;padding:22px 18px;text-align:center;">
+            <div id="rStatPct" style="font-size:36px;font-weight:800;line-height:1.1;">—</div>
+            <div style="font-size:13px;margin-top:6px;opacity:0.9;">Payout %</div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /panel-reports -->
 
   </div><!-- /.container -->
 
