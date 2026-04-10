@@ -236,6 +236,9 @@ function handleRequest(e) {
       case 'exportHSRPToPdf':
         result = exportHSRPToPdf(params.sessionId, params.fromDate, params.toDate);
         break;
+case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
+case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
+case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'getVehicleMileageDashboard':
   result = getVehicleMileageDashboard(params.sessionId);
   break;
@@ -6868,6 +6871,168 @@ function exportHSRPToPdf(sessionId, fromDate, toDate) {
       message: 'Error generating PDF: ' + error.toString()
     };
   }
+}
+
+// ==========================================
+// FINANCIER DETAILS
+// ==========================================
+
+/**
+ * Get HSRP records with financier data
+ * Filters: customerName, refCustomer, financier (HP Company) — all optional partial match
+ */
+function getFinancierData(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const customerName = (params.customerName || '').trim().toLowerCase();
+    const refCustomer  = (params.refCustomer  || '').trim().toLowerCase();
+    const financier    = (params.financier    || '').trim().toLowerCase();
+
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+
+    function fmtDateDisplay(val) {
+      if (!val) return '';
+      try {
+        if (val instanceof Date) return Utilities.formatDate(val, 'Asia/Kolkata', 'dd-MMM-yyyy');
+        return String(val).split(' ')[0];
+      } catch(e) { return String(val); }
+    }
+
+    // For date inputs (receivedDate, doDate) — return in yyyy-MM-dd format
+    function fmtDateInput(val) {
+      if (!val) return '';
+      try {
+        if (val instanceof Date) return Utilities.formatDate(val, 'Asia/Kolkata', 'yyyy-MM-dd');
+        const s = String(val).trim();
+        // If already yyyy-MM-dd, return as-is
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.substring(0, 10);
+        return s;
+      } catch(e) { return String(val); }
+    }
+
+    const records = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[1]) continue; // skip rows without invoice no
+
+      // Apply optional filters (partial match, case-insensitive)
+      if (customerName && String(row[5]).toLowerCase().indexOf(customerName) === -1) continue;
+      if (refCustomer  && String(row[8]).toLowerCase().indexOf(refCustomer)  === -1) continue;
+      if (financier    && String(row[12]).toLowerCase().indexOf(financier)   === -1) continue;
+
+      records.push({
+        srNo:            row[0],
+        invoiceNo:       row[1],
+        invoiceDate:     fmtDateDisplay(row[2]),
+        customerName:    row[5] || '',
+        mobileNo:        row[4] || '',
+        modelName:       row[9] || '',
+        refCustomer:     row[8] || '',
+        financier:       row[12] || '',      // HP Company
+        disbursalAmount: row[13] !== '' && row[13] !== null && row[13] !== undefined ? row[13] : '',
+        amountReceived:  row[14] !== '' && row[14] !== null && row[14] !== undefined ? row[14] : '',
+        receivedDate:    fmtDateInput(row[15]),
+        doDate:          fmtDateInput(row[16]),
+        doNumber:        row[17] || ''
+      });
+    }
+
+    return { success: true, data: records };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Save financier data for an invoice (columns N-R of HSRP sheet)
+ */
+function saveFinancierData(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const { invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber } = params;
+    if (!invoiceNo) return { success: false, message: 'Invoice No is required' };
+
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+
+    let targetRow = -1;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][1]) === String(invoiceNo)) {
+        targetRow = i + 1; // 1-indexed sheet row
+        break;
+      }
+    }
+
+    if (targetRow === -1) return { success: false, message: 'Invoice not found: ' + invoiceNo };
+
+    // N=14, O=15, P=16, Q=17, R=18 (1-indexed columns)
+    sheet.getRange(targetRow, 14).setValue(disbursalAmount !== '' && disbursalAmount !== null && disbursalAmount !== undefined ? disbursalAmount : '');
+    sheet.getRange(targetRow, 15).setValue(amountReceived  !== '' && amountReceived  !== null && amountReceived  !== undefined ? amountReceived  : '');
+    sheet.getRange(targetRow, 16).setValue(receivedDate || '');
+    sheet.getRange(targetRow, 17).setValue(doDate       || '');
+    sheet.getRange(targetRow, 18).setValue(doNumber     || '');
+    SpreadsheetApp.flush();
+
+    return { success: true, message: 'Saved successfully' };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Batch save financier data for multiple invoices
+ */
+function batchSaveFinancierData(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const recs = params.records || [];
+    if (recs.length === 0) return { success: false, message: 'No records to save' };
+
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+
+    // Build invoice → sheet row map once
+    const invoiceRowMap = {};
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][1]) invoiceRowMap[String(data[i][1])] = i + 1;
+    }
+
+    let saved = 0;
+    const notFound = [];
+
+    for (let k = 0; k < recs.length; k++) {
+      const rec = recs[k];
+      const targetRow = invoiceRowMap[String(rec.invoiceNo)];
+      if (!targetRow) { notFound.push(rec.invoiceNo); continue; }
+
+      sheet.getRange(targetRow, 14).setValue(rec.disbursalAmount !== '' && rec.disbursalAmount !== null ? rec.disbursalAmount : '');
+      sheet.getRange(targetRow, 15).setValue(rec.amountReceived  !== '' && rec.amountReceived  !== null ? rec.amountReceived  : '');
+      sheet.getRange(targetRow, 16).setValue(rec.receivedDate || '');
+      sheet.getRange(targetRow, 17).setValue(rec.doDate       || '');
+      sheet.getRange(targetRow, 18).setValue(rec.doNumber     || '');
+      saved++;
+    }
+
+    SpreadsheetApp.flush();
+    const msg = 'Saved ' + saved + ' record' + (saved !== 1 ? 's' : '') +
+                (notFound.length ? '. Not found: ' + notFound.join(', ') : '');
+    return { success: true, message: msg };
+  } catch(e) { return { success: false, message: e.message }; }
 }
 
 /**
