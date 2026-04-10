@@ -61,13 +61,8 @@ async function loadFinancierData(filters) {
 
   const sessionId = session.sessionId;
 
-  // Merge provided filters with defaults (empty string = no filter)
-  const params = {
-    sessionId,
-    customerName: (filters && filters.customerName) ? filters.customerName.trim() : '',
-    refCustomer:  (filters && filters.refCustomer)  ? filters.refCustomer.trim()  : '',
-    financier:    (filters && filters.financier)    ? filters.financier.trim()    : ''
-  };
+  // Always fetch all data from GAS; filtering is done client-side
+  const params = { sessionId, customerName: '', refCustomer: '', financier: '' };
 
   // Show loading state
   const tbody = document.getElementById('financierBody');
@@ -78,6 +73,7 @@ async function loadFinancierData(filters) {
 
     if (response.success) {
       records = response.data || [];
+      populateDropdowns(records);
       renderTable(records);
       console.log('Loaded', records.length, 'financier records');
     } else {
@@ -89,6 +85,40 @@ async function loadFinancierData(filters) {
     tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#dc3545;">' +
       'Error: ' + error.message + '</td></tr>';
   }
+}
+
+// ==========================================
+// DROPDOWN POPULATION
+// ==========================================
+
+/**
+ * Populate Ref Customer and Financier dropdowns from all loaded records.
+ * Preserves existing selections when reloading.
+ */
+function populateDropdowns(data) {
+  const refSet = new Set();
+  const finSet = new Set();
+
+  data.forEach(function(r) {
+    if (r.refCustomer) refSet.add(r.refCustomer);
+    if (r.financier)   finSet.add(r.financier);
+  });
+
+  function rebuildSelect(id, values) {
+    const sel = document.getElementById(id);
+    const prev = new Set(Array.from(sel.selectedOptions).map(o => o.value));
+    sel.innerHTML = '';
+    Array.from(values).sort().forEach(function(v) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      if (prev.has(v)) opt.selected = true;
+      sel.appendChild(opt);
+    });
+  }
+
+  rebuildSelect('filterRefCustomer', refSet);
+  rebuildSelect('filterFinancier', finSet);
 }
 
 // ==========================================
@@ -311,23 +341,39 @@ async function saveFinancierData() {
  */
 function applyFilters() {
   const customerName = document.getElementById('filterCustomer').value.trim();
-  const refCustomer  = document.getElementById('filterRefCustomer').value.trim();
-  const financier    = document.getElementById('filterFinancier').value.trim();
 
-  currentFilters = { customerName, refCustomer, financier };
-  loadFinancierData(currentFilters);
+  // Multi-select: collect all selected option values
+  const refSel = document.getElementById('filterRefCustomer');
+  const refSelected = Array.from(refSel.selectedOptions).map(o => o.value).filter(Boolean);
+
+  const finSel = document.getElementById('filterFinancier');
+  const finSelected = Array.from(finSel.selectedOptions).map(o => o.value).filter(Boolean);
+
+  currentFilters = { customerName, refCustomer: refSelected, financier: finSelected };
+
+  // Filter client-side from full records list (avoids extra API call)
+  const filtered = records.filter(function(r) {
+    if (customerName && r.customerName.toLowerCase().indexOf(customerName.toLowerCase()) === -1) return false;
+    if (refSelected.length > 0 && !refSelected.includes(r.refCustomer)) return false;
+    if (finSelected.length > 0 && !finSelected.includes(r.financier)) return false;
+    return true;
+  });
+
+  renderTable(filtered);
 }
 
 /**
- * Clear all filter inputs and reload all data
+ * Clear all filter inputs and re-render full records list
  */
 function clearFilters() {
-  document.getElementById('filterCustomer').value    = '';
-  document.getElementById('filterRefCustomer').value = '';
-  document.getElementById('filterFinancier').value   = '';
+  document.getElementById('filterCustomer').value = '';
 
-  currentFilters = { customerName: '', refCustomer: '', financier: '' };
-  loadFinancierData({});
+  // Deselect all options in multi-selects
+  Array.from(document.getElementById('filterRefCustomer').options).forEach(o => o.selected = false);
+  Array.from(document.getElementById('filterFinancier').options).forEach(o => o.selected = false);
+
+  currentFilters = { customerName: '', refCustomer: [], financier: [] };
+  renderTable(records);
 }
 
 // ==========================================
