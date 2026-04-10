@@ -54,6 +54,7 @@ async function loadFinancierData() {
     if (response.success) {
       records = response.data || [];
       populateDropdowns(records);
+      populatePayoutHpDropdown(records);
       applyFiltersAndSort();
     } else {
       tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#dc3545;">Error: ' + (response.message || 'Failed to load') + '</td></tr>';
@@ -67,6 +68,20 @@ async function loadFinancierData() {
 // ==========================================
 // DROPDOWNS
 // ==========================================
+
+function populatePayoutHpDropdown(data) {
+  const sel = document.getElementById('payHpCompany');
+  if (!sel) return;
+  const prev = sel.value;
+  const companies = Array.from(new Set(data.map(function(r) { return r.financier; }).filter(Boolean))).sort();
+  sel.innerHTML = '<option value="">-- Select --</option>';
+  companies.forEach(function(c) {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    if (c === prev) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
 
 function populateDropdowns(data) {
   const refSet = new Set();
@@ -438,7 +453,7 @@ async function loadPayouts() {
 function renderPayouts(data) {
   const tbody = document.getElementById('payoutBody');
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px;color:#999;">No payout records found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#999;">No payout records found</td></tr>';
     return;
   }
   let html = '';
@@ -446,6 +461,7 @@ function renderPayouts(data) {
     html += '<tr>';
     html += '<td style="color:#999;font-size:12px;">' + (idx + 1) + '</td>';
     html += '<td style="white-space:nowrap;font-size:12px;">' + (p.createdDate || '—') + '</td>';
+    html += '<td style="white-space:nowrap;font-weight:600;color:#1e40af;">' + (p.hpCompany || '—') + '</td>';
     html += '<td style="font-weight:600;">' + (p.invoiceAmount !== '' && p.invoiceAmount !== null ? formatCurrency(p.invoiceAmount) : '—') + '</td>';
     html += '<td style="font-weight:600;color:#166534;">' + (p.payoutAmount !== '' && p.payoutAmount !== null ? formatCurrency(p.payoutAmount) : '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (p.payoutMonth || '—') + '</td>';
@@ -471,6 +487,7 @@ async function savePayout() {
 
   const invoiceAmountRaw = document.getElementById('payInvoiceAmount').value.trim();
   const payoutAmountRaw  = document.getElementById('payPayoutAmount').value.trim();
+  const hpCompany        = document.getElementById('payHpCompany').value.trim();
   const payoutMonth      = document.getElementById('payPayoutMonth').value.trim();
   const notes            = document.getElementById('payNotes').value.trim();
 
@@ -496,7 +513,7 @@ async function savePayout() {
   try {
     const res = await API.call('savePayout', {
       sessionId: session.sessionId,
-      invoiceAmount, payoutAmount, payoutMonth, notes
+      invoiceAmount, payoutAmount, hpCompany, payoutMonth, notes
     });
     if (res.success) {
       showPayoutMsg('Payout saved successfully!', 'success');
@@ -515,6 +532,7 @@ async function savePayout() {
 function clearPayoutForm() {
   document.getElementById('payInvoiceAmount').value = '';
   document.getElementById('payPayoutAmount').value  = '';
+  document.getElementById('payHpCompany').value     = '';
   document.getElementById('payPayoutMonth').value   = '';
   document.getElementById('payNotes').value         = '';
   const msg = document.getElementById('payoutFormMsg');
@@ -535,11 +553,12 @@ function showPayoutMsg(text, type) {
 
 function exportPayoutExcel() {
   if (!payoutRecords || payoutRecords.length === 0) { showMessage('No payout data to export.', 'error'); return; }
-  const wsData = [['#', 'Date Added', 'Invoice Amount', 'Payout Amount', 'Payout Month', 'Notes', 'Entered By']];
+  const wsData = [['#', 'Date Added', 'HP Company', 'Invoice Amount', 'Payout Amount', 'Payout Month', 'Notes', 'Entered By']];
   payoutRecords.forEach(function(p, idx) {
     wsData.push([
       idx + 1,
       p.createdDate || '',
+      p.hpCompany || '',
       p.invoiceAmount !== '' && p.invoiceAmount !== null ? parseFloat(p.invoiceAmount) || '' : '',
       p.payoutAmount  !== '' && p.payoutAmount  !== null ? parseFloat(p.payoutAmount)  || '' : '',
       p.payoutMonth || '',
@@ -549,7 +568,7 @@ function exportPayoutExcel() {
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(wsData);
-  ws['!cols'] = [4, 18, 16, 16, 14, 30, 16].map(function(w) { return { wch: w }; });
+  ws['!cols'] = [4, 18, 20, 16, 16, 14, 30, 16].map(function(w) { return { wch: w }; });
   XLSX.utils.book_append_sheet(wb, ws, 'Payouts');
   XLSX.writeFile(wb, 'Payout_Records_' + new Date().toISOString().split('T')[0] + '.xlsx');
   showMessage('Payout Excel exported.', 'success');
