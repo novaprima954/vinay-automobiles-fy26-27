@@ -653,6 +653,54 @@
         </div>
       </div>
 
+      <!-- Disbursement Comparison Report (admin + password) -->
+      <div id="disbReportSection" class="card" style="display:none;">
+        <h3 style="margin:0 0 18px;color:#333;font-size:17px;font-weight:700;">&#128290; Disbursement Comparison</h3>
+
+        <!-- Password gate -->
+        <div id="disbPasswordGate">
+          <p style="color:#666;font-size:13px;margin-bottom:14px;">This report is password protected. Enter password to view.</p>
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+            <input type="password" id="disbPassword" placeholder="Enter password" style="padding:9px 12px;border:1px solid #ddd;border-radius:6px;font-size:14px;outline:none;width:220px;">
+            <button class="btn btn-primary" onclick="loadDisbursementReport()" style="font-size:13px;padding:9px 18px;">&#128274; Unlock</button>
+          </div>
+          <div id="disbPasswordMsg" style="margin-top:10px;font-size:13px;color:#dc3545;display:none;"></div>
+        </div>
+
+        <!-- Report content (hidden until unlocked) -->
+        <div id="disbReportContent" style="display:none;">
+          <div style="display:flex;gap:10px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+            <select id="disbFilter" onchange="filterDisbReport()" style="padding:8px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;cursor:pointer;">
+              <option value="all">Show: All Records</option>
+              <option value="mismatch">Mismatches Only</option>
+              <option value="matched">Matched Only</option>
+              <option value="missing">Not in HSRP</option>
+            </select>
+            <button class="btn btn-secondary" onclick="exportDisbExcel()" style="font-size:13px;padding:8px 16px;">&#128202; Export Excel</button>
+            <span id="disbRecordCount" style="font-size:13px;color:#666;"></span>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Customer Name</th>
+                  <th>Variant</th>
+                  <th>Frame No</th>
+                  <th>Data Disbursed (AG)</th>
+                  <th>HSRP Disbursed (N)</th>
+                  <th>Difference</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="disbReportBody">
+                <tr><td colspan="8" style="text-align:center;padding:30px;color:#999;">Enter password to load report</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
     </div><!-- /panel-reports -->
 
   </div><!-- /.container -->

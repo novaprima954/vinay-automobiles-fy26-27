@@ -421,7 +421,7 @@ function switchTab(tab) {
   document.getElementById('tab-' + tab).classList.add('active');
   document.getElementById('panel-' + tab).classList.add('active');
   if (tab === 'payout')  loadPayouts();
-  if (tab === 'reports') loadFinancierReport();
+  if (tab === 'reports') onReportsTabOpen();
 }
 
 // ==========================================
@@ -429,6 +429,17 @@ function switchTab(tab) {
 // ==========================================
 
 let reportData = [];
+let currentUserRole = '';
+
+function onReportsTabOpen() {
+  loadFinancierReport();
+  // Show disbursement section only for admin
+  const session = SessionManager.getSession();
+  const role = session && session.user ? session.user.role : '';
+  currentUserRole = role;
+  const disbSection = document.getElementById('disbReportSection');
+  if (disbSection) disbSection.style.display = role === 'admin' ? 'block' : 'none';
+}
 
 async function loadFinancierReport() {
   const session = SessionManager.getSession();
@@ -636,6 +647,135 @@ function exportPayoutExcel() {
   XLSX.writeFile(wb, 'Payout_Records_' + new Date().toISOString().split('T')[0] + '.xlsx');
   showMessage('Payout Excel exported.', 'success');
 }
+
+// ==========================================
+// DISBURSEMENT COMPARISON REPORT
+// ==========================================
+
+let disbRows = [];   // all rows from API
+let disbFiltered = []; // currently displayed
+
+async function loadDisbursementReport() {
+  const session = SessionManager.getSession();
+  if (!session) { window.location.href = 'index.html'; return; }
+
+  const password = document.getElementById('disbPassword').value;
+  if (!password) { showDisbMsg('Please enter the password.'); return; }
+
+  const tbody = document.getElementById('disbReportBody');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#666;">Loading...</td></tr>';
+
+  try {
+    const res = await API.call('getDisbursementComparison', {
+      sessionId: session.sessionId,
+      password
+    });
+
+    if (res.success) {
+      disbRows = res.rows || [];
+      document.getElementById('disbPasswordGate').style.display = 'none';
+      document.getElementById('disbReportContent').style.display = 'block';
+      document.getElementById('disbPassword').value = '';
+      filterDisbReport();
+    } else {
+      showDisbMsg(res.message || 'Failed to load report');
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#999;">Enter password to load report</td></tr>';
+    }
+  } catch (err) {
+    showDisbMsg('Error: ' + err.message);
+  }
+}
+
+function filterDisbReport() {
+  const filter = document.getElementById('disbFilter').value;
+  if (filter === 'mismatch') {
+    disbFiltered = disbRows.filter(function(r) { return r.difference !== null && r.difference !== 0; });
+  } else if (filter === 'matched') {
+    disbFiltered = disbRows.filter(function(r) { return r.matched; });
+  } else if (filter === 'missing') {
+    disbFiltered = disbRows.filter(function(r) { return r.hsrpDisbursed === null; });
+  } else {
+    disbFiltered = disbRows.slice();
+  }
+  renderDisbReport(disbFiltered);
+}
+
+function renderDisbReport(data) {
+  const tbody = document.getElementById('disbReportBody');
+  document.getElementById('disbRecordCount').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
+
+  if (!data || data.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:30px;color:#999;">No records found</td></tr>';
+    return;
+  }
+
+  let html = '';
+  data.forEach(function(r, idx) {
+    const diff = r.difference;
+    let rowBg = '';
+    let statusBadge = '';
+
+    if (r.hsrpDisbursed === null) {
+      rowBg = '';
+      statusBadge = '<span style="background:#e5e7eb;color:#374151;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;">Not in HSRP</span>';
+    } else if (r.matched) {
+      rowBg = 'background:#dcfce7;';
+      statusBadge = '<span style="background:#166534;color:white;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;">✓ Matched</span>';
+    } else {
+      rowBg = 'background:#fee2e2;';
+      statusBadge = '<span style="background:#991b1b;color:white;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:600;">✗ Mismatch</span>';
+    }
+
+    html += '<tr style="' + rowBg + '">';
+    html += '<td style="color:#999;font-size:12px;">' + (idx + 1) + '</td>';
+    html += '<td style="font-weight:600;">' + (r.customerName || '—') + '</td>';
+    html += '<td style="font-size:13px;">' + (r.variant || '—') + '</td>';
+    html += '<td style="font-family:monospace;font-size:12px;">' + (r.frameNo || '—') + '</td>';
+    html += '<td style="text-align:right;font-weight:600;">' + (r.dataDisbursed !== '' && r.dataDisbursed !== null ? formatCurrency(r.dataDisbursed) : '—') + '</td>';
+    html += '<td style="text-align:right;font-weight:600;">' + (r.hsrpDisbursed !== null && r.hsrpDisbursed !== '' ? formatCurrency(r.hsrpDisbursed) : '—') + '</td>';
+    html += '<td style="text-align:right;font-weight:700;">' + (diff !== null ? formatCurrency(diff) : '—') + '</td>';
+    html += '<td>' + statusBadge + '</td>';
+    html += '</tr>';
+  });
+
+  tbody.innerHTML = html;
+}
+
+function exportDisbExcel() {
+  if (!disbFiltered || disbFiltered.length === 0) { showMessage('No data to export.', 'error'); return; }
+  const wsData = [['#', 'Customer Name', 'Variant', 'Frame No', 'Data Disbursed (AG)', 'HSRP Disbursed (N)', 'Difference', 'Status']];
+  disbFiltered.forEach(function(r, idx) {
+    let status = r.hsrpDisbursed === null ? 'Not in HSRP' : (r.matched ? 'Matched' : 'Mismatch');
+    wsData.push([
+      idx + 1,
+      r.customerName || '',
+      r.variant || '',
+      r.frameNo || '',
+      r.dataDisbursed !== '' && r.dataDisbursed !== null ? parseFloat(r.dataDisbursed) : '',
+      r.hsrpDisbursed !== null && r.hsrpDisbursed !== '' ? parseFloat(r.hsrpDisbursed) : '',
+      r.difference !== null ? r.difference : '',
+      status
+    ]);
+  });
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = [4, 24, 18, 20, 18, 18, 14, 14].map(function(w) { return { wch: w }; });
+  XLSX.utils.book_append_sheet(wb, ws, 'Disbursement Comparison');
+  XLSX.writeFile(wb, 'Disbursement_Comparison_' + new Date().toISOString().split('T')[0] + '.xlsx');
+  showMessage('Excel exported.', 'success');
+}
+
+function showDisbMsg(text) {
+  const el = document.getElementById('disbPasswordMsg');
+  el.textContent = text;
+  el.style.display = 'block';
+}
+
+// Allow Enter key to submit password
+document.addEventListener('DOMContentLoaded', function() {
+  const inp = document.getElementById('disbPassword');
+  if (inp) inp.addEventListener('keydown', function(e) { if (e.key === 'Enter') loadDisbursementReport(); });
+});
 
 // ==========================================
 // HELPERS
