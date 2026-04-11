@@ -913,7 +913,22 @@ async function loadAccountCheckDashboard() {
       grid.innerHTML = '<div style="color:#28a745; font-size:13px; padding:8px;">✅ All bookings have Account Check completed for this period!</div>';
       return;
     }
-    grid.innerHTML = execs.map(exec => `
+
+    // Total card for admin only
+    const session = SessionManager.getSession();
+    const role = session && session.user ? session.user.role : '';
+    let totalCard = '';
+    if (role === 'admin') {
+      const total = execs.reduce((sum, e) => sum + (stats[e].count || 0), 0);
+      totalCard = `
+        <div class="acct-exec-card" style="border-left:5px solid #dc3545;cursor:default;grid-column:1/-1;">
+          <div class="exec-name" style="color:#dc3545;">📋 Total Pending</div>
+          <div class="exec-count" style="color:#dc3545;">${total}</div>
+          <div class="exec-label">Account Check Pending (All Executives)</div>
+        </div>`;
+    }
+
+    grid.innerHTML = totalCard + execs.map(exec => `
       <div class="acct-exec-card" onclick="showPendingForExec('${exec.replace(/'/g, "\\'")}')">
         <div class="exec-name">${exec || '⚠️ (No Name)'}</div>
         <div class="exec-count">${stats[exec].count}</div>
