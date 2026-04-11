@@ -3337,23 +3337,27 @@ function getOperatorPendingCounts(sessionId, month) {
     
     // Column indices
     const COLS = {
-      deliveryDate: 11,      // Column C
-      dmsStatus: 42,        // Column AE
-      insuranceStatus: 45,  // Column AF
-      vahanStatus: 48       // Column AG
+      deliveryDate: 11,      // Column L
+      accountCheck: 21,      // Column V
+      dmsStatus: 42,         // Column AQ
+      insuranceStatus: 45,   // Column AT
+      vahanStatus: 48        // Column AW
     };
-    
+
     // Skip header row
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      
+
+      // Only include rows where Account Check is Yes
+      if (row[COLS.accountCheck] !== 'Yes') continue;
+
       // ADDED: Month filter
       if (month) {
         const deliveryDate = row[COLS.deliveryDate];
         if (deliveryDate) {
           const dateObj = new Date(deliveryDate);
           const rowMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-          
+
           // Skip if not matching month
           if (rowMonth !== month) {
             continue;
@@ -3363,8 +3367,8 @@ function getOperatorPendingCounts(sessionId, month) {
           continue;
         }
       }
-      
-      // Count pending statuses
+
+      // Count pending statuses (account check is Yes but status not yet Yes)
       if (row[COLS.dmsStatus] !== 'Yes') {
         dmsPending++;
       }
@@ -3758,7 +3762,7 @@ function getOperatorPendingList(sessionId, type, month) {
     
     const results = [];
     
-    // Column indices (adjust based on your sheet structure)
+    // Column indices
     const COLS = {
       receiptNo: 0,
       bookingDate: 1,
@@ -3768,24 +3772,28 @@ function getOperatorPendingList(sessionId, type, month) {
       variant: 5,
       model: 6,
       executiveName: 7,
-      dmsStatus: 42,        // Column AE
-      insuranceStatus: 45,  // Column AF
-      vahanStatus: 48,      // Column AG
-      engineNumber: 59,     // Column AH
-      frameNumber: 60       // Column AI
+      accountCheck: 21,      // Column V
+      dmsStatus: 42,         // Column AQ
+      insuranceStatus: 45,   // Column AT
+      vahanStatus: 48,       // Column AW
+      engineNumber: 59,
+      frameNumber: 60
     };
-    
+
     // Skip header row
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      
+
+      // Only include rows where Account Check is Yes
+      if (row[COLS.accountCheck] !== 'Yes') continue;
+
       // ADDED: Month filter
       if (month) {
         const deliveryDate = row[COLS.deliveryDate];
         if (deliveryDate) {
           const dateObj = new Date(deliveryDate);
           const rowMonth = dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
-          
+
           // Skip if not matching month
           if (rowMonth !== month) {
             continue;
@@ -3795,10 +3803,10 @@ function getOperatorPendingList(sessionId, type, month) {
           continue;
         }
       }
-      
-      // Filter based on type
+
+      // Filter based on type (account check is Yes but status not yet Yes)
       let matches = false;
-      
+
       if (type === 'dms') {
         matches = row[COLS.dmsStatus] !== 'Yes';
       } else if (type === 'insurance') {
