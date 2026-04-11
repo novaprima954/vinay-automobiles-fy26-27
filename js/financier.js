@@ -370,13 +370,15 @@ function exportToExcel() {
   const rows = document.querySelectorAll('tr[id^="frow-"]');
   if (rows.length === 0) { showMessage('No data to export.', 'error'); return; }
 
-  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'Disbursal Amount', 'Amount Received', 'Received Date', 'DO Date', 'DO Number', 'Difference']];
+  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'Disbursal Amount', 'Amount Received', 'Received Date', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'DO Number', 'Difference']];
 
   rows.forEach(function(row) {
     const idx = row.id.replace('frow-', '');
     const cells = row.querySelectorAll('td');
-    const disbVal = (document.getElementById('disb-' + idx) || {}).value || '';
-    const rcvdVal = (document.getElementById('rcvd-' + idx) || {}).value || '';
+    const disbVal  = (document.getElementById('disb-'    + idx) || {}).value || '';
+    const rcvdVal  = (document.getElementById('rcvd-'    + idx) || {}).value || '';
+    const rcvDate  = (document.getElementById('rcvdate-' + idx) || {}).value || '';
+    const donoVal  = (document.getElementById('dono-'    + idx) || {}).value || '';
     const d = parseFloat(disbVal);
     const r = parseFloat(rcvdVal);
     const diff = (!isNaN(d) && disbVal !== '' ? d : 0) - (!isNaN(r) && rcvdVal !== '' ? r : 0);
@@ -387,15 +389,14 @@ function exportToExcel() {
       cells[1].textContent.trim(),   // Invoice No
       cells[2].textContent.trim(),   // Invoice Date
       cells[3].textContent.trim(),   // Customer
-      cells[4].textContent.trim(),   // Mobile
-      cells[5].textContent.trim(),   // Model
-      cells[6].textContent.trim(),   // Ref Customer
-      cells[7].textContent.trim(),   // Financier
-      disbVal !== '' ? parseFloat(disbVal) : '',
-      rcvdVal !== '' ? parseFloat(rcvdVal) : '',
-      (document.getElementById('rcvdate-' + idx) || {}).value || '',
-      (document.getElementById('dodate-'  + idx) || {}).value || '',
-      (document.getElementById('dono-'    + idx) || {}).value || '',
+      disbVal  !== '' ? parseFloat(disbVal)  : '',
+      rcvdVal  !== '' ? parseFloat(rcvdVal)  : '',
+      rcvDate,
+      cells[7].textContent.trim(),   // Mobile
+      cells[8].textContent.trim(),   // Model
+      cells[9].textContent.trim(),   // Ref Customer
+      cells[10].textContent.trim(),  // Financier
+      donoVal,
       diffDisplay
     ]);
   });
