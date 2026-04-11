@@ -222,19 +222,19 @@ function renderTable(data) {
     const invoiceStr = String(record.invoiceNo || '');
     const invoiceEsc = invoiceStr.replace(/"/g, '&quot;');
 
-    html += '<tr id="frow-' + idx + '" data-invoice="' + invoiceEsc + '" style="' + rowStyle + '">';
+    const dodateEsc = (record.doDate || '').replace(/"/g, '&quot;');
+    html += '<tr id="frow-' + idx + '" data-invoice="' + invoiceEsc + '" data-dodate="' + dodateEsc + '" style="' + rowStyle + '">';
     html += '<td style="white-space:nowrap;">' + (record.srNo || '—') + '</td>';
     html += '<td style="white-space:nowrap;font-weight:600;">' + (invoiceStr || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.invoiceDate || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.customerName || '—') + '</td>';
+    html += '<td><input type="number" id="disb-' + idx + '" value="' + (record.disbursalAmount !== '' && record.disbursalAmount !== null && record.disbursalAmount !== undefined ? record.disbursalAmount : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
+    html += '<td><input type="number" id="rcvd-' + idx + '" value="' + (record.amountReceived  !== '' && record.amountReceived  !== null && record.amountReceived  !== undefined ? record.amountReceived  : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
+    html += '<td><input type="date"   id="rcvdate-' + idx + '" value="' + (record.receivedDate || '') + '" style="' + inputStyle() + 'min-width:120px;"></td>';
     html += '<td style="white-space:nowrap;">' + (record.mobileNo || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.modelName || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.refCustomer || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.financier || '—') + '</td>';
-    html += '<td><input type="number" id="disb-' + idx + '" value="' + (record.disbursalAmount !== '' && record.disbursalAmount !== null && record.disbursalAmount !== undefined ? record.disbursalAmount : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
-    html += '<td><input type="number" id="rcvd-' + idx + '" value="' + (record.amountReceived  !== '' && record.amountReceived  !== null && record.amountReceived  !== undefined ? record.amountReceived  : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
-    html += '<td><input type="date"   id="rcvdate-' + idx + '" value="' + (record.receivedDate || '') + '" style="' + inputStyle() + 'min-width:120px;"></td>';
-    html += '<td><input type="date"   id="dodate-'  + idx + '" value="' + (record.doDate       || '') + '" style="' + inputStyle() + 'min-width:120px;"></td>';
     html += '<td><input type="text"   id="dono-'    + idx + '" value="' + (record.doNumber     || '') + '" style="' + inputStyle() + 'min-width:90px;" placeholder="DO No"></td>';
     html += '<td style="text-align:center;font-weight:700;white-space:nowrap;" id="diff-' + idx + '">' + diffText + '</td>';
     html += '<td style="text-align:center;"><button id="savebtn-' + idx + '" onclick="saveRow(' + idx + ')" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button></td>';
@@ -269,7 +269,7 @@ async function saveRow(idx) {
   const disbursalAmountRaw = document.getElementById('disb-' + idx).value.trim();
   const amountReceivedRaw  = document.getElementById('rcvd-' + idx).value.trim();
   const receivedDate = document.getElementById('rcvdate-' + idx).value.trim();
-  const doDate       = document.getElementById('dodate-'  + idx).value.trim();
+  const doDate       = row.getAttribute('data-dodate') || '';
   const doNumber     = document.getElementById('dono-'    + idx).value.trim();
 
   let disbursalAmount = '';
@@ -324,11 +324,11 @@ async function saveAllRows() {
     const disbursalAmountRaw = (document.getElementById('disb-' + idx)    || {}).value || '';
     const amountReceivedRaw  = (document.getElementById('rcvd-' + idx)    || {}).value || '';
     const receivedDate       = (document.getElementById('rcvdate-' + idx) || {}).value || '';
-    const doDate             = (document.getElementById('dodate-'  + idx) || {}).value || '';
+    const doDate             = row.getAttribute('data-dodate') || '';
     const doNumber           = (document.getElementById('dono-'    + idx) || {}).value || '';
 
     // Only include rows with at least one field filled
-    if (!disbursalAmountRaw && !amountReceivedRaw && !receivedDate && !doDate && !doNumber) return;
+    if (!disbursalAmountRaw && !amountReceivedRaw && !receivedDate && !doNumber) return;
 
     toSave.push({
       invoiceNo,
