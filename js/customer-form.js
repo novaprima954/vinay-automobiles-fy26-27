@@ -226,93 +226,81 @@ function printAllForms() {
   window.print();
 }
 
-// FIXED: Direct PDF download
 async function shareAsPDF() {
-  console.log('📄 Generating PDF...');
-  
   if (!currentRecord || !currentRecord.customerName) {
     alert('⚠️ No customer data available');
     return;
   }
-  
+
+  if (typeof html2pdf === 'undefined') {
+    alert('PDF library not loaded. Please use Print → Save as PDF instead.');
+    window.print();
+    return;
+  }
+
+  showMessage('⏳ Generating PDF... Please wait.', 'info');
+
   try {
-    if (typeof html2pdf !== 'undefined') {
-      showMessage('⏳ Generating PDF... Please wait.', 'info');
-      
-      // Get all visible pages only
-      const pages = [];
-      
-      const page1 = document.getElementById('page1');
-      if (page1 && page1.style.display !== 'none') {
-        pages.push(page1);
+    // Build filename
+    const customerName = currentRecord.customerName
+      .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
+    const filename = customerName + '.pdf';
+
+    // Collect visible pages and clone into a single wrapper div
+    const pageIds = ['page1', 'page2', 'page3'];
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'width:210mm;background:white;';
+
+    pageIds.forEach(function(id) {
+      const el = document.getElementById(id);
+      if (el && el.style.display !== 'none') {
+        const clone = el.cloneNode(true);
+        // Ensure page break between pages
+        clone.style.pageBreakAfter = 'always';
+        clone.style.breakAfter = 'page';
+        clone.style.width = '210mm';
+        clone.style.minHeight = '297mm';
+        clone.style.boxSizing = 'border-box';
+        clone.style.padding = '20mm 15mm';
+        clone.style.margin = '0';
+        wrapper.appendChild(clone);
       }
-      
-      const page2 = document.getElementById('page2');
-      if (page2 && page2.style.display !== 'none') {
-        pages.push(page2);
-      }
-      
-      const page3 = document.getElementById('page3');
-      if (page3 && page3.style.display !== 'none') {
-        pages.push(page3);
-      }
-      
-      if (pages.length === 0) {
-        alert('⚠️ No pages to export');
-        return;
-      }
-      
-      console.log('📄 Exporting ' + pages.length + ' pages');
-      
-      // Create customer name for filename
-      const customerName = currentRecord.customerName
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .replace(/\s+/g, '_')
-        .toUpperCase();
-      
-      const filename = customerName + '.pdf';
-      
-      // PDF options for A4
-      const opt = {
-        margin: [10, 10, 10, 10],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { 
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          windowWidth: 794,
-          windowHeight: 1123
-        },
-        jsPDF: { 
-          unit: 'mm', 
-          format: 'a4', 
-          orientation: 'portrait'
-        }
-      };
-      
-      // Generate PDF page by page
-      let pdfWorker = html2pdf().set(opt).from(pages[0]);
-      
-      for (let i = 1; i < pages.length; i++) {
-        pdfWorker = pdfWorker.get('pdf').then(function(pdf) {
-          pdf.addPage();
-        }).from(pages[i]).toContainer().toCanvas().toPdf();
-      }
-      
-      await pdfWorker.save();
-      
-      showMessage('✅ PDF downloaded: ' + filename, 'success');
-      console.log('✅ PDF generated: ' + filename);
-      
-    } else {
-      alert('📄 Generate PDF\n\nTo save as PDF:\n1. A print dialog will open\n2. Select "Save as PDF" as the printer\n3. Click Save\n4. Share the saved PDF file');
-      window.print();
+    });
+
+    if (!wrapper.children.length) {
+      alert('⚠️ No pages to export');
+      return;
     }
-    
+
+    // Temporarily attach to DOM (required by html2canvas)
+    wrapper.style.position = 'absolute';
+    wrapper.style.left = '-9999px';
+    wrapper.style.top = '0';
+    document.body.appendChild(wrapper);
+
+    const opt = {
+      margin: 0,
+      filename: filename,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        width: 794,          // 210mm at 96dpi
+        windowWidth: 794
+      },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'legacy'], after: '.printable-form' }
+    };
+
+    await html2pdf().set(opt).from(wrapper).save();
+    document.body.removeChild(wrapper);
+
+    showMessage('✅ PDF downloaded: ' + filename, 'success');
+
   } catch (error) {
     console.error('PDF generation error:', error);
-    alert('⚠️ Direct PDF generation not available.\n\nPlease use the Print button and select "Save as PDF".');
+    showMessage('⚠️ PDF failed — using print dialog instead.', 'error');
     window.print();
   }
 }
