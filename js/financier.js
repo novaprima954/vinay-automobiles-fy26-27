@@ -228,6 +228,7 @@ function renderTable(data) {
     html += '<td style="white-space:nowrap;font-weight:600;">' + (invoiceStr || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.invoiceDate || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.customerName || '—') + '</td>';
+    html += '<td><input type="text"   id="dono-'    + idx + '" value="' + (record.doNumber     || '') + '" style="' + inputStyle() + 'min-width:90px;" placeholder="DO No"></td>';
     html += '<td><input type="number" id="disb-' + idx + '" value="' + (record.disbursalAmount !== '' && record.disbursalAmount !== null && record.disbursalAmount !== undefined ? record.disbursalAmount : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
     html += '<td><input type="number" id="rcvd-' + idx + '" value="' + (record.amountReceived  !== '' && record.amountReceived  !== null && record.amountReceived  !== undefined ? record.amountReceived  : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
     html += '<td><input type="date"   id="rcvdate-' + idx + '" value="' + (record.receivedDate || '') + '" style="' + inputStyle() + 'min-width:120px;"></td>';
@@ -235,7 +236,6 @@ function renderTable(data) {
     html += '<td style="white-space:nowrap;">' + (record.modelName || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.refCustomer || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.financier || '—') + '</td>';
-    html += '<td><input type="text"   id="dono-'    + idx + '" value="' + (record.doNumber     || '') + '" style="' + inputStyle() + 'min-width:90px;" placeholder="DO No"></td>';
     html += '<td style="text-align:center;font-weight:700;white-space:nowrap;" id="diff-' + idx + '">' + diffText + '</td>';
     html += '<td style="text-align:center;"><button id="savebtn-' + idx + '" onclick="saveRow(' + idx + ')" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button></td>';
     html += '</tr>';
@@ -370,7 +370,7 @@ function exportToExcel() {
   const rows = document.querySelectorAll('tr[id^="frow-"]');
   if (rows.length === 0) { showMessage('No data to export.', 'error'); return; }
 
-  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'Disbursal Amount', 'Amount Received', 'Received Date', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'DO Number', 'Difference']];
+  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'DO Number', 'Disbursal Amount', 'Amount Received', 'Received Date', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'Difference']];
 
   rows.forEach(function(row) {
     const idx = row.id.replace('frow-', '');
@@ -389,14 +389,14 @@ function exportToExcel() {
       cells[1].textContent.trim(),   // Invoice No
       cells[2].textContent.trim(),   // Invoice Date
       cells[3].textContent.trim(),   // Customer
+      donoVal,                       // DO Number
       disbVal  !== '' ? parseFloat(disbVal)  : '',
       rcvdVal  !== '' ? parseFloat(rcvdVal)  : '',
       rcvDate,
-      cells[7].textContent.trim(),   // Mobile
-      cells[8].textContent.trim(),   // Model
-      cells[9].textContent.trim(),   // Ref Customer
-      cells[10].textContent.trim(),  // Financier
-      donoVal,
+      cells[8].textContent.trim(),   // Mobile
+      cells[9].textContent.trim(),   // Model
+      cells[10].textContent.trim(),  // Ref Customer
+      cells[11].textContent.trim(),  // Financier
       diffDisplay
     ]);
   });
