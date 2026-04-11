@@ -8609,23 +8609,40 @@ function cancelBooking(params, sessionId) {
     const receiptNo = (params.receiptNo || '').toString().trim();
     if (!receiptNo) return { success: false, message: 'Receipt number required' };
 
-    const sheet = getSheet(CONFIG.SHEETS.DATA);
-    const data  = sheet.getDataRange().getValues();
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const data      = dataSheet.getDataRange().getValues();
 
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === receiptNo) {
-        const accountCheck = data[i][21];
-        if (accountCheck === 'Yes') {
-          return { success: false, message: 'Cannot cancel: Account Check is already "Yes"' };
-        }
-        // Write CANCELLED to column BM (index 64, 1-based col 65)
-        sheet.getRange(i + 1, 65).setValue('CANCELLED');
-        sheet.getRange(i + 1, 66).setValue(
-          'Cancelled by ' + (user.name || user.username) + ' on ' +
-          Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
-        );
-        return { success: true, message: 'Booking ' + receiptNo + ' cancelled successfully' };
+      if (String(data[i][0]).trim() !== receiptNo) continue;
+
+      const accountCheck = data[i][21];
+      if (accountCheck === 'Yes') {
+        return { success: false, message: 'Cannot cancel: Account Check is already "Yes"' };
       }
+
+      // --- Copy row to Cancel sheet ---
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      let cancelSheet = ss.getSheetByName('Cancel');
+      if (!cancelSheet) {
+        cancelSheet = ss.insertSheet('Cancel');
+        // Copy header row from Data sheet + two extra columns
+        const headerRow = data[0].slice();
+        headerRow.push('CancelledBy', 'CancelledOn');
+        cancelSheet.appendRow(headerRow);
+      }
+
+      // Build cancel row: all Data columns + metadata
+      const cancelRow = data[i].slice();
+      cancelRow.push(
+        user.name || user.username,
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+      );
+      cancelSheet.appendRow(cancelRow);
+
+      // --- Delete row from Data sheet ---
+      dataSheet.deleteRow(i + 1);
+
+      return { success: true, message: 'Booking ' + receiptNo + ' cancelled and moved to Cancel sheet' };
     }
     return { success: false, message: 'Record not found: ' + receiptNo };
   } catch(e) { return { success: false, message: e.message }; }
