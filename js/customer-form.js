@@ -232,7 +232,7 @@ async function shareAsPDF() {
     return;
   }
 
-  if (typeof html2pdf === 'undefined') {
+  if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
     alert('PDF library not loaded. Please use Print → Save as PDF instead.');
     window.print();
     return;
@@ -245,34 +245,35 @@ async function shareAsPDF() {
       .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
     const filename = customerName + '.pdf';
 
-    // Use the actual formsWrapper that is already rendered in the DOM
-    const source = document.getElementById('formsWrapper');
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
-    // Temporarily hide the action bar so it doesn't bleed into the capture
-    const actions = document.getElementById('formActions');
-    const prevActionsDisplay = actions ? actions.style.display : '';
-    if (actions) actions.style.display = 'none';
+    const pageIds = ['page1', 'page2', 'page3'];
+    let firstPage = true;
 
-    const opt = {
-      margin: 0,
-      filename: filename,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: {
+    for (let i = 0; i < pageIds.length; i++) {
+      const el = document.getElementById(pageIds[i]);
+      if (!el || el.style.display === 'none') continue;
+
+      const canvas = await html2canvas(el, {
         scale: 2,
         useCORS: true,
         logging: false,
-        windowWidth: document.documentElement.scrollWidth,
+        windowWidth: 794,
         scrollY: 0
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'legacy'], after: '.printable-form' }
-    };
+      });
 
-    await html2pdf().set(opt).from(source).save();
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
 
-    // Restore action bar
-    if (actions) actions.style.display = prevActionsDisplay;
+      if (!firstPage) pdf.addPage();
+      // Fit image to exactly A4 (210 x 297 mm)
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+      firstPage = false;
+    }
 
+    if (firstPage) { alert('⚠️ No pages to export'); return; }
+
+    pdf.save(filename);
     showMessage('✅ PDF downloaded: ' + filename, 'success');
 
   } catch (error) {
