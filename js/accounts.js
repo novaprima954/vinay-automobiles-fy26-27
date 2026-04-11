@@ -1176,7 +1176,7 @@ function displayPriceBreakdown(calculation) {
   // Note field when not matched
   if (!matched) {
     html += '<div style="margin-top: 14px;">';
-    html += '<label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📝 Reason for mismatch <span style="font-weight:400;color:#999;">(optional)</span></label>';
+    html += '<label style="display:block;font-size:13px;font-weight:600;color:#555;margin-bottom:6px;">📝 Reason for mismatch <span style="color:#dc3545;">*</span></label>';
     html += '<textarea id="priceMatchedNote" rows="2" style="width:100%;padding:10px;border:2px solid #ffc107;border-radius:8px;font-size:14px;resize:vertical;box-sizing:border-box;" placeholder="e.g. Customer discount given, error in receipt..."></textarea>';
     html += '</div>';
   }
@@ -1200,9 +1200,15 @@ async function savePriceVerification(calculatedTotal, matched) {
     return;
   }
 
-  // Read optional note when not matched
+  // Read note — mandatory when not matched
   const noteEl = document.getElementById('priceMatchedNote');
   const note = noteEl ? noteEl.value.trim() : '';
+  if (!matched && !note) {
+    alert('Please enter a reason for mismatch before saving.');
+    if (noteEl) { noteEl.focus(); noteEl.style.borderColor = '#dc3545'; }
+    return;
+  }
+  if (noteEl) noteEl.style.borderColor = '#ffc107';
 
   // Store verification data for use in handleUpdate
   window.lastPriceVerification = {
