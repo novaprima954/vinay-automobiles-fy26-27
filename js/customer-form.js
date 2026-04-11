@@ -241,42 +241,17 @@ async function shareAsPDF() {
   showMessage('⏳ Generating PDF... Please wait.', 'info');
 
   try {
-    // Build filename
     const customerName = currentRecord.customerName
       .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
     const filename = customerName + '.pdf';
 
-    // Collect visible pages and clone into a single wrapper div
-    const pageIds = ['page1', 'page2', 'page3'];
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'width:210mm;background:white;';
+    // Use the actual formsWrapper that is already rendered in the DOM
+    const source = document.getElementById('formsWrapper');
 
-    pageIds.forEach(function(id) {
-      const el = document.getElementById(id);
-      if (el && el.style.display !== 'none') {
-        const clone = el.cloneNode(true);
-        // Ensure page break between pages
-        clone.style.pageBreakAfter = 'always';
-        clone.style.breakAfter = 'page';
-        clone.style.width = '210mm';
-        clone.style.minHeight = '297mm';
-        clone.style.boxSizing = 'border-box';
-        clone.style.padding = '20mm 15mm';
-        clone.style.margin = '0';
-        wrapper.appendChild(clone);
-      }
-    });
-
-    if (!wrapper.children.length) {
-      alert('⚠️ No pages to export');
-      return;
-    }
-
-    // Temporarily attach to DOM (required by html2canvas)
-    wrapper.style.position = 'absolute';
-    wrapper.style.left = '-9999px';
-    wrapper.style.top = '0';
-    document.body.appendChild(wrapper);
+    // Temporarily hide the action bar so it doesn't bleed into the capture
+    const actions = document.getElementById('formActions');
+    const prevActionsDisplay = actions ? actions.style.display : '';
+    if (actions) actions.style.display = 'none';
 
     const opt = {
       margin: 0,
@@ -286,15 +261,17 @@ async function shareAsPDF() {
         scale: 2,
         useCORS: true,
         logging: false,
-        width: 794,          // 210mm at 96dpi
-        windowWidth: 794
+        windowWidth: document.documentElement.scrollWidth,
+        scrollY: 0
       },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'legacy'], after: '.printable-form' }
     };
 
-    await html2pdf().set(opt).from(wrapper).save();
-    document.body.removeChild(wrapper);
+    await html2pdf().set(opt).from(source).save();
+
+    // Restore action bar
+    if (actions) actions.style.display = prevActionsDisplay;
 
     showMessage('✅ PDF downloaded: ' + filename, 'success');
 
