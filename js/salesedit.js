@@ -921,7 +921,7 @@ async function loadAccountCheckDashboard() {
     if (role === 'admin') {
       const total = execs.reduce((sum, e) => sum + (stats[e].count || 0), 0);
       totalCard = `
-        <div class="acct-exec-card" style="border-left:5px solid #dc3545;cursor:default;grid-column:1/-1;">
+        <div class="acct-exec-card" onclick="showAllPending()" style="border-left:5px solid #dc3545;grid-column:1/-1;">
           <div class="exec-name" style="color:#dc3545;">📋 Total Pending</div>
           <div class="exec-count" style="color:#dc3545;">${total}</div>
           <div class="exec-label">Account Check Pending (All Executives)</div>
@@ -943,11 +943,36 @@ async function loadAccountCheckDashboard() {
   }
 }
 
+function showAllPending() {
+  const stats = window._acctStats || {};
+  const allRecords = Object.keys(stats).reduce((acc, exec) => {
+    return acc.concat((stats[exec].records || []).map(r => Object.assign({}, r, { executiveName: exec })));
+  }, []);
+  document.getElementById('acctPendingTitle').textContent = 'All Executives — ' + allRecords.length + ' pending';
+  document.getElementById('acctPendingHead').innerHTML =
+    '<tr><th>Receipt No</th><th>Customer</th><th>Model</th><th>Booking Date</th><th>Executive</th><th>Acct Check</th></tr>';
+  document.getElementById('acctPendingBody').innerHTML = allRecords.map(r => `
+    <tr onclick="searchAndLoadReceipt('${r.receiptNo.replace(/'/g, "\\'")}')">
+      <td><strong>${r.receiptNo}</strong></td>
+      <td>${r.customerName}</td>
+      <td style="font-size:12px;">${r.model}</td>
+      <td>${r.bookingDate}</td>
+      <td style="font-size:12px;color:#667eea;font-weight:600;">${r.executiveName || '—'}</td>
+      <td><span style="color:${r.accountCheck === 'Blank' ? '#999' : '#dc3545'};">${r.accountCheck}</span></td>
+    </tr>
+  `).join('');
+  const panel = document.getElementById('acctPendingList');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
 function showPendingForExec(execName) {
   const stats = window._acctStats || {};
   const records = (stats[execName] || {}).records || [];
   const panel = document.getElementById('acctPendingList');
   document.getElementById('acctPendingTitle').textContent = execName + ' — ' + records.length + ' pending';
+  document.getElementById('acctPendingHead').innerHTML =
+    '<tr><th>Receipt No</th><th>Customer</th><th>Model</th><th>Booking Date</th><th>Acct Check</th></tr>';
   const tbody = document.getElementById('acctPendingBody');
   tbody.innerHTML = records.map(r => `
     <tr onclick="searchAndLoadReceipt('${r.receiptNo.replace(/'/g, "\\'")}')">
