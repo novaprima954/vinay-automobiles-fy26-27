@@ -280,6 +280,7 @@ case 'invTransfer':        result = invTransfer(params, params.sessionId); break
 case 'getBookingForIssue': result = getBookingForIssue(params, params.sessionId); break;
 case 'invIssueToBooking':  result = invIssueToBooking(params, params.sessionId); break;
 case 'invOtcSale':         result = invOtcSale(params, params.sessionId); break;
+case 'invAdSale':          result = invAdSale(params, params.sessionId); break;
 case 'getIssuedItems':     result = getIssuedItems(params, params.sessionId); break;
 case 'invReturn':          result = invReturn(params, params.sessionId); break;
 case 'getInvTransactions': result = getInvTransactions(params, params.sessionId); break;
@@ -8458,6 +8459,38 @@ const user = validation.user;
       updateInvStock(item.skuId, locationId, -item.qty);
       logInvTransaction('OTC_SALE', item.skuId, skuName, locName, '', item.qty,
         '', customerName, '', otcReceiptNo, saleAmount, '', remarks || '', user.name);
+    }
+    return { success: true };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+function invAdSale(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    const { adName, busyInvoiceNo, saleAmount, date, locationId, items, remarks } = params;
+    const itemList = JSON.parse(items || '[]');
+    if (!itemList.length) return { success: false, message: 'No items' };
+    if (!adName) return { success: false, message: 'AD Name is required' };
+
+    const locName = getLocationName(locationId);
+
+    // Check stock for all items first
+    for (const item of itemList) {
+      const avail = getStockQty(item.skuId, locationId);
+      if (avail < item.qty) {
+        return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+      }
+    }
+
+    // Deduct stock and log each item
+    for (const item of itemList) {
+      const skuName = getSkuName(item.skuId);
+      updateInvStock(item.skuId, locationId, -item.qty);
+      logInvTransaction('AD_SALE', item.skuId, skuName, locName, '', item.qty,
+        '', adName, '', '', saleAmount, '', remarks || '', user.name,
+        '', '', busyInvoiceNo || '');
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.message }; }

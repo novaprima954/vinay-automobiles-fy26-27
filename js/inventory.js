@@ -13,6 +13,7 @@ let activeIssueType = 'issue';
 let currentFieldTab = 'Category';
 let issueSkuRowCount = 0;
 let otcSkuRowCount = 0;
+let adSkuRowCount = 0;
 let returnSkuRowCount = 0;
 let currentBooking = null;
 let bookingSearchResults = [];
@@ -49,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // Set today's date on date fields
   const today = new Date().toISOString().split('T')[0];
-  ['siDate', 'otcDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo'].forEach(id => {
+  ['siDate', 'otcDate', 'adDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = today;
   });
@@ -158,7 +159,7 @@ function populateLocationDropdowns() {
   const locOptions = invLocations.map(l =>
     `<option value="${l.locationId}">${l.name}</option>`
   ).join('');
-  ['siLocation', 'trFrom', 'trTo', 'otcLocation', 'returnToLocation',
+  ['siLocation', 'trFrom', 'trTo', 'otcLocation', 'adLocation', 'returnToLocation',
    'dashLocationFilter', 'histLocation'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -370,9 +371,12 @@ function setIssueType(type) {
   activeIssueType = type;
   document.getElementById('toggleIssue').classList.toggle('active', type === 'issue');
   document.getElementById('toggleOtc').classList.toggle('active', type === 'otc');
+  document.getElementById('toggleAd').classList.toggle('active', type === 'ad');
   document.getElementById('issueBookingForm').style.display = type === 'issue' ? '' : 'none';
   document.getElementById('otcSaleForm').style.display = type === 'otc' ? '' : 'none';
+  document.getElementById('adSaleForm').style.display = type === 'ad' ? '' : 'none';
   if (type === 'otc' && document.getElementById('otcSkuList').children.length === 0) addOtcSkuRow();
+  if (type === 'ad' && document.getElementById('adSkuList').children.length === 0) addAdSkuRow();
 }
 
 function onIssueSearchTypeChange() {
@@ -661,6 +665,76 @@ async function submitOtcSale() {
     addOtcSkuRow();
   } else {
     showMessage(res.message || 'OTC sale failed', 'error');
+  }
+}
+
+// ==========================================
+// AD SALE
+// ==========================================
+
+function addAdSkuRow() {
+  const id = ++adSkuRowCount;
+  const dlId  = 'inv-sku-dl-ad-'  + id;
+  const valId = 'inv-sku-val-ad-' + id;
+  const row = document.createElement('div');
+  row.className = 'sku-issue-item';
+  row.id = 'ad-row-' + id;
+  row.innerHTML = `
+    <div>
+      <label>Accessory</label>
+      <input type="text" list="${dlId}" placeholder="Search SKU…"
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; box-sizing:border-box;"
+        oninput="resolveSkuFromSearch(this,'${dlId}','${valId}')">
+      <datalist id="${dlId}">${buildSkuDatalistOptions()}</datalist>
+      <input type="hidden" id="${valId}" data-role="sku">
+    </div>
+    <div>
+      <label>Qty</label>
+      <input type="number" min="1" value="1" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+    </div>
+    <div></div>
+    <button class="btn-remove-sku" onclick="document.getElementById('ad-row-${id}').remove()">✕</button>
+  `;
+  document.getElementById('adSkuList').appendChild(row);
+}
+
+async function submitAdSale() {
+  const adName     = document.getElementById('adName').value.trim();
+  const invoiceNo  = document.getElementById('adInvoiceNo').value.trim();
+  const amount     = document.getElementById('adAmount').value;
+  const locationId = document.getElementById('adLocation').value;
+  const items      = collectSkuRows('adSkuList');
+
+  if (!adName || !locationId || items.length === 0) {
+    showMessage('Select AD Name, Location, and add at least one item', 'error'); return;
+  }
+
+  showLoading(true);
+  const res = await API.inventoryCall('invAdSale', {
+    sessionId: invSessionId,
+    adName,
+    busyInvoiceNo: invoiceNo,
+    saleAmount: amount,
+    date: document.getElementById('adDate').value,
+    locationId,
+    items: JSON.stringify(items),
+    remarks: document.getElementById('adRemarks').value
+  });
+  showLoading(false);
+
+  if (res.success) {
+    showMessage('AD sale recorded', 'success');
+    await loadStock();
+    renderDashboard();
+    document.getElementById('adName').value = '';
+    ['adInvoiceNo', 'adAmount', 'adRemarks'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('adSkuList').innerHTML = '';
+    adSkuRowCount = 0;
+    addAdSkuRow();
+  } else {
+    showMessage(res.message || 'AD sale failed', 'error');
   }
 }
 

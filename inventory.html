@@ -162,6 +162,7 @@
     .txn-TRANSFER    { background: #cce5ff; color: #004085; }
     .txn-ISSUE       { background: #d1ecf1; color: #0c5460; }
     .txn-OTC_SALE    { background: #fff3cd; color: #856404; }
+    .txn-AD_SALE     { background: #e8d5f5; color: #6a1b9a; }
     .txn-RETURN      { background: #f8d7da; color: #721c24; }
     .txn-ADJUSTMENT  { background: #e2e3e5; color: #383d41; }
 
@@ -360,6 +361,7 @@
         <div class="type-toggle">
           <button id="toggleIssue" class="active" onclick="setIssueType('issue')">🔖 Issue to Booking</button>
           <button id="toggleOtc" onclick="setIssueType('otc')">🛒 OTC Sale</button>
+          <button id="toggleAd" onclick="setIssueType('ad')">🏪 AD Sale</button>
         </div>
 
         <!-- Issue to Booking -->
@@ -468,6 +470,61 @@
             <button class="btn-primary" onclick="submitOtcSale()" style="margin-top:12px;">🛒 Record Sale</button>
           </div>
         </div>
+
+        <!-- AD Sale -->
+        <div id="adSaleForm" style="display:none;">
+          <h3>🏪 AD Sale</h3>
+          <div class="inv-form">
+            <div class="form-row">
+              <div>
+                <label>AD Name</label>
+                <select id="adName">
+                  <option value="">-- Select AD --</option>
+                  <option value="Balaji Automobiles">Balaji Automobiles</option>
+                  <option value="Mangal Murti Automobiles">Mangal Murti Automobiles</option>
+                  <option value="Om Sai Motors">Om Sai Motors</option>
+                  <option value="Seva Motors">Seva Motors</option>
+                  <option value="Shri Sai Automobiles">Shri Sai Automobiles</option>
+                  <option value="Sudesh Motors">Sudesh Motors</option>
+                  <option value="Uttarwar Motors">Uttarwar Motors</option>
+                  <option value="Vishal Motors">Vishal Motors</option>
+                </select>
+              </div>
+              <div>
+                <label>Busy Invoice No</label>
+                <input type="text" id="adInvoiceNo" placeholder="Busy invoice number">
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label>Sale Amount (₹)</label>
+                <input type="number" id="adAmount" placeholder="Total amount">
+              </div>
+              <div>
+                <label>Date</label>
+                <input type="date" id="adDate">
+              </div>
+            </div>
+            <div class="form-row single">
+              <div>
+                <label>From Location</label>
+                <select id="adLocation">
+                  <option value="">-- Select Location --</option>
+                </select>
+              </div>
+            </div>
+            <label style="font-weight:700; font-size:14px; color:#333;">Items Sold:</label>
+            <div class="sku-issue-list" id="adSkuList"></div>
+            <button class="btn-add-sku" onclick="addAdSkuRow()">+ Add Item</button>
+            <div class="form-row single" style="margin-top:16px;">
+              <div>
+                <label>Remarks (optional)</label>
+                <input type="text" id="adRemarks">
+              </div>
+            </div>
+            <button class="btn-primary" onclick="submitAdSale()" style="margin-top:12px;">🏪 Record AD Sale</button>
+          </div>
+        </div>
       </div>
 
       <!-- ===== RETURNS ===== -->
@@ -532,6 +589,7 @@
               <option value="TRANSFER">Transfer</option>
               <option value="ISSUE">Issue</option>
               <option value="OTC_SALE">OTC Sale</option>
+              <option value="AD_SALE">AD Sale</option>
               <option value="RETURN">Return</option>
               <option value="ADJUSTMENT">Adjustment</option>
             </select>
