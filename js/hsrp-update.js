@@ -9,6 +9,8 @@ let step1File = null;
 let step2File = null;
 let step1Completed = false;
 let currentUserRole = null;
+let hsrpAllData = [];
+let activeDashCard = null;
 
 // ==========================================
 // AUTHENTICATION CHECK
@@ -60,7 +62,138 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Initialize upload areas
   initializeUploadArea('step1');
   initializeUploadArea('step2');
+
+  // Initialize HSRP dashboard
+  initDashboardFilters();
+  loadHsrpDashboard();
 });
+
+// ==========================================
+// HSRP DASHBOARD
+// ==========================================
+
+function initDashboardFilters() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const monthSel = document.getElementById('dashMonth');
+  months.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i + 1;
+    opt.textContent = m;
+    if (i === now.getMonth()) opt.selected = true;
+    monthSel.appendChild(opt);
+  });
+
+  const yearSel = document.getElementById('dashYear');
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === now.getFullYear()) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+}
+
+// Parse "dd-MMM-yyyy" → Date object
+function parseDMY(dateStr) {
+  if (!dateStr) return null;
+  const monthMap = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,
+                    Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+  const parts = String(dateStr).split('-');
+  if (parts.length !== 3) return null;
+  const d = parseInt(parts[0]);
+  const m = monthMap[parts[1]];
+  const y = parseInt(parts[2]);
+  if (isNaN(d) || m === undefined || isNaN(y)) return null;
+  return new Date(y, m, d);
+}
+
+async function loadHsrpDashboard() {
+  const dashCards = document.getElementById('hsrpDashCards');
+  dashCards.innerHTML = '<div class="dash-loading">⏳ Loading...</div>';
+
+  try {
+    const response = await API.getHSRPData();
+    if (!response.success) {
+      dashCards.innerHTML = '<div class="dash-loading">Failed to load dashboard</div>';
+      return;
+    }
+
+    hsrpAllData = response.data || [];
+    renderDashboard();
+
+  } catch (e) {
+    dashCards.innerHTML = '<div class="dash-loading">Error loading dashboard</div>';
+    console.error('Dashboard error:', e);
+  }
+}
+
+function renderDashboard() {
+  const month = parseInt(document.getElementById('dashMonth').value);
+  const year  = parseInt(document.getElementById('dashYear').value);
+
+  const filtered = hsrpAllData.filter(r => {
+    const d = parseDMY(r.invoiceDate);
+    return d && d.getMonth() + 1 === month && d.getFullYear() === year;
+  });
+
+  const total    = filtered.length;
+  const ordered  = filtered.filter(r => r.status === 'Ordered').length;
+  const received = filtered.filter(r => r.status === 'Received').length;
+  const fitted   = filtered.filter(r => r.status === 'Fitted').length;
+
+  const cards = [
+    { key: 'total',    count: total,    label: 'Total',    cls: 'card-total',    icon: '📋' },
+    { key: 'ordered',  count: ordered,  label: 'Ordered',  cls: 'card-ordered',  icon: '🔖' },
+    { key: 'received', count: received, label: 'Received', cls: 'card-received', icon: '📦' },
+    { key: 'fitted',   count: fitted,   label: 'Fitted',   cls: 'card-fitted',   icon: '✅' },
+  ];
+
+  document.getElementById('hsrpDashCards').innerHTML = cards.map(c => `
+    <div class="hsrp-dash-card ${c.cls} ${activeDashCard === c.key ? 'active' : ''}"
+         onclick="onDashCardClick('${c.key}', this)">
+      <div class="dash-count">${c.count}</div>
+      <div class="dash-label">${c.icon} ${c.label}</div>
+    </div>
+  `).join('');
+
+  // If a card was already active, refresh the table with new month/year
+  if (activeDashCard) showDashboardFilterData(activeDashCard);
+}
+
+function onDashCardClick(cardKey, el) {
+  activeDashCard = cardKey;
+  document.querySelectorAll('.hsrp-dash-card').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  showDashboardFilterData(cardKey);
+  document.querySelector('.view-data-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+function showDashboardFilterData(cardKey) {
+  const month    = parseInt(document.getElementById('dashMonth').value);
+  const year     = parseInt(document.getElementById('dashYear').value);
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthLabel = monthNames[month - 1] + ' ' + year;
+
+  let filtered = hsrpAllData.filter(r => {
+    const d = parseDMY(r.invoiceDate);
+    return d && d.getMonth() + 1 === month && d.getFullYear() === year;
+  });
+
+  const statusMap = { ordered: 'Ordered', received: 'Received', fitted: 'Fitted' };
+  if (cardKey !== 'total') {
+    filtered = filtered.filter(r => r.status === statusMap[cardKey]);
+  }
+
+  const labelEl = document.getElementById('dashFilterLabel');
+  const cardLabels = { total: 'All', ordered: 'Ordered', received: 'Received', fitted: 'Fitted' };
+  labelEl.textContent = `📌 Showing: ${cardLabels[cardKey]} HSRP records for ${monthLabel} (${filtered.length} records)`;
+  labelEl.classList.add('show');
+
+  displayDataTable(filtered);
+}
 
 // ==========================================
 // SEARCH FUNCTIONALITY
@@ -131,8 +264,13 @@ async function searchData() {
     }
   }
   
+  // Clear dashboard active card when doing a manual search
+  activeDashCard = null;
+  document.querySelectorAll('.hsrp-dash-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('dashFilterLabel').classList.remove('show');
+
   console.log('Searching:', { searchBy, searchValue, dateFilter, customDate });
-  
+
   try {
     const response = await API.searchHSRPData(searchBy, searchValue, dateFilter, customDate);
     
@@ -154,12 +292,17 @@ function clearSearch() {
   document.getElementById('searchValue').value = '';
   document.getElementById('dateFilter').value = '';
   document.getElementById('customDate').value = '';
-  
+
   document.getElementById('searchValueGroup').style.display = 'none';
   document.getElementById('dateFilterGroup').style.display = 'none';
   document.getElementById('customDateGroup').style.display = 'none';
-  
+
   document.getElementById('dataTableContainer').style.display = 'none';
+
+  // Clear dashboard active state
+  activeDashCard = null;
+  document.querySelectorAll('.hsrp-dash-card').forEach(c => c.classList.remove('active'));
+  document.getElementById('dashFilterLabel').classList.remove('show');
 }
 
 async function viewAllData() {

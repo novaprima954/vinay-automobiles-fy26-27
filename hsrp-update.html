@@ -468,6 +468,92 @@
       display: none !important;
     }
 
+    /* HSRP Dashboard */
+    .hsrp-dash-section {
+      background: white;
+      border-radius: 12px;
+      padding: 24px 30px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .hsrp-dash-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .hsrp-dash-header h2 {
+      margin: 0;
+      color: #333;
+      font-size: 20px;
+    }
+    .hsrp-dash-filters {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .hsrp-dash-filters select {
+      padding: 8px 12px;
+      border: 2px solid #ddd;
+      border-radius: 7px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .hsrp-dash-filters select:focus {
+      border-color: #667eea;
+      outline: none;
+    }
+    .hsrp-dash-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 14px;
+    }
+    .hsrp-dash-card {
+      border-radius: 10px;
+      padding: 22px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+      border: 2px solid transparent;
+      user-select: none;
+    }
+    .hsrp-dash-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+    }
+    .hsrp-dash-card.active {
+      border-color: #333 !important;
+      transform: translateY(-3px);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.15);
+    }
+    .dash-count {
+      font-size: 38px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .dash-label {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 6px;
+      opacity: 0.85;
+    }
+    .card-total    { background: #ede7f6; color: #4527a0; }
+    .card-ordered  { background: #e3f2fd; color: #1565c0; }
+    .card-received { background: #fff8e1; color: #e65100; }
+    .card-fitted   { background: #e8f5e9; color: #2e7d32; }
+    .dash-loading  { color: #999; font-size: 14px; padding: 20px 0; }
+    .dash-filter-label {
+      font-size: 13px;
+      color: #667eea;
+      font-weight: 700;
+      margin-bottom: 10px;
+      display: none;
+    }
+    .dash-filter-label.show { display: block; }
+
     /* Modal Styles */
     .modal {
       position: fixed;
@@ -545,6 +631,20 @@
       <p>Upload invoice and registration files to manage HSRP data</p>
     </div>
 
+    <!-- HSRP Dashboard -->
+    <div class="hsrp-dash-section">
+      <div class="hsrp-dash-header">
+        <h2>📊 HSRP Dashboard</h2>
+        <div class="hsrp-dash-filters">
+          <select id="dashMonth" onchange="loadHsrpDashboard()"></select>
+          <select id="dashYear" onchange="loadHsrpDashboard()"></select>
+        </div>
+      </div>
+      <div class="hsrp-dash-cards" id="hsrpDashCards">
+        <div class="dash-loading">Loading dashboard...</div>
+      </div>
+    </div>
+
     <!-- View Current Data -->
     <div class="view-data-section">
       <h2 style="margin-bottom: 20px;">📊 Current HSRP Data</h2>
@@ -611,6 +711,7 @@
         </button>
       </div>
       
+      <div class="dash-filter-label" id="dashFilterLabel"></div>
       <div id="dataTableContainer" style="display: none; margin-top: 20px;">
         <div class="table-container">
           <table class="data-table" id="dataTable">
