@@ -143,11 +143,14 @@ function renderDashboard() {
   const received = filtered.filter(r => r.status === 'Received').length;
   const fitted   = filtered.filter(r => r.status === 'Fitted').length;
 
+  const notOrdered = filtered.filter(r => !r.status || r.status.trim() === '').length;
+
   const cards = [
-    { key: 'total',    count: total,    label: 'Total',    cls: 'card-total',    icon: '📋' },
-    { key: 'ordered',  count: ordered,  label: 'Ordered',  cls: 'card-ordered',  icon: '🔖' },
-    { key: 'received', count: received, label: 'Received', cls: 'card-received', icon: '📦' },
-    { key: 'fitted',   count: fitted,   label: 'Fitted',   cls: 'card-fitted',   icon: '✅' },
+    { key: 'total',      count: total,      label: 'Total',       cls: 'card-total',      icon: '📋' },
+    { key: 'notordered', count: notOrdered, label: 'Not Ordered', cls: 'card-notordered', icon: '⏳' },
+    { key: 'ordered',    count: ordered,    label: 'Ordered',     cls: 'card-ordered',    icon: '🔖' },
+    { key: 'received',   count: received,   label: 'Received',    cls: 'card-received',   icon: '📦' },
+    { key: 'fitted',     count: fitted,     label: 'Fitted',      cls: 'card-fitted',     icon: '✅' },
   ];
 
   document.getElementById('hsrpDashCards').innerHTML = cards.map(c => `
@@ -183,12 +186,14 @@ function showDashboardFilterData(cardKey) {
   });
 
   const statusMap = { ordered: 'Ordered', received: 'Received', fitted: 'Fitted' };
-  if (cardKey !== 'total') {
+  if (cardKey === 'notordered') {
+    filtered = filtered.filter(r => !r.status || r.status.trim() === '');
+  } else if (cardKey !== 'total') {
     filtered = filtered.filter(r => r.status === statusMap[cardKey]);
   }
 
   const labelEl = document.getElementById('dashFilterLabel');
-  const cardLabels = { total: 'All', ordered: 'Ordered', received: 'Received', fitted: 'Fitted' };
+  const cardLabels = { total: 'All', notordered: 'Not Ordered', ordered: 'Ordered', received: 'Received', fitted: 'Fitted' };
   labelEl.textContent = `📌 Showing: ${cardLabels[cardKey]} HSRP records for ${monthLabel} (${filtered.length} records)`;
   labelEl.classList.add('show');
 
