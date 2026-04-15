@@ -7015,8 +7015,11 @@ function batchSaveFinancierData(params, sessionId) {
       return { success: false, message: 'Access denied' };
     }
 
-    const recs = params.records || [];
-    if (recs.length === 0) return { success: false, message: 'No records to save' };
+    let recs = params.records || [];
+    if (typeof recs === 'string') {
+      try { recs = JSON.parse(recs); } catch(e) { recs = []; }
+    }
+    if (!Array.isArray(recs) || recs.length === 0) return { success: false, message: 'No records to save' };
 
     const sheet = getSheet('HSRP');
     const data = sheet.getDataRange().getValues();

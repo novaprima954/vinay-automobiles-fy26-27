@@ -52,7 +52,7 @@ async function loadFinancierData() {
     });
 
     if (response.success) {
-      records = response.data || [];
+      records = (response.data || []).filter(function(r) { return r.financier && r.financier.trim() !== ''; });
       populateDropdowns(records);
       populatePayoutHpDropdown(records);
       applyFiltersAndSort();
