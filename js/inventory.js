@@ -277,9 +277,9 @@ function renderDashboard() {
 
     const totalCls = rowTotal === 0 ? 'zero' : (isLow ? 'low' : '');
     return `<tr>
-      <td style="font-size:11px; color:#888; font-family:monospace;">${sku.skuId || '-'}</td>
+      <td style="width:70px; max-width:70px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; color:#888; font-family:monospace;" title="${sku.skuId || ''}">${sku.skuId || '-'}</td>
       <td>${sku.category || '-'}</td>
-      <td style="max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${sku.type || ''}">${sku.type || '-'}</td>
+      <td style="white-space:nowrap;">${sku.type || '-'}</td>
       <td>${sku.brand || '-'}</td>
       <td>${sku.color || '-'} ${sku.minStock > 0 ? '<span class="low-badge">Min:' + sku.minStock + '</span>' : ''}</td>
       ${qtyCells}
