@@ -245,34 +245,45 @@ function renderDashboard() {
 
   // Inject location headers into the header row
   const headerRow = document.querySelector('.stock-table thead tr');
-  // Remove old location headers (keep first 4)
-  while (headerRow.cells.length > 4) headerRow.deleteCell(4);
+  // Remove old location + Total headers (keep first 5 static cols)
+  while (headerRow.cells.length > 5) headerRow.deleteCell(5);
   visibleLocs.forEach(l => {
     const th = document.createElement('th');
     th.textContent = l.name;
     th.style.textAlign = 'center';
     headerRow.appendChild(th);
   });
+  // Total header
+  const thTotal = document.createElement('th');
+  thTotal.textContent = 'Total';
+  thTotal.style.textAlign = 'center';
+  thTotal.style.background = '#4a5568';
+  headerRow.appendChild(thTotal);
 
   if (filteredSkus.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="' + (4 + visibleLocs.length) + '" style="text-align:center; color:#999; padding:20px;">No accessories found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="' + (5 + visibleLocs.length + 1) + '" style="text-align:center; color:#999; padding:20px;">No accessories found</td></tr>';
     return;
   }
 
   tbody.innerHTML = filteredSkus.map(sku => {
+    const rowTotal = invLocations.reduce((s, loc) => s + (stockMap[sku.skuId + '|' + loc.locationId] || 0), 0);
+    const isLow = sku.minStock > 0 && rowTotal <= sku.minStock;
+
     const qtyCells = visibleLocs.map(l => {
       const qty = stockMap[sku.skuId + '|' + l.locationId] || 0;
-      const total = invLocations.reduce((s, loc) => s + (stockMap[sku.skuId + '|' + loc.locationId] || 0), 0);
-      const isLow = sku.minStock > 0 && total <= sku.minStock;
       const cls = qty === 0 ? 'zero' : (isLow ? 'low' : '');
       return `<td class="stock-qty ${cls}">${qty === 0 ? '-' : qty}</td>`;
     }).join('');
+
+    const totalCls = rowTotal === 0 ? 'zero' : (isLow ? 'low' : '');
     return `<tr>
+      <td style="font-size:11px; color:#888; font-family:monospace;">${sku.skuId || '-'}</td>
       <td>${sku.category || '-'}</td>
-      <td>${sku.type || '-'}</td>
+      <td style="max-width:80px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${sku.type || ''}">${sku.type || '-'}</td>
       <td>${sku.brand || '-'}</td>
       <td>${sku.color || '-'} ${sku.minStock > 0 ? '<span class="low-badge">Min:' + sku.minStock + '</span>' : ''}</td>
       ${qtyCells}
+      <td class="stock-qty ${totalCls}" style="background:#f0f4f8; font-weight:800;">${rowTotal === 0 ? '-' : rowTotal}</td>
     </tr>`;
   }).join('');
 }
@@ -915,10 +926,11 @@ function exportHistoryCSV() {
 function exportStockCSV() {
   const stockMap = {};
   invStock.forEach(s => { stockMap[s.skuId + '|' + s.locationId] = s.qty || 0; });
-  let csv = 'Category,Type,Brand,Color,' + invLocations.map(l => l.name).join(',') + '\n';
+  let csv = 'SKU ID,Category,Type,Brand,Color,' + invLocations.map(l => l.name).join(',') + ',Total\n';
   invSkus.forEach(sku => {
     const qtys = invLocations.map(l => stockMap[sku.skuId + '|' + l.locationId] || 0);
-    csv += [sku.category, sku.type, sku.brand, sku.color, ...qtys]
+    const total = qtys.reduce((a, b) => a + b, 0);
+    csv += [sku.skuId, sku.category, sku.type, sku.brand, sku.color, ...qtys, total]
       .map(v => '"' + String(v || '').replace(/"/g, '""') + '"').join(',') + '\n';
   });
   downloadCSV(csv, 'Inventory_Stock.csv');
