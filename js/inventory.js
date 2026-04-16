@@ -100,14 +100,13 @@ function populateAllDropdowns() {
 }
 
 function populateSkuDropdowns() {
-  // Stock In uses datalist (searchable by SKU ID or name)
+  // Stock In datalist
   const siDl = document.getElementById('siSkuDl');
   if (siDl) siDl.innerHTML = buildSkuDatalistOptions();
 
-  // Transfer still uses a plain select
-  const skuOptions = buildSkuOptions();
-  const trEl = document.getElementById('trSku');
-  if (trEl) trEl.innerHTML = '<option value="">-- Select Accessory --</option>' + skuOptions;
+  // Transfer datalist (searchable, shows SKU ID + name)
+  const trDl = document.getElementById('trSkuDl');
+  if (trDl) trDl.innerHTML = buildSkuDatalistOptions();
 }
 
 function buildSkuOptions() {
@@ -200,9 +199,17 @@ function renderDashboard() {
   catEl.innerHTML = '<option value="">All Categories</option>' +
     cats.map(c => `<option value="${c}" ${catFilter === c ? 'selected' : ''}>${c}</option>`).join('');
 
-  const filteredSkus = invSkus.filter(s =>
-    (!catFilter || s.category === catFilter)
-  );
+  const searchText = (document.getElementById('dashSearch').value || '').toLowerCase().trim();
+
+  const filteredSkus = invSkus.filter(s => {
+    if (catFilter && s.category !== catFilter) return false;
+    if (searchText) {
+      const haystack = [s.skuId, s.category, s.type, s.brand, s.color]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!haystack.includes(searchText)) return false;
+    }
+    return true;
+  });
 
   const visibleLocs = locFilter
     ? invLocations.filter(l => l.locationId === locFilter)
@@ -330,7 +337,7 @@ async function submitStockIn() {
 // ==========================================
 
 function showTransferStock() {
-  const skuId = document.getElementById('trSku').value;
+  const skuId = document.getElementById('trSkuVal').value;
   const locationId = document.getElementById('trFrom').value;
   const el = document.getElementById('trAvailableStock');
   if (!skuId || !locationId) { el.textContent = ''; return; }
@@ -340,7 +347,7 @@ function showTransferStock() {
 }
 
 async function submitTransfer() {
-  const skuId = document.getElementById('trSku').value;
+  const skuId = document.getElementById('trSkuVal').value;
   const fromId = document.getElementById('trFrom').value;
   const toId = document.getElementById('trTo').value;
   const qty = parseInt(document.getElementById('trQty').value);

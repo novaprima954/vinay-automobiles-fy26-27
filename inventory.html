@@ -246,6 +246,9 @@
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
           <h3 style="margin:0;">Current Stock Levels</h3>
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <input type="text" id="dashSearch" placeholder="🔍 Search SKU, name, type…"
+              oninput="renderDashboard()"
+              style="padding:8px 12px; border:2px solid #ddd; border-radius:7px; font-size:13px; min-width:200px;">
             <select id="dashLocationFilter" onchange="renderDashboard()" style="padding:8px 12px; border:2px solid #ddd; border-radius:7px; font-size:13px;">
               <option value="">All Locations</option>
             </select>
@@ -259,7 +262,7 @@
           <table class="stock-table">
             <thead>
               <tr>
-                <th style="width:70px;">SKU ID</th>
+                <th style="width:140px;">SKU ID</th>
                 <th>Category</th>
                 <th>Type</th>
                 <th>Brand</th>
@@ -323,9 +326,11 @@
           <div class="form-row">
             <div>
               <label>Accessory (SKU)</label>
-              <select id="trSku">
-                <option value="">-- Select Accessory --</option>
-              </select>
+              <input type="text" id="trSkuSearch" list="trSkuDl"
+                placeholder="Search by SKU ID or name…" style="width:100%; box-sizing:border-box;"
+                oninput="resolveSkuFromSearch(this,'trSkuDl','trSkuVal'); showTransferStock()">
+              <datalist id="trSkuDl"></datalist>
+              <input type="hidden" id="trSkuVal">
             </div>
             <div>
               <label>Quantity</label>
