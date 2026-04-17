@@ -592,18 +592,25 @@ function populateDetails(record, user) {
   // Pending items
   populatePendingItems(record);
   
-  // Check edit mode - only based on Account Check
+  // Check edit mode
   const accountCheck = record.accountCheck || '';
-  
+  const pendingStr = (record.pending || '').trim();
+
   if (accountCheck !== 'Yes') {
     // BLOCKED - Account Check not Yes
     document.getElementById('viewOnlyBanner').style.display = 'none';
     document.getElementById('accountWarning').style.display = 'block';
     document.getElementById('limitedEditNote').style.display = 'none';
     setFieldsMode('blocked');
+  } else if (pendingStr) {
+    // PENDING ONLY - Account Check = Yes, but there are unresolved pending items
+    document.getElementById('viewOnlyBanner').style.display = 'none';
+    document.getElementById('accountWarning').style.display = 'none';
+    document.getElementById('limitedEditNote').style.display = 'block';
+    document.getElementById('limitedEditNote').textContent = '⏳ Pending items exist — only pending item fields are editable.';
+    setFieldsMode('pending_only', pendingStr);
   } else {
-    // FULL EDIT - Account Check = Yes
-    // Allow editing regardless of Accessory Fitted status
+    // FULL EDIT - Account Check = Yes, no pending items
     document.getElementById('viewOnlyBanner').style.display = 'none';
     document.getElementById('accountWarning').style.display = 'none';
     document.getElementById('limitedEditNote').style.display = 'none';
@@ -698,8 +705,13 @@ function populatePendingItems(record) {
   if (modelConfig) {
     const accessories = modelConfig.accessories;
     const allPendingOptions = accessories.concat(ADDITIONAL_PENDING_ITEMS);
-    
-    
+
+    // Always include Helmet if ordered, even if not in model's accessories list
+    if (record.helmet === 'Yes' && allPendingOptions.indexOf('Helmet') === -1) {
+      allPendingOptions.push('Helmet');
+    }
+
+
     // Filter to only show accessories that were ordered (value = "Yes")
     const orderedAccessories = [];
     
@@ -809,18 +821,84 @@ function populatePendingItems(record) {
       pendingContainer.appendChild(itemDiv);
     });
   } else {
-    pendingContainer.innerHTML = '<div style="color: #999; padding: 10px;">Model not found in configuration</div>';
+    // No model config — still show ADDITIONAL_PENDING_ITEMS + Helmet if ordered
+    const fallbackOptions = ADDITIONAL_PENDING_ITEMS.slice();
+    if (record.helmet === 'Yes') fallbackOptions.unshift('Helmet');
+
+    if (fallbackOptions.length === 0) {
+      pendingContainer.innerHTML = '<div style="color: #999; padding: 10px;">Model not found in configuration</div>';
+    } else {
+      fallbackOptions.forEach(function(accessory) {
+        const safeName  = accessory.toLowerCase().replace(/ /g, '');
+        const radioName = 'pending_' + safeName;
+        const isPending = pendingItemsStr.indexOf(accessory) !== -1;
+        const isRefused = refusedItemsStr.indexOf(accessory) !== -1;
+        const dlId   = 'acc-sku-dl-'  + safeName;
+        const valId  = 'acc-sku-val-' + safeName;
+        const locId  = 'acc-loc-'     + safeName;
+        const qtyId  = 'acc-qty-'     + safeName;
+        const invRowId = 'pi-inv-'    + safeName;
+        const storeLocation = accInvLocations.find(function(l) { return l.name.toLowerCase() === 'store'; });
+        const locOptions = accInvLocations.map(function(l) {
+          const sel = (storeLocation && l.locationId === storeLocation.locationId) ? ' selected' : '';
+          return '<option value="' + l.locationId + '"' + sel + '>' + l.name + '</option>';
+        }).join('');
+        const dlOptions = buildAccSkuDatalistOptions(accessory);
+        let statusClass = isPending ? 'status-pending' : (isRefused ? 'status-refused' : '');
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'pending-item ' + statusClass;
+        itemDiv.id = 'pi-' + safeName;
+        itemDiv.innerHTML = `
+          <div class="pending-item-top">
+            <span class="pending-item-name">${accessory}</span>
+            <div class="pending-item-options">
+              <label><input type="radio" name="${radioName}" value="none" ${!isPending && !isRefused ? 'checked' : ''}
+                onchange="onPendingItemChange('${safeName}')"> None</label>
+              <label><input type="radio" name="${radioName}" value="pending" ${isPending ? 'checked' : ''}
+                onchange="onPendingItemChange('${safeName}')"> 🔔 Pending</label>
+              <label><input type="radio" name="${radioName}" value="refused" ${isRefused ? 'checked' : ''}
+                onchange="onPendingItemChange('${safeName}')"> ❌ Refused</label>
+              <label><input type="radio" name="${radioName}" value="issued"
+                onchange="onPendingItemChange('${safeName}')"> 📦 Issue from Stock</label>
+            </div>
+          </div>
+          <div class="pending-inv-row" id="${invRowId}">
+            <div style="flex:2; min-width:180px;">
+              <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">${accessory} SKU</label>
+              <input type="text" list="${dlId}" placeholder="Type to search SKU…"
+                style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px; box-sizing:border-box;"
+                oninput="resolveAccSkuFromSearch(this,'${dlId}','${valId}')">
+              <datalist id="${dlId}">${dlOptions}</datalist>
+              <input type="hidden" id="${valId}" data-role="acc-sku">
+            </div>
+            <div style="flex:1; min-width:120px;">
+              <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">From Location</label>
+              <select id="${locId}"
+                style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
+                <option value="">-- Location --</option>${locOptions}
+              </select>
+            </div>
+            <div style="flex:0; min-width:80px;">
+              <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Qty</label>
+              <input type="number" id="${qtyId}" min="1" value="1"
+                style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
+            </div>
+          </div>
+        `;
+        pendingContainer.appendChild(itemDiv);
+      });
+    }
   }
 }
 
 /**
- * Set fields mode (blocked, full)
+ * Set fields mode (blocked, pending_only, full)
  */
-function setFieldsMode(mode) {
+function setFieldsMode(mode, pendingItemsStr) {
   const fields = ['accessoryRemark'];
   const alwaysEditableFields = ['accessoryReceipt1', 'accessoryExtra'];
   const updateBtn = document.getElementById('updateBtn');
-  
+
   if (mode === 'blocked') {
     // BLOCKED MODE: Account Check ≠ Yes
     fields.forEach(function(id) {
@@ -829,16 +907,51 @@ function setFieldsMode(mode) {
     alwaysEditableFields.forEach(function(id) {
       document.getElementById(id).disabled = true;
     });
-    
+
     // Disable all pending radio buttons
     document.querySelectorAll('#pendingCheckboxes input[type="radio"]').forEach(function(radio) {
       radio.disabled = true;
     });
-    
+
     updateBtn.disabled = true;
     updateBtn.textContent = '🚫 Blocked - Account Check Required';
     updateBtn.style.background = '#dc3545';
-    
+
+  } else if (mode === 'pending_only') {
+    // PENDING ONLY MODE: lock all fields; only allow editing radios of items still pending
+    fields.forEach(function(id) {
+      document.getElementById(id).disabled = true;
+    });
+    alwaysEditableFields.forEach(function(id) {
+      document.getElementById(id).disabled = true;
+    });
+    const checkerEl = document.getElementById('accessoryCheckerName');
+    if (checkerEl) checkerEl.disabled = true;
+
+    // Disable all accessory ordered radios
+    document.querySelectorAll('#accessoriesOrdered input[type="radio"]').forEach(function(radio) {
+      radio.disabled = true;
+    });
+
+    // Disable all pending radios first, then re-enable only those that are still pending
+    document.querySelectorAll('#pendingCheckboxes input[type="radio"]').forEach(function(radio) {
+      radio.disabled = true;
+    });
+    if (pendingItemsStr) {
+      pendingItemsStr.split(',').forEach(function(item) {
+        const safeName = item.trim().toLowerCase().replace(/ /g, '');
+        if (safeName) {
+          document.querySelectorAll('#pendingCheckboxes input[name="pending_' + safeName + '"]').forEach(function(radio) {
+            radio.disabled = false;
+          });
+        }
+      });
+    }
+
+    updateBtn.disabled = false;
+    updateBtn.textContent = '💾 Update Pending Items';
+    updateBtn.style.background = 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)';
+
   } else {
     // FULL EDIT MODE: Account Check = Yes
     // Allow editing regardless of Accessory Fitted status
@@ -848,12 +961,14 @@ function setFieldsMode(mode) {
     alwaysEditableFields.forEach(function(id) {
       document.getElementById(id).disabled = false;
     });
-    
+    const checkerEl = document.getElementById('accessoryCheckerName');
+    if (checkerEl) checkerEl.disabled = false;
+
     // Enable all pending radio buttons
     document.querySelectorAll('#pendingCheckboxes input[type="radio"]').forEach(function(radio) {
       radio.disabled = false;
     });
-    
+
     updateBtn.disabled = false;
     updateBtn.textContent = '💾 Update';
     updateBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
