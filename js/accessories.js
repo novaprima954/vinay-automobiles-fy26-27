@@ -570,7 +570,9 @@ function populateDetails(record, user) {
       } else if (accessory === 'Handle Hook') {
         value.textContent = firstVal('handleHook', 'handlehook', 'HandleHook');
       } else if (accessory === 'Helmet') {
-        value.textContent = firstVal('helmet', 'Helmet');
+        // Helmet stored as quantity: 'No' / '1' / '2' etc.
+        var hv = firstVal('helmet', 'Helmet');
+        value.textContent = (hv === '-' || hv.toLowerCase() === 'no') ? 'No' : 'Yes (Qty: ' + hv + ')';
       } else if (accessory === 'Rain Cover') {
         value.textContent = firstVal('raincover', 'rainCover', 'RainCover');
       } else if (accessory === 'Buzzer') {
@@ -712,8 +714,14 @@ function populatePendingItems(record) {
     const accessories = modelConfig.accessories;
     const allPendingOptions = accessories.concat(ADDITIONAL_PENDING_ITEMS);
 
+    // Helper: Helmet stores quantity ('1','2',...) not 'Yes'. Ordered = non-empty, non-'No', non-'0'.
+    function helmetOrdered() {
+      var v = (record.helmet || record.Helmet || '').toString().trim();
+      return v !== '' && v.toLowerCase() !== 'no' && v !== '0';
+    }
+
     // Always include Helmet if ordered, even if not in model's accessories list
-    if (record.helmet === 'Yes' && allPendingOptions.indexOf('Helmet') === -1) {
+    if (helmetOrdered() && allPendingOptions.indexOf('Helmet') === -1) {
       allPendingOptions.push('Helmet');
     }
 
@@ -747,7 +755,7 @@ function populatePendingItems(record) {
       } else if (accessory === 'Handle Hook') {
         isOrdered = accOrdered('handleHook', 'handlehook', 'HandleHook', 'Handle Hook');
       } else if (accessory === 'Helmet') {
-        isOrdered = accOrdered('helmet', 'Helmet');
+        isOrdered = helmetOrdered(); // quantity-based: '1','2',... = ordered; 'No'/'' = not ordered
       } else if (accessory === 'Rain Cover') {
         isOrdered = accOrdered('raincover', 'rainCover', 'RainCover', 'Rain Cover');
       } else if (accessory === 'Buzzer') {
@@ -796,9 +804,14 @@ function populatePendingItems(record) {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'pending-item ' + statusClass;
       itemDiv.id = 'pi-' + safeName;
+      // For Helmet, append quantity to label
+      const helmetQtyLabel = (accessory === 'Helmet')
+        ? (() => { var v = (record.helmet || record.Helmet || '').toString().trim(); return (v && v.toLowerCase() !== 'no' && v !== '0') ? ' (Qty: ' + v + ')' : ''; })()
+        : '';
+
       itemDiv.innerHTML = `
         <div class="pending-item-top">
-          <span class="pending-item-name">${accessory}</span>
+          <span class="pending-item-name">${accessory}${helmetQtyLabel}</span>
           <div class="pending-item-options">
             <label><input type="radio" name="${radioName}" value="none" ${!isPending && !isRefused ? 'checked' : ''}
               onchange="onPendingItemChange('${safeName}')"> None</label>
@@ -828,7 +841,8 @@ function populatePendingItems(record) {
           </div>
           <div style="flex:0; min-width:80px;">
             <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Qty</label>
-            <input type="number" id="${qtyId}" min="1" value="1"
+            <input type="number" id="${qtyId}" min="1"
+              value="${accessory === 'Helmet' ? ((record.helmet || record.Helmet || '1').toString().trim().replace(/[^0-9]/g, '') || '1') : '1'}"
               style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
           </div>
         </div>
@@ -845,7 +859,9 @@ function populatePendingItems(record) {
       }
       return false;
     };
-    if (accOrd2('helmet', 'Helmet'))                                    fallbackOptions.push('Helmet');
+    // Helmet uses quantity ('1','2',...) not 'Yes'
+    const helmetVal2 = (record.helmet || record.Helmet || '').toString().trim();
+    if (helmetVal2 !== '' && helmetVal2.toLowerCase() !== 'no' && helmetVal2 !== '0') fallbackOptions.push('Helmet');
     if (accOrd2('guard', 'Guard'))                                       fallbackOptions.push('Guard');
     if (accOrd2('gripCover', 'gripcover', 'GripCover'))                  fallbackOptions.push('Grip Cover');
     if (accOrd2('seatCover', 'seatcover', 'SeatCover'))                  fallbackOptions.push('Seat Cover');
