@@ -571,9 +571,9 @@ function populateDetails(record, user) {
       } else if (accessory === 'Handle Hook') {
         value.textContent = firstVal('handleHook', 'handlehook', 'HandleHook');
       } else if (accessory === 'Helmet') {
-        // Helmet stored as quantity: 'No' / '1' / '2' etc.
-        var hv = firstVal('helmet', 'Helmet');
-        value.textContent = (hv === '-' || hv.toLowerCase() === 'no') ? 'No' : 'Yes (Qty: ' + hv + ')';
+        // Helmet stored as quantity: 'No' / 1 / 2 etc. (may be number or string)
+        var hv = String(firstVal('helmet', 'Helmet'));
+        value.textContent = (hv === '-' || hv.toLowerCase() === 'no' || hv === '0') ? 'No' : 'Yes (Qty: ' + hv + ')';
       } else if (accessory === 'Rain Cover') {
         value.textContent = firstVal('raincover', 'rainCover', 'RainCover');
       } else if (accessory === 'Buzzer') {
