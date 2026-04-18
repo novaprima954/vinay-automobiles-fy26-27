@@ -497,7 +497,8 @@ async function loadRecordDetails(row) {
       showMessage(response.message, 'error');
     }
   } catch (error) {
-    showMessage('Failed to load record details', 'error');
+    console.error('loadRecordDetails error:', error);
+    showMessage('Failed to load record details: ' + (error && error.message ? error.message : error), 'error');
   }
 }
 
@@ -703,40 +704,49 @@ function onPendingItemChange(safeName) {
 function populatePendingItems(record) {
   const pendingContainer = document.getElementById('pendingCheckboxes');
   pendingContainer.innerHTML = '';
-  
-  
+
   const pendingItemsStr = record.pending || '';
-  const refusedItemsStr = record.customerRefused || ''; 
-  
+  const refusedItemsStr = record.customerRefused || '';
+
+  // ── Helpers (defined here so they are available in all branches below) ──
+
+  // Helmet stores quantity ('1','2',...) not 'Yes'.
+  // Ordered = non-empty AND not 'No' AND not '0'.
+  var helmetOrdered = function() {
+    var v = (record.helmet || record.Helmet || '').toString().trim();
+    return v !== '' && v.toLowerCase() !== 'no' && v !== '0';
+  };
+
+  // Returns the numeric quantity stored for Helmet (or '1' as fallback).
+  var helmetQty = function() {
+    var v = (record.helmet || record.Helmet || '1').toString().trim().replace(/\D/g, '');
+    return v || '1';
+  };
+
+  // Case-insensitive "Yes" check across multiple possible field-name variants.
+  var accOrdered = function() {
+    for (var i = 0; i < arguments.length; i++) {
+      var v = record[arguments[i]];
+      if (v && v.toString().toLowerCase() === 'yes') return true;
+    }
+    return false;
+  };
+
+  // ── End helpers ──
+
   const modelConfig = getModelConfig(record.model);
-  
+
   if (modelConfig) {
     const accessories = modelConfig.accessories;
     const allPendingOptions = accessories.concat(ADDITIONAL_PENDING_ITEMS);
-
-    // Helper: Helmet stores quantity ('1','2',...) not 'Yes'. Ordered = non-empty, non-'No', non-'0'.
-    function helmetOrdered() {
-      var v = (record.helmet || record.Helmet || '').toString().trim();
-      return v !== '' && v.toLowerCase() !== 'no' && v !== '0';
-    }
 
     // Always include Helmet if ordered, even if not in model's accessories list
     if (helmetOrdered() && allPendingOptions.indexOf('Helmet') === -1) {
       allPendingOptions.push('Helmet');
     }
 
-
     // Filter to only show accessories that were ordered (value = "Yes")
     const orderedAccessories = [];
-    
-    // Helper: case-insensitive "Yes" check across multiple possible field name variants
-    function accOrdered() {
-      for (var i = 0; i < arguments.length; i++) {
-        var v = record[arguments[i]];
-        if (v && v.toString().toLowerCase() === 'yes') return true;
-      }
-      return false;
-    }
 
     allPendingOptions.forEach(function(accessory) {
       let isOrdered = false;
@@ -804,10 +814,8 @@ function populatePendingItems(record) {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'pending-item ' + statusClass;
       itemDiv.id = 'pi-' + safeName;
-      // For Helmet, append quantity to label
-      const helmetQtyLabel = (accessory === 'Helmet')
-        ? (() => { var v = (record.helmet || record.Helmet || '').toString().trim(); return (v && v.toLowerCase() !== 'no' && v !== '0') ? ' (Qty: ' + v + ')' : ''; })()
-        : '';
+      // For Helmet, append ordered quantity to the label
+      var helmetQtyLabel = (accessory === 'Helmet') ? ' (Qty: ' + helmetQty() + ')' : '';
 
       itemDiv.innerHTML = `
         <div class="pending-item-top">
@@ -842,7 +850,7 @@ function populatePendingItems(record) {
           <div style="flex:0; min-width:80px;">
             <label style="font-size:11px; font-weight:600; color:#555; display:block; margin-bottom:3px;">Qty</label>
             <input type="number" id="${qtyId}" min="1"
-              value="${accessory === 'Helmet' ? ((record.helmet || record.Helmet || '1').toString().trim().replace(/[^0-9]/g, '') || '1') : '1'}"
+              value="${accessory === 'Helmet' ? helmetQty() : '1'}"
               style="width:100%; padding:7px; border:2px solid #17a2b8; border-radius:6px; font-size:13px;">
           </div>
         </div>
@@ -851,26 +859,18 @@ function populatePendingItems(record) {
     });
   } else {
     // No model config — still show known accessories if ordered + ADDITIONAL_PENDING_ITEMS
+    // (reuse accOrdered / helmetOrdered helpers defined at top of this function)
     const fallbackOptions = [];
-    const accOrd2 = function() {
-      for (var i = 0; i < arguments.length; i++) {
-        var v = record[arguments[i]];
-        if (v && v.toString().toLowerCase() === 'yes') return true;
-      }
-      return false;
-    };
-    // Helmet uses quantity ('1','2',...) not 'Yes'
-    const helmetVal2 = (record.helmet || record.Helmet || '').toString().trim();
-    if (helmetVal2 !== '' && helmetVal2.toLowerCase() !== 'no' && helmetVal2 !== '0') fallbackOptions.push('Helmet');
-    if (accOrd2('guard', 'Guard'))                                       fallbackOptions.push('Guard');
-    if (accOrd2('gripCover', 'gripcover', 'GripCover'))                  fallbackOptions.push('Grip Cover');
-    if (accOrd2('seatCover', 'seatcover', 'SeatCover'))                  fallbackOptions.push('Seat Cover');
-    if (accOrd2('matin', 'Matin'))                                       fallbackOptions.push('Matin');
-    if (accOrd2('tankCover', 'tankcover', 'TankCover'))                  fallbackOptions.push('Tank Cover');
-    if (accOrd2('handleHook', 'handlehook', 'HandleHook'))               fallbackOptions.push('Handle Hook');
-    if (accOrd2('raincover', 'rainCover', 'RainCover'))                  fallbackOptions.push('Rain Cover');
-    if (accOrd2('buzzer', 'Buzzer'))                                      fallbackOptions.push('Buzzer');
-    if (accOrd2('backrest', 'backRest', 'BackRest'))                     fallbackOptions.push('Back Rest');
+    if (helmetOrdered())                                                  fallbackOptions.push('Helmet');
+    if (accOrdered('guard', 'Guard'))                                     fallbackOptions.push('Guard');
+    if (accOrdered('gripCover', 'gripcover', 'GripCover'))                fallbackOptions.push('Grip Cover');
+    if (accOrdered('seatCover', 'seatcover', 'SeatCover'))                fallbackOptions.push('Seat Cover');
+    if (accOrdered('matin', 'Matin'))                                     fallbackOptions.push('Matin');
+    if (accOrdered('tankCover', 'tankcover', 'TankCover'))                fallbackOptions.push('Tank Cover');
+    if (accOrdered('handleHook', 'handlehook', 'HandleHook'))             fallbackOptions.push('Handle Hook');
+    if (accOrdered('raincover', 'rainCover', 'RainCover'))                fallbackOptions.push('Rain Cover');
+    if (accOrdered('buzzer', 'Buzzer'))                                   fallbackOptions.push('Buzzer');
+    if (accOrdered('backrest', 'backRest', 'BackRest'))                   fallbackOptions.push('Back Rest');
     ADDITIONAL_PENDING_ITEMS.forEach(function(i) { fallbackOptions.push(i); });
 
     if (fallbackOptions.length === 0) {
