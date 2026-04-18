@@ -5,43 +5,43 @@
 // Model-Variant-Accessory Configuration
 const MODEL_VARIANTS = {
   'Jupiter 110': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Jupiter 125': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Ntorq': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Radeon': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Raider': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Ronin': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Sport': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Star': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'XL 100': {
-    accessories: ['Grip Cover', 'Seat Cover', 'Tank Cover', 'Handle Hook', 'Helmet']
+    accessories: ['Grip Cover', 'Seat Cover', 'Tank Cover', 'Handle Hook', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Zest': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'iQube': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Orbiter': {
-    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet']
+    accessories: ['Guard', 'Grip Cover', 'Seat Cover', 'Matin', 'Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   },
   'Apache': {
-    accessories: ['Helmet']
+    accessories: ['Helmet', 'Rain Cover', 'Buzzer', 'Back Rest']
   }
 };
 
@@ -551,26 +551,32 @@ function populateDetails(record, user) {
       value.className = 'detail-value';
       
       // Check both camelCase and lowercase variants of field names
+      const firstVal = function() {
+        for (var i = 0; i < arguments.length; i++) {
+          if (record[arguments[i]]) return record[arguments[i]];
+        }
+        return '-';
+      };
       if (accessory === 'Guard') {
-        value.textContent = record.guard || '-';
+        value.textContent = firstVal('guard', 'Guard');
       } else if (accessory === 'Grip Cover') {
-        value.textContent = record.gripCover || record.gripcover || '-';
+        value.textContent = firstVal('gripCover', 'gripcover', 'GripCover');
       } else if (accessory === 'Seat Cover') {
-        value.textContent = record.seatCover || record.seatcover || '-';
+        value.textContent = firstVal('seatCover', 'seatcover', 'SeatCover');
       } else if (accessory === 'Matin') {
-        value.textContent = record.matin || '-';
+        value.textContent = firstVal('matin', 'Matin');
       } else if (accessory === 'Tank Cover') {
-        value.textContent = record.tankCover || record.tankcover || '-';
+        value.textContent = firstVal('tankCover', 'tankcover', 'TankCover');
       } else if (accessory === 'Handle Hook') {
-        value.textContent = record.handleHook || record.handlehook || '-';
+        value.textContent = firstVal('handleHook', 'handlehook', 'HandleHook');
       } else if (accessory === 'Helmet') {
-        value.textContent = record.helmet || '-';
+        value.textContent = firstVal('helmet', 'Helmet');
       } else if (accessory === 'Rain Cover') {
-        value.textContent = record.raincover || '-';
+        value.textContent = firstVal('raincover', 'rainCover', 'RainCover');
       } else if (accessory === 'Buzzer') {
-        value.textContent = record.buzzer || '-';
+        value.textContent = firstVal('buzzer', 'Buzzer');
       } else if (accessory === 'Back Rest') {
-        value.textContent = record.backrest || '-';
+        value.textContent = firstVal('backrest', 'backRest', 'BackRest');
       }
       
       
@@ -715,32 +721,41 @@ function populatePendingItems(record) {
     // Filter to only show accessories that were ordered (value = "Yes")
     const orderedAccessories = [];
     
+    // Helper: case-insensitive "Yes" check across multiple possible field name variants
+    function accOrdered() {
+      for (var i = 0; i < arguments.length; i++) {
+        var v = record[arguments[i]];
+        if (v && v.toString().toLowerCase() === 'yes') return true;
+      }
+      return false;
+    }
+
     allPendingOptions.forEach(function(accessory) {
       let isOrdered = false;
-      
-      // Check if this accessory was ordered (value = "Yes")
+
+      // Check if this accessory was ordered (value = "Yes" / case-insensitive)
       if (accessory === 'Guard') {
-        isOrdered = record.guard === 'Yes';
+        isOrdered = accOrdered('guard', 'Guard');
       } else if (accessory === 'Grip Cover') {
-        isOrdered = (record.gripCover === 'Yes' || record.gripcover === 'Yes');
+        isOrdered = accOrdered('gripCover', 'gripcover', 'GripCover', 'Grip Cover');
       } else if (accessory === 'Seat Cover') {
-        isOrdered = (record.seatCover === 'Yes' || record.seatcover === 'Yes');
+        isOrdered = accOrdered('seatCover', 'seatcover', 'SeatCover', 'Seat Cover');
       } else if (accessory === 'Matin') {
-        isOrdered = record.matin === 'Yes';
+        isOrdered = accOrdered('matin', 'Matin');
       } else if (accessory === 'Tank Cover') {
-        isOrdered = (record.tankCover === 'Yes' || record.tankcover === 'Yes');
+        isOrdered = accOrdered('tankCover', 'tankcover', 'TankCover', 'Tank Cover');
       } else if (accessory === 'Handle Hook') {
-        isOrdered = (record.handleHook === 'Yes' || record.handlehook === 'Yes');
+        isOrdered = accOrdered('handleHook', 'handlehook', 'HandleHook', 'Handle Hook');
       } else if (accessory === 'Helmet') {
-        isOrdered = record.helmet === 'Yes';
+        isOrdered = accOrdered('helmet', 'Helmet');
       } else if (accessory === 'Rain Cover') {
-        isOrdered = record.raincover === 'Yes';
+        isOrdered = accOrdered('raincover', 'rainCover', 'RainCover', 'Rain Cover');
       } else if (accessory === 'Buzzer') {
-        isOrdered = record.buzzer === 'Yes';
+        isOrdered = accOrdered('buzzer', 'Buzzer');
       } else if (accessory === 'Back Rest') {
-        isOrdered = record.backrest === 'Yes';
+        isOrdered = accOrdered('backrest', 'backRest', 'BackRest', 'Back Rest');
       } else {
-        // For any other ADDITIONAL_PENDING_ITEMS
+        // For any other ADDITIONAL_PENDING_ITEMS (Mirror, Side Stand, Center Stand)
         isOrdered = true;
       }
       
@@ -821,9 +836,26 @@ function populatePendingItems(record) {
       pendingContainer.appendChild(itemDiv);
     });
   } else {
-    // No model config — still show ADDITIONAL_PENDING_ITEMS + Helmet if ordered
-    const fallbackOptions = ADDITIONAL_PENDING_ITEMS.slice();
-    if (record.helmet === 'Yes') fallbackOptions.unshift('Helmet');
+    // No model config — still show known accessories if ordered + ADDITIONAL_PENDING_ITEMS
+    const fallbackOptions = [];
+    const accOrd2 = function() {
+      for (var i = 0; i < arguments.length; i++) {
+        var v = record[arguments[i]];
+        if (v && v.toString().toLowerCase() === 'yes') return true;
+      }
+      return false;
+    };
+    if (accOrd2('helmet', 'Helmet'))                                    fallbackOptions.push('Helmet');
+    if (accOrd2('guard', 'Guard'))                                       fallbackOptions.push('Guard');
+    if (accOrd2('gripCover', 'gripcover', 'GripCover'))                  fallbackOptions.push('Grip Cover');
+    if (accOrd2('seatCover', 'seatcover', 'SeatCover'))                  fallbackOptions.push('Seat Cover');
+    if (accOrd2('matin', 'Matin'))                                       fallbackOptions.push('Matin');
+    if (accOrd2('tankCover', 'tankcover', 'TankCover'))                  fallbackOptions.push('Tank Cover');
+    if (accOrd2('handleHook', 'handlehook', 'HandleHook'))               fallbackOptions.push('Handle Hook');
+    if (accOrd2('raincover', 'rainCover', 'RainCover'))                  fallbackOptions.push('Rain Cover');
+    if (accOrd2('buzzer', 'Buzzer'))                                      fallbackOptions.push('Buzzer');
+    if (accOrd2('backrest', 'backRest', 'BackRest'))                     fallbackOptions.push('Back Rest');
+    ADDITIONAL_PENDING_ITEMS.forEach(function(i) { fallbackOptions.push(i); });
 
     if (fallbackOptions.length === 0) {
       pendingContainer.innerHTML = '<div style="color: #999; padding: 10px;">Model not found in configuration</div>';
