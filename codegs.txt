@@ -2686,18 +2686,48 @@ function getSalesDashboard(sessionId, dateFilter) {
       }
     }
     
-    // Calculate target progress
-    const targetProgress = target > 0 ? Math.round((myCompletedSales / target) * 100) : 0;
-    
+    // Target progress — always use CURRENT MONTH sales regardless of active filter
+    // (filteredData may be "Today" / "All Time" etc. which would give wrong %)
+    let myCompletedSalesThisMonth = 0;
+    let myTotalSalesThisMonth = 0;
+    const dailyMap = {};
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= daysInMonth; d++) { dailyMap[d] = 0; }
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if ((row[1] || '').toString().trim() !== user.name.trim()) continue;
+      if (!row[2]) continue;
+      try {
+        const d = new Date(row[2]);
+        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+          myTotalSalesThisMonth++;
+          if (row[21] === 'Yes') myCompletedSalesThisMonth++;
+          const day = d.getDate();
+          if (day >= 1 && day <= daysInMonth) dailyMap[day]++;
+        }
+      } catch(e) {}
+    }
+
+    const targetProgress = target > 0 ? Math.round((myCompletedSalesThisMonth / target) * 100) : 0;
+
+    const dailyTrend = [];
+    for (let d = 1; d <= daysInMonth; d++) {
+      dailyTrend.push({ day: d, count: dailyMap[d] || 0 });
+    }
+
     return {
       success: true,
       dashboard: {
         mySales: mySales,
         myCompletedSales: myCompletedSales,
+        myCompletedSalesThisMonth: myCompletedSalesThisMonth,
+        myTotalSalesThisMonth: myTotalSalesThisMonth,
         target: target,
         targetProgress: targetProgress,
         modelBreakdown: modelBreakdown,
         monthlyTrend: monthlyTrend,
+        dailyTrend: dailyTrend,
         dmsPending: dmsPending,
         insurancePending: insurancePending,
         rtoPending: rtoPending,
@@ -3049,6 +3079,7 @@ function getAdminDashboard(sessionId, dateFilter) {
 
     // Model breakdown (Account Check = Yes only)
     const modelCounts = {};
+    const modelVariantCounts = {}; // "Model|||Variant" → count
 
     // Process data (skip header)
     for (let i = 1; i < filteredData.length; i++) {
@@ -3102,9 +3133,13 @@ function getAdminDashboard(sessionId, dateFilter) {
         if (row[62] === 'Yes') accessories.buzzer++;
         if (row[63] === 'Yes') accessories.backRest++;
 
-        // Model breakdown
+        // Model breakdown + variant tracking
         if (model) {
           modelCounts[model] = (modelCounts[model] || 0) + 1;
+          const variant = (row[6] || 'Unknown').toString().trim() || 'Unknown';
+          const mvKey = model + '|||' + variant;
+          if (!modelVariantCounts[mvKey]) modelVariantCounts[mvKey] = 0;
+          modelVariantCounts[mvKey]++;
         }
 
         // Operator pending for account-checked rows
@@ -3125,7 +3160,26 @@ function getAdminDashboard(sessionId, dateFilter) {
     const modelBreakdown = Object.keys(modelCounts).map(function(m) {
       return { model: m, count: modelCounts[m] };
     }).sort(function(a, b) { return b.count - a.count; });
-    
+
+    // Build model+variant nested breakdown
+    const mvMap = {};
+    Object.keys(modelVariantCounts).forEach(function(key) {
+      var parts = key.split('|||');
+      var m = parts[0], v = parts[1] || 'Unknown';
+      if (!mvMap[m]) mvMap[m] = {};
+      mvMap[m][v] = modelVariantCounts[key];
+    });
+    const modelVariantBreakdown = modelBreakdown.map(function(mb) {
+      var variants = mvMap[mb.model] || {};
+      return {
+        model: mb.model,
+        total: mb.count,
+        variants: Object.keys(variants).map(function(v) {
+          return { variant: v, count: variants[v] };
+        }).sort(function(a, b) { return b.count - a.count; })
+      };
+    });
+
     // Get CRM stats
     const crmSheet = getSheet('CRM_Leads');
     const crmData = crmSheet.getDataRange().getValues();
@@ -3163,6 +3217,7 @@ function getAdminDashboard(sessionId, dateFilter) {
         executiveList: executiveList,
         accessories: accessories,
         modelBreakdown: modelBreakdown,
+        modelVariantBreakdown: modelVariantBreakdown,
         crmNewLeads: newLeads,
         crmHotLeads: hotLeads,
         crmConversionRate: conversionRate

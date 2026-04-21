@@ -106,18 +106,21 @@ function renderSalesDashboard(data) {
 
     <!-- Target Progress -->
     <div class="section">
-      <div class="section-header">🎯 Target Progress</div>
+      <div class="section-header">🎯 Target Progress — This Month</div>
       ${data.target > 0 ? `
         <div class="progress-container">
           <div class="progress-label">
-            <span>Target: ${data.target} sales</span>
-            <span>${data.targetProgress}%</span>
+            <span>${data.myCompletedSalesThisMonth} completed / ${data.target} target</span>
+            <span style="font-weight:700; color:${data.targetProgress >= 100 ? '#4CAF50' : '#667eea'};">${data.targetProgress}%</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width: ${Math.min(data.targetProgress, 100)}%"></div>
+            <div class="progress-fill" style="width: ${Math.min(data.targetProgress, 100)}%; background: ${data.targetProgress >= 100 ? 'linear-gradient(90deg,#4CAF50,#45a049)' : 'linear-gradient(90deg,#667eea,#764ba2)'};"></div>
           </div>
           <div style="margin-top: 8px; font-size: 13px; color: #666;">
-            ${data.target - data.myCompletedSales > 0 ? (data.target - data.myCompletedSales) + ' more sales needed' : 'Target achieved! 🎉'}
+            ${data.target - data.myCompletedSalesThisMonth > 0
+              ? (data.target - data.myCompletedSalesThisMonth) + ' more needed to hit target'
+              : '🎉 Target achieved!'}
+            &nbsp;·&nbsp; ${data.myTotalSalesThisMonth} bookings this month
           </div>
         </div>
       ` : '<div class="empty-state">No target set for this month</div>'}
@@ -154,6 +157,31 @@ function renderSalesDashboard(data) {
             </div>
           </div>
         `).join('')}
+      </div>
+    </div>
+    ` : ''}
+
+    <!-- Daily Sales Trend (current month) -->
+    ${data.dailyTrend && data.dailyTrend.some(function(d){return d.count>0;}) ? `
+    <div class="section">
+      <div class="section-header">📅 Daily Bookings — This Month</div>
+      <div style="margin-top:10px;">
+        ${(function(){
+          var today = new Date().getDate();
+          var max = Math.max.apply(null, data.dailyTrend.map(function(d){return d.count;})) || 1;
+          return data.dailyTrend.map(function(d){
+            var pct = Math.round((d.count / max) * 100);
+            var isToday = d.day === today;
+            var hasSale = d.count > 0;
+            return '<div style="display:flex;align-items:center;margin-bottom:5px;">' +
+              '<div style="width:24px;font-size:11px;color:' + (isToday?'#667eea':'#aaa') + ';font-weight:' + (isToday?'700':'400') + ';text-align:right;margin-right:8px;">' + d.day + '</div>' +
+              '<div style="flex:1;background:#f0f0f0;border-radius:4px;height:16px;overflow:hidden;">' +
+                (hasSale ? '<div style="width:' + pct + '%;height:100%;background:' + (isToday?'linear-gradient(90deg,#667eea,#764ba2)':'#81C784') + ';border-radius:4px;"></div>' : '') +
+              '</div>' +
+              '<div style="width:18px;font-size:11px;font-weight:600;color:#333;text-align:right;margin-left:6px;">' + (hasSale ? d.count : '') + '</div>' +
+              '</div>';
+          }).join('');
+        })()}
       </div>
     </div>
     ` : ''}
@@ -493,6 +521,32 @@ function renderAdminDashboard(data) {
           </div>
         `).join('')}
       </div>
+    </div>
+    ` : ''}
+
+    <!-- Model + Variant Breakdown -->
+    ${data.modelVariantBreakdown && data.modelVariantBreakdown.length > 0 ? `
+    <div class="section">
+      <div class="section-header">🔍 Model + Variant Breakdown</div>
+      ${data.modelVariantBreakdown.map(m => `
+        <div style="margin-bottom:14px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;background:#f0f4ff;border-radius:8px;border-left:4px solid #667eea;">
+            <span style="font-weight:700;color:#333;">${m.model}</span>
+            <span style="font-weight:700;color:#667eea;font-size:16px;">${m.total}</span>
+          </div>
+          ${m.variants.map(v => {
+            const pct = Math.round((v.count / m.total) * 100);
+            return `<div style="display:flex;align-items:center;padding:5px 12px 5px 24px;gap:8px;">
+              <span style="font-size:12px;color:#777;">↳</span>
+              <span style="flex:1;font-size:13px;color:#444;">${v.variant}</span>
+              <div style="width:80px;background:#f0f0f0;border-radius:4px;height:8px;overflow:hidden;">
+                <div style="width:${pct}%;height:100%;background:#a5b4fc;border-radius:4px;"></div>
+              </div>
+              <span style="font-size:13px;font-weight:600;color:#333;min-width:20px;text-align:right;">${v.count}</span>
+            </div>`;
+          }).join('')}
+        </div>
+      `).join('')}
     </div>
     ` : ''}
 
