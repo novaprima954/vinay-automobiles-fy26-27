@@ -162,6 +162,9 @@ function handleRequest(e) {
       case 'getDiscountAnalysis':
         result = getDiscountAnalysis(params.sessionId, params.dateFilter);
         break;
+      case 'getInventoryAnalysis':
+        result = getInventoryAnalysis(params.sessionId, params.dateFilter);
+        break;
       case 'getAccessoryBreakdown':
         result = getAccessoryBreakdown(params.sessionId, params.accessoryType, params.dateFilter);
         break;
@@ -3353,6 +3356,83 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     };
   } catch(e) {
     Logger.log('getDiscountAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Inventory Analysis: ISSUE units per SKU, OTC_SALE units per SKU, AD_SALE by AD name
+ * InvTransactions columns: 0:txnId 1:date 2:type 3:skuId 4:skuName 5:from 6:to 7:qty
+ *   8:receiptNo 9:customerName(AD name for AD_SALE) 10:executiveName ... 18:invoiceNo
+ */
+function getInventoryAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.INV_TXN_SHEET);
+    if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
+
+    const allRows = sheet.getDataRange().getValues();
+    // Filter by dateFilter on col index 1 (date column)
+    const rows = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header
+
+    // --- Accumulators ---
+    const issueTotals = {};   // skuName -> qty
+    const otcTotals   = {};   // skuName -> qty
+    const adTotals    = {};   // adName -> { skuName -> qty }
+
+    rows.forEach(function(row) {
+      const type    = String(row[2] || '').trim().toUpperCase();
+      const skuName = String(row[4] || '').trim();
+      const qty     = Number(row[7]) || 0;
+
+      if (!skuName || qty <= 0) return;
+
+      if (type === 'ISSUE') {
+        issueTotals[skuName] = (issueTotals[skuName] || 0) + qty;
+
+      } else if (type === 'OTC_SALE') {
+        otcTotals[skuName] = (otcTotals[skuName] || 0) + qty;
+
+      } else if (type === 'AD_SALE') {
+        const adName = String(row[9] || '').trim() || 'Unknown';
+        if (!adTotals[adName]) adTotals[adName] = {};
+        adTotals[adName][skuName] = (adTotals[adName][skuName] || 0) + qty;
+      }
+    });
+
+    // Convert to sorted arrays
+    const issue = Object.keys(issueTotals)
+      .map(function(k) { return { skuName: k, qty: issueTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    const otc = Object.keys(otcTotals)
+      .map(function(k) { return { skuName: k, qty: otcTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    const adSale = Object.keys(adTotals)
+      .map(function(adName) {
+        const items = Object.keys(adTotals[adName])
+          .map(function(sku) { return { skuName: sku, qty: adTotals[adName][sku] }; })
+          .sort(function(a, b) { return b.qty - a.qty; });
+        return { adName: adName, items: items };
+      })
+      .sort(function(a, b) {
+        // sort ADs by total qty desc
+        const ta = a.items.reduce(function(s, x) { return s + x.qty; }, 0);
+        const tb = b.items.reduce(function(s, x) { return s + x.qty; }, 0);
+        return tb - ta;
+      });
+
+    return {
+      success: true,
+      data: { issue: issue, otc: otc, adSale: adSale }
+    };
+  } catch(e) {
+    Logger.log('getInventoryAnalysis error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }

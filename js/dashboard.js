@@ -23,7 +23,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   currentUser = session.user;
   currentSessionId = session.sessionId;
   console.log('✅ User:', currentUser.name, '| Role:', currentUser.role);
-  
+
+  // Set dynamic month name on filter button (e.g. "April 2026")
+  var monthBtn = document.getElementById('monthFilterBtn');
+  if (monthBtn) {
+    var now = new Date();
+    monthBtn.textContent = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }
+
   // Load dashboard
   await loadDashboard();
 });
@@ -706,6 +713,27 @@ function renderAdminDashboard(data) {
       </div>
       <div id="discountAnalysisContent" style="display:none;"></div>
     </div>
+
+    <!-- Inventory Analysis (Admin Only – same password unlock, no title) -->
+    <div class="section" id="inventorySection">
+      <div class="section-header">📦 Inventory Analysis
+        <span style="font-size:11px;background:#6c757d;color:white;padding:2px 7px;border-radius:10px;margin-left:8px;">Admin Only</span>
+      </div>
+      <div id="inventoryLockView">
+        <div style="text-align:center;padding:25px 15px;">
+          <div style="font-size:44px;margin-bottom:10px;">🔒</div>
+          <input type="password" id="inventoryPwd" placeholder="Enter password"
+            style="border:2px solid #ddd;border-radius:8px;padding:10px 15px;font-size:14px;width:200px;text-align:center;display:block;margin:0 auto 12px;outline:none;"
+            onkeydown="if(event.key==='Enter') unlockInventory()">
+          <button onclick="unlockInventory()"
+            style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;">
+            🔓 Unlock
+          </button>
+          <div id="inventoryPwdError" style="color:#dc3545;font-size:13px;margin-top:10px;display:none;">❌ Incorrect password</div>
+        </div>
+      </div>
+      <div id="inventoryAnalysisContent" style="display:none;"></div>
+    </div>
   `;
 
   content.style.display = 'block';
@@ -715,6 +743,10 @@ function renderAdminDashboard(data) {
     document.getElementById('discountLockView').style.display = 'none';
     document.getElementById('discountAnalysisContent').style.display = 'block';
     loadDiscountAnalysis();
+
+    document.getElementById('inventoryLockView').style.display = 'none';
+    document.getElementById('inventoryAnalysisContent').style.display = 'block';
+    loadInventoryAnalysis();
   }
 }
 
@@ -728,10 +760,39 @@ function unlockDiscount() {
     document.getElementById('discountLockView').style.display = 'none';
     document.getElementById('discountAnalysisContent').style.display = 'block';
     loadDiscountAnalysis();
+    // Also unlock inventory section (same password, same session flag)
+    document.getElementById('inventoryLockView').style.display = 'none';
+    document.getElementById('inventoryAnalysisContent').style.display = 'block';
+    loadInventoryAnalysis();
   } else {
     const errEl = document.getElementById('discountPwdError');
     errEl.style.display = 'block';
     document.getElementById('discountPwd').value = '';
+    setTimeout(function() { errEl.style.display = 'none'; }, 2500);
+  }
+}
+
+/**
+ * Unlock Inventory Analysis (same password & flag as discount)
+ */
+function unlockInventory() {
+  const pwd = document.getElementById('inventoryPwd').value;
+  if (pwd === 'advait55&') {
+    discountUnlocked = true;
+    document.getElementById('inventoryLockView').style.display = 'none';
+    document.getElementById('inventoryAnalysisContent').style.display = 'block';
+    loadInventoryAnalysis();
+    // Also unlock discount section if still locked
+    var discLock = document.getElementById('discountLockView');
+    if (discLock && discLock.style.display !== 'none') {
+      discLock.style.display = 'none';
+      document.getElementById('discountAnalysisContent').style.display = 'block';
+      loadDiscountAnalysis();
+    }
+  } else {
+    const errEl = document.getElementById('inventoryPwdError');
+    errEl.style.display = 'block';
+    document.getElementById('inventoryPwd').value = '';
     setTimeout(function() { errEl.style.display = 'none'; }, 2500);
   }
 }
@@ -753,6 +814,111 @@ async function loadDiscountAnalysis() {
     console.error('Discount analysis error:', e);
     container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">Error loading discount data</div>';
   }
+}
+
+/**
+ * Fetch inventory analysis data and render
+ */
+async function loadInventoryAnalysis() {
+  const container = document.getElementById('inventoryAnalysisContent');
+  container.innerHTML = '<div style="text-align:center;padding:25px;color:#999;">⏳ Loading inventory data...</div>';
+  try {
+    const response = await API.call('getInventoryAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      renderInventoryAnalysis(response.data);
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    console.error('Inventory analysis error:', e);
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">Error loading inventory data</div>';
+  }
+}
+
+/**
+ * Render inventory analysis: ISSUE, OTC Sale, AD Sale
+ */
+function renderInventoryAnalysis(d) {
+  var container = document.getElementById('inventoryAnalysisContent');
+
+  // --- ISSUE section ---
+  var issueRows = '';
+  if (d.issue && d.issue.length > 0) {
+    var maxIssue = Math.max.apply(null, d.issue.map(function(x) { return x.qty; })) || 1;
+    issueRows = d.issue.map(function(item) {
+      var bp = Math.round((item.qty / maxIssue) * 100);
+      return '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
+          '<span style="font-weight:600;">' + item.skuName + '</span>' +
+          '<span style="background:#e8f4fd;color:#1a73e8;font-weight:700;padding:2px 8px;border-radius:10px;font-size:12px;">' + item.qty + ' units</span>' +
+        '</div>' +
+        '<div style="background:#f0f0f0;border-radius:6px;height:8px;overflow:hidden;">' +
+          '<div style="width:' + bp + '%;height:100%;background:linear-gradient(90deg,#4CAF50,#45a049);border-radius:6px;"></div>' +
+        '</div></div>';
+    }).join('');
+  } else {
+    issueRows = '<div style="color:#999;text-align:center;padding:15px;font-size:13px;">No ISSUE transactions in this period</div>';
+  }
+
+  // --- OTC Sale section ---
+  var otcRows = '';
+  if (d.otc && d.otc.length > 0) {
+    var maxOtc = Math.max.apply(null, d.otc.map(function(x) { return x.qty; })) || 1;
+    otcRows = d.otc.map(function(item) {
+      var bp = Math.round((item.qty / maxOtc) * 100);
+      return '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
+          '<span style="font-weight:600;">' + item.skuName + '</span>' +
+          '<span style="background:#fff3e0;color:#e65100;font-weight:700;padding:2px 8px;border-radius:10px;font-size:12px;">' + item.qty + ' units</span>' +
+        '</div>' +
+        '<div style="background:#f0f0f0;border-radius:6px;height:8px;overflow:hidden;">' +
+          '<div style="width:' + bp + '%;height:100%;background:linear-gradient(90deg,#FF9800,#f57c00);border-radius:6px;"></div>' +
+        '</div></div>';
+    }).join('');
+  } else {
+    otcRows = '<div style="color:#999;text-align:center;padding:15px;font-size:13px;">No OTC Sales in this period</div>';
+  }
+
+  // --- AD Sale section ---
+  var adRows = '';
+  if (d.adSale && d.adSale.length > 0) {
+    adRows = d.adSale.map(function(ad) {
+      var itemsHtml = ad.items.map(function(item) {
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0 6px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;">' +
+          '<span style="color:#555;">' + item.skuName + '</span>' +
+          '<span style="font-weight:600;color:#667eea;">' + item.qty + ' units</span>' +
+        '</div>';
+      }).join('');
+      var totalQty = ad.items.reduce(function(s, x) { return s + x.qty; }, 0);
+      return '<div style="border:1px solid #e9ecef;border-radius:8px;margin-bottom:12px;overflow:hidden;">' +
+        '<div style="background:#f8f9fa;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-weight:700;color:#333;font-size:14px;">🏪 ' + ad.adName + '</span>' +
+          '<span style="font-size:12px;color:#666;">' + totalQty + ' total units</span>' +
+        '</div>' +
+        itemsHtml +
+      '</div>';
+    }).join('');
+  } else {
+    adRows = '<div style="color:#999;text-align:center;padding:15px;font-size:13px;">No AD Sales in this period</div>';
+  }
+
+  container.innerHTML = `
+    <!-- ISSUE Section -->
+    <div style="font-weight:700;color:#333;margin:10px 0 12px;font-size:14px;">📤 Stock Issued (ISSUE)</div>
+    <div style="margin-bottom:20px;">${issueRows}</div>
+
+    <hr style="border:none;border-top:2px solid #f0f0f0;margin:18px 0;">
+
+    <!-- OTC Sale Section -->
+    <div style="font-weight:700;color:#333;margin:0 0 12px;font-size:14px;">🛒 OTC Sales</div>
+    <div style="margin-bottom:20px;">${otcRows}</div>
+
+    <hr style="border:none;border-top:2px solid #f0f0f0;margin:18px 0;">
+
+    <!-- AD Sale Section -->
+    <div style="font-weight:700;color:#333;margin:0 0 12px;font-size:14px;">🤝 AD Sales</div>
+    <div>${adRows}</div>
+  `;
 }
 
 /**
