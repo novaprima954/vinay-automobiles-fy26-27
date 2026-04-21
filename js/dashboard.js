@@ -6,6 +6,7 @@ let currentUser = null;
 let currentSessionId = null;
 let currentFilter = 'month'; // Default to 'This Month'
 let dashboardData = null;
+let discountUnlocked = false; // persists within session so filter changes don't re-lock
 
 document.addEventListener('DOMContentLoaded', async function() {
   console.log('=== DASHBOARD PAGE ===');
@@ -629,9 +630,253 @@ function renderAdminDashboard(data) {
         </div>
       </div>
     </div>
+
+    <!-- Discount Analysis (Admin Only – Password Protected) -->
+    <div class="section" id="discountSection">
+      <div class="section-header">💸 Discount Analysis
+        <span style="font-size:11px;background:#6c757d;color:white;padding:2px 7px;border-radius:10px;margin-left:8px;">Admin Only</span>
+      </div>
+      <div id="discountLockView">
+        <div style="text-align:center;padding:25px 15px;">
+          <div style="font-size:44px;margin-bottom:10px;">🔒</div>
+          <div style="color:#666;margin-bottom:18px;font-size:14px;">This section is password protected</div>
+          <input type="password" id="discountPwd" placeholder="Enter password"
+            style="border:2px solid #ddd;border-radius:8px;padding:10px 15px;font-size:14px;width:200px;text-align:center;display:block;margin:0 auto 12px;outline:none;"
+            onkeydown="if(event.key==='Enter') unlockDiscount()">
+          <button onclick="unlockDiscount()"
+            style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;">
+            🔓 Unlock
+          </button>
+          <div id="discountPwdError" style="color:#dc3545;font-size:13px;margin-top:10px;display:none;">❌ Incorrect password</div>
+        </div>
+      </div>
+      <div id="discountAnalysisContent" style="display:none;"></div>
+    </div>
   `;
 
   content.style.display = 'block';
+
+  // Auto-unlock if already authenticated in this session
+  if (discountUnlocked) {
+    document.getElementById('discountLockView').style.display = 'none';
+    document.getElementById('discountAnalysisContent').style.display = 'block';
+    loadDiscountAnalysis();
+  }
+}
+
+/**
+ * Unlock Discount Analysis (password check is client-side intentionally)
+ */
+function unlockDiscount() {
+  const pwd = document.getElementById('discountPwd').value;
+  if (pwd === 'advait55&') {
+    discountUnlocked = true;
+    document.getElementById('discountLockView').style.display = 'none';
+    document.getElementById('discountAnalysisContent').style.display = 'block';
+    loadDiscountAnalysis();
+  } else {
+    const errEl = document.getElementById('discountPwdError');
+    errEl.style.display = 'block';
+    document.getElementById('discountPwd').value = '';
+    setTimeout(function() { errEl.style.display = 'none'; }, 2500);
+  }
+}
+
+/**
+ * Fetch discount analysis data and render
+ */
+async function loadDiscountAnalysis() {
+  const container = document.getElementById('discountAnalysisContent');
+  container.innerHTML = '<div style="text-align:center;padding:25px;color:#999;">⏳ Loading discount data...</div>';
+  try {
+    const response = await API.call('getDiscountAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      renderDiscountAnalysis(response.data);
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    console.error('Discount analysis error:', e);
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">Error loading discount data</div>';
+  }
+}
+
+/**
+ * Render all discount analysis sections
+ */
+function renderDiscountAnalysis(d) {
+  const fmt  = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
+  const pct  = function(n) { return (Math.round(n * 10) / 10).toFixed(1) + '%'; };
+
+  // Monthly trend max (for progress bars)
+  const maxMonthDisc = d.monthly && d.monthly.length
+    ? Math.max.apply(null, d.monthly.map(function(x) { return x.totalDiscount; })) || 1
+    : 1;
+
+  const monthlyHTML = (d.monthly && d.monthly.length > 1) ? `
+    <div style="font-weight:700;color:#333;margin:20px 0 10px;font-size:14px;">📅 Monthly Discount Trend</div>
+    ${d.monthly.map(function(m) {
+      var bp = Math.round((m.totalDiscount / maxMonthDisc) * 100);
+      return '<div style="margin-bottom:10px;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
+          '<span style="font-weight:600;">' + m.month + '</span>' +
+          '<span style="color:#dc3545;font-weight:600;">' + fmt(m.totalDiscount) + ' (' + m.count + ' deals)</span>' +
+        '</div>' +
+        '<div style="background:#f0f0f0;border-radius:6px;height:10px;overflow:hidden;">' +
+          '<div style="width:' + bp + '%;height:100%;background:linear-gradient(90deg,#667eea,#764ba2);border-radius:6px;"></div>' +
+        '</div></div>';
+    }).join('')}
+  ` : '';
+
+  const bucketsHTML = [
+    { label: 'No Discount (₹0)',   count: d.buckets.zero,   color: '#4CAF50' },
+    { label: '₹1 – ₹1,000',        count: d.buckets.small,  color: '#2196F3' },
+    { label: '₹1,001 – ₹5,000',    count: d.buckets.medium, color: '#FF9800' },
+    { label: '₹5,001 – ₹10,000',   count: d.buckets.large,  color: '#F44336' },
+    { label: 'Above ₹10,000',      count: d.buckets.xlarge, color: '#9C27B0' }
+  ].map(function(b) {
+    var bp = d.totalDeals > 0 ? Math.round((b.count / d.totalDeals) * 100) : 0;
+    return '<div style="margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
+        '<span>' + b.label + '</span>' +
+        '<span style="font-weight:600;">' + b.count + ' deals (' + bp + '%)</span>' +
+      '</div>' +
+      '<div style="background:#f0f0f0;border-radius:6px;height:10px;overflow:hidden;">' +
+        '<div style="width:' + bp + '%;height:100%;background:' + b.color + ';border-radius:6px;"></div>' +
+      '</div></div>';
+  }).join('');
+
+  const modelRows = d.byModel.map(function(m) {
+    return '<tr style="border-bottom:1px solid #f0f0f0;">' +
+      '<td style="padding:8px;font-weight:600;">' + m.model + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + m.count + '</td>' +
+      '<td style="padding:8px;text-align:right;color:#dc3545;font-weight:600;">' + fmt(m.totalDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(m.avgDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(m.maxDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;color:#856404;">' + pct(m.discountPct) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  const execRows = d.byExecutive.map(function(e) {
+    return '<tr style="border-bottom:1px solid #f0f0f0;">' +
+      '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + e.deals + '</td>' +
+      '<td style="padding:8px;text-align:right;color:#dc3545;font-weight:600;">' + fmt(e.totalDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(e.avgDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(e.maxDiscount) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  const top10Rows = d.top10.map(function(deal, i) {
+    return '<tr style="border-bottom:1px solid #f0f0f0;">' +
+      '<td style="padding:7px;color:#999;">' + (i + 1) + '</td>' +
+      '<td style="padding:7px;white-space:nowrap;">' + deal.date + '</td>' +
+      '<td style="padding:7px;font-weight:600;">' + deal.customer + '</td>' +
+      '<td style="padding:7px;">' + deal.model + '</td>' +
+      '<td style="padding:7px;">' + deal.executive + '</td>' +
+      '<td style="padding:7px;text-align:right;color:#dc3545;font-weight:700;">' + fmt(deal.discount) + '</td>' +
+      '<td style="padding:7px;text-align:right;">' + fmt(deal.finalPrice) + '</td>' +
+      '</tr>';
+  }).join('');
+
+  const container = document.getElementById('discountAnalysisContent');
+  container.innerHTML = `
+    <!-- Summary Cards -->
+    <div class="stats-grid" style="padding:0 0 5px;">
+      <div class="stat-card purple" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">💸</div>
+        <div class="stat-label">Total Discount</div>
+        <div class="stat-value" style="font-size:16px;">${fmt(d.totalDiscount)}</div>
+      </div>
+      <div class="stat-card orange" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">📊</div>
+        <div class="stat-label">Avg / Deal</div>
+        <div class="stat-value" style="font-size:16px;">${fmt(d.avgDiscountPerDeal)}</div>
+      </div>
+      <div class="stat-card red" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">⬆️</div>
+        <div class="stat-label">Max Discount</div>
+        <div class="stat-value" style="font-size:16px;">${fmt(d.maxDiscount)}</div>
+      </div>
+      <div class="stat-card blue" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">🧾</div>
+        <div class="stat-label">w/ Discount</div>
+        <div class="stat-value" style="font-size:16px;">${d.dealsWithDiscount}/${d.totalDeals}</div>
+      </div>
+      <div class="stat-card green" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">💰</div>
+        <div class="stat-label">Gross Revenue</div>
+        <div class="stat-value" style="font-size:14px;">${fmt(d.totalGrossRevenue)}</div>
+      </div>
+      <div class="stat-card green" style="padding:15px 10px;">
+        <div class="stat-icon" style="font-size:24px;">🏦</div>
+        <div class="stat-label">Net Revenue</div>
+        <div class="stat-value" style="font-size:14px;">${fmt(d.totalNetRevenue)}</div>
+      </div>
+    </div>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px 14px;margin:10px 0 15px;font-size:13px;color:#856404;">
+      📉 Discount is <strong>${pct(d.discountPct)}</strong> of gross revenue &nbsp;|&nbsp;
+      Avg per discounted deal: <strong>${fmt(d.avgDiscountPerDiscountedDeal)}</strong>
+    </div>
+
+    <!-- By Model -->
+    <div style="font-weight:700;color:#333;margin:18px 0 10px;font-size:14px;">🏍️ Discount by Model</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8f9fa;">
+          <th style="padding:8px;text-align:left;border-bottom:2px solid #dee2e6;">Model</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Deals</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Total</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Avg</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Max</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Disc%</th>
+        </tr></thead>
+        <tbody>${modelRows}</tbody>
+      </table>
+    </div>
+
+    <!-- By Executive -->
+    <div style="font-weight:700;color:#333;margin:20px 0 10px;font-size:14px;">👥 Discount by Executive</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead><tr style="background:#f8f9fa;">
+          <th style="padding:8px;text-align:left;border-bottom:2px solid #dee2e6;">Executive</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Deals</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Total</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Avg</th>
+          <th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Max</th>
+        </tr></thead>
+        <tbody>${execRows}</tbody>
+      </table>
+    </div>
+
+    <!-- Distribution -->
+    <div style="font-weight:700;color:#333;margin:20px 0 10px;font-size:14px;">📊 Discount Distribution</div>
+    ${bucketsHTML}
+
+    <!-- Monthly Trend -->
+    ${monthlyHTML}
+
+    <!-- Top 10 Deals -->
+    ${d.top10 && d.top10.length > 0 ? `
+    <div style="font-weight:700;color:#333;margin:20px 0 10px;font-size:14px;">🏆 Top ${d.top10.length} Highest Discount Deals</div>
+    <div style="overflow-x:auto;">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead><tr style="background:#f8f9fa;">
+          <th style="padding:7px;text-align:left;border-bottom:2px solid #dee2e6;">#</th>
+          <th style="padding:7px;text-align:left;border-bottom:2px solid #dee2e6;">Date</th>
+          <th style="padding:7px;text-align:left;border-bottom:2px solid #dee2e6;">Customer</th>
+          <th style="padding:7px;text-align:left;border-bottom:2px solid #dee2e6;">Model</th>
+          <th style="padding:7px;text-align:left;border-bottom:2px solid #dee2e6;">Executive</th>
+          <th style="padding:7px;text-align:right;border-bottom:2px solid #dee2e6;">Discount</th>
+          <th style="padding:7px;text-align:right;border-bottom:2px solid #dee2e6;">Final Price</th>
+        </tr></thead>
+        <tbody>${top10Rows}</tbody>
+      </table>
+    </div>
+    ` : ''}
+  `;
 }
 
 /**

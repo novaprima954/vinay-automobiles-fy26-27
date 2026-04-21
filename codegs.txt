@@ -159,6 +159,9 @@ function handleRequest(e) {
       case 'getAdminDashboard':
         result = getAdminDashboard(params.sessionId, params.dateFilter);
         break;
+      case 'getDiscountAnalysis':
+        result = getDiscountAnalysis(params.sessionId, params.dateFilter);
+        break;
       case 'getAccessoryBreakdown':
         result = getAccessoryBreakdown(params.sessionId, params.accessoryType, params.dateFilter);
         break;
@@ -3150,6 +3153,130 @@ function getAdminDashboard(sessionId, dateFilter) {
       success: false,
       message: 'Error loading dashboard: ' + error.toString()
     };
+  }
+}
+
+/**
+ * Discount Analysis (Admin only, password-protected on frontend)
+ */
+function getDiscountAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    let totalDiscount = 0;
+    let dealsWithDiscount = 0;
+    let maxDiscount = 0;
+    const byModel = {};
+    const byExec  = {};
+    const buckets = { zero: 0, small: 0, medium: 0, large: 0, xlarge: 0 };
+    const allDeals = [];
+    const monthlyMap = {};
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      const executive  = (row[1] || '').toString().trim();
+      const custName   = (row[3] || '').toString().trim();
+      const model      = (row[5] || '').toString().trim();
+      const disc       = parseFloat(row[8]) || 0;
+      const finalPrice = parseFloat(row[9]) || 0;
+      const grossPrice = finalPrice + disc;
+      let rowDateFmt = '', rowMonth = '';
+      if (row[2]) {
+        try {
+          rowDateFmt = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy');
+          rowMonth   = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'MMM yy');
+        } catch(e) {}
+      }
+
+      totalDiscount += disc;
+      if (disc > 0) dealsWithDiscount++;
+      if (disc > maxDiscount) maxDiscount = disc;
+
+      if (model) {
+        if (!byModel[model]) byModel[model] = { count: 0, totalDiscount: 0, totalGross: 0, maxDiscount: 0 };
+        byModel[model].count++;
+        byModel[model].totalDiscount += disc;
+        byModel[model].totalGross += grossPrice;
+        if (disc > byModel[model].maxDiscount) byModel[model].maxDiscount = disc;
+      }
+      if (executive) {
+        if (!byExec[executive]) byExec[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+        byExec[executive].count++;
+        byExec[executive].totalDiscount += disc;
+        if (disc > byExec[executive].maxDiscount) byExec[executive].maxDiscount = disc;
+      }
+
+      if (disc === 0)          buckets.zero++;
+      else if (disc <= 1000)   buckets.small++;
+      else if (disc <= 5000)   buckets.medium++;
+      else if (disc <= 10000)  buckets.large++;
+      else                     buckets.xlarge++;
+
+      allDeals.push({ date: rowDateFmt, customer: custName, model: model, executive: executive, discount: disc, finalPrice: finalPrice, grossPrice: grossPrice });
+      if (rowMonth) {
+        if (!monthlyMap[rowMonth]) monthlyMap[rowMonth] = { totalDiscount: 0, count: 0 };
+        monthlyMap[rowMonth].totalDiscount += disc;
+        monthlyMap[rowMonth].count++;
+      }
+    }
+
+    const totalRows  = filteredData.length - 1;
+    const totalGross = allDeals.reduce(function(s, d) { return s + d.grossPrice; }, 0);
+    const totalNet   = allDeals.reduce(function(s, d) { return s + d.finalPrice; }, 0);
+
+    const byModelArr = Object.keys(byModel).map(function(m) {
+      var d = byModel[m];
+      return { model: m, count: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount,
+        discountPct:   d.totalGross > 0 ? Math.round((d.totalDiscount / d.totalGross) * 1000) / 10 : 0 };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const byExecArr = Object.keys(byExec).map(function(e) {
+      var d = byExec[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const top10 = allDeals.filter(function(d) { return d.discount > 0; })
+      .sort(function(a, b) { return b.discount - a.discount; }).slice(0, 10);
+
+    const monthly = Object.keys(monthlyMap).map(function(m) {
+      return { month: m, totalDiscount: Math.round(monthlyMap[m].totalDiscount), count: monthlyMap[m].count };
+    });
+
+    return {
+      success: true,
+      data: {
+        totalDiscount:               Math.round(totalDiscount),
+        totalDeals:                  totalRows,
+        dealsWithDiscount:           dealsWithDiscount,
+        avgDiscountPerDeal:          totalRows > 0 ? Math.round(totalDiscount / totalRows) : 0,
+        avgDiscountPerDiscountedDeal: dealsWithDiscount > 0 ? Math.round(totalDiscount / dealsWithDiscount) : 0,
+        maxDiscount:                 maxDiscount,
+        totalGrossRevenue:           Math.round(totalGross),
+        totalNetRevenue:             Math.round(totalNet),
+        discountPct:                 totalGross > 0 ? Math.round((totalDiscount / totalGross) * 1000) / 10 : 0,
+        byModel:                     byModelArr,
+        byExecutive:                 byExecArr,
+        buckets:                     buckets,
+        top10:                       top10,
+        monthly:                     monthly
+      }
+    };
+  } catch(e) {
+    Logger.log('getDiscountAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
   }
 }
 
