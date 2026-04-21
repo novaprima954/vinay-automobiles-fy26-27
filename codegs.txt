@@ -165,6 +165,9 @@ function handleRequest(e) {
       case 'getInventoryAnalysis':
         result = getInventoryAnalysis(params.sessionId, params.dateFilter);
         break;
+      case 'getStockInAnalysis':
+        result = getStockInAnalysis(params.sessionId, params.dateFilter);
+        break;
       case 'getAccessoryBreakdown':
         result = getAccessoryBreakdown(params.sessionId, params.accessoryType, params.dateFilter);
         break;
@@ -2600,11 +2603,11 @@ function getSalesDashboard(sessionId, dateFilter) {
       // Only count user's own sales
       if (executive === user.name) {
         mySales++;
-        
-        // Count completed sales (Account Check = Yes)
+
+        // Count completed retail sales (Account Check = Yes)
         if (accountCheck === 'Yes') {
           myCompletedSales++;
-          
+
           // Model breakdown (only completed sales)
           if (model) {
             if (!modelBreakdownMap[model]) {
@@ -2612,7 +2615,7 @@ function getSalesDashboard(sessionId, dateFilter) {
             }
             modelBreakdownMap[model]++;
           }
-          
+
           // Count accessories (only when Account Check = Yes AND accessory = Yes)
           if (row[12] === 'Yes') myAccessories.guard++;
           if (row[13] === 'Yes') myAccessories.grip++;
@@ -2625,13 +2628,13 @@ function getSalesDashboard(sessionId, dateFilter) {
           if (row[62] === 'Yes') myAccessories.buzzer++;
           if (row[63] === 'Yes') myAccessories.backRest++;
 
+          // Pending tasks: only for retail sales (accountCheck=Yes)
+          // Status stored as 'Yes' when done
+          if (dmsStatus !== 'Yes') dmsPending++;
+          if (insuranceStatus !== 'Yes') insurancePending++;
+          if (rtoStatus !== 'Yes') rtoPending++;
+          if (accessoryFitted !== 'Yes') accessoriesPending++;
         }
-        
-        // Count pending tasks (for all sales, not just completed)
-        if (dmsStatus !== 'Done') dmsPending++;
-        if (insuranceStatus !== 'Done') insurancePending++;
-        if (rtoStatus !== 'Done') rtoPending++;
-        if (accessoryFitted !== 'Yes') accessoriesPending++;
       }
     }
     
@@ -2689,34 +2692,69 @@ function getSalesDashboard(sessionId, dateFilter) {
       }
     }
     
-    // Target progress — always use CURRENT MONTH sales regardless of active filter
-    // (filteredData may be "Today" / "All Time" etc. which would give wrong %)
+    // Target progress — always use CURRENT MONTH (calendar month) regardless of filter
     let myCompletedSalesThisMonth = 0;
     let myTotalSalesThisMonth = 0;
-    const dailyMap = {};
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    for (let d = 1; d <= daysInMonth; d++) { dailyMap[d] = 0; }
+    const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyBookingMap = {};
+    const dailySalesMap   = {};
+    for (let d = 1; d <= daysInCurrentMonth; d++) { dailyBookingMap[d] = 0; dailySalesMap[d] = 0; }
+
+    // Determine which month to show on daily trend chart
+    // If filter is 'month:YYYY-MM', show that month's daily data; otherwise current month
+    let trendYear  = now.getFullYear();
+    let trendMonth = now.getMonth();
+    if (dateFilter && dateFilter.indexOf('month:') === 0) {
+      const parts = dateFilter.substring(6).split('-');
+      trendYear  = parseInt(parts[0]);
+      trendMonth = parseInt(parts[1]) - 1;
+    }
+    const daysInTrendMonth = new Date(trendYear, trendMonth + 1, 0).getDate();
+    const trendBookingMap  = {};
+    const trendSalesMap    = {};
+    for (let d = 1; d <= daysInTrendMonth; d++) { trendBookingMap[d] = 0; trendSalesMap[d] = 0; }
+    const isSameMonth = (trendYear === now.getFullYear() && trendMonth === now.getMonth());
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if ((row[1] || '').toString().trim() !== user.name.trim()) continue;
       if (!row[2]) continue;
       try {
-        const d = new Date(row[2]);
-        if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) {
+        const dt = new Date(row[2]);
+        const dtMonth = dt.getMonth();
+        const dtYear  = dt.getFullYear();
+
+        // Current month → target progress
+        if (dtMonth === now.getMonth() && dtYear === now.getFullYear()) {
           myTotalSalesThisMonth++;
           if (row[21] === 'Yes') myCompletedSalesThisMonth++;
-          const day = d.getDate();
-          if (day >= 1 && day <= daysInMonth) dailyMap[day]++;
+          const day = dt.getDate();
+          if (day >= 1 && day <= daysInCurrentMonth) {
+            dailyBookingMap[day]++;
+            if (row[21] === 'Yes') dailySalesMap[day]++;
+          }
+        }
+
+        // Trend month (may differ if user picked a past month)
+        if (!isSameMonth && dtMonth === trendMonth && dtYear === trendYear) {
+          const day = dt.getDate();
+          if (day >= 1 && day <= daysInTrendMonth) {
+            trendBookingMap[day]++;
+            if (row[21] === 'Yes') trendSalesMap[day]++;
+          }
         }
       } catch(e) {}
     }
 
+    // If trend month IS current month, reuse same maps
+    const finalBookingMap = isSameMonth ? dailyBookingMap : trendBookingMap;
+    const finalSalesMap   = isSameMonth ? dailySalesMap   : trendSalesMap;
+
     const targetProgress = target > 0 ? Math.round((myCompletedSalesThisMonth / target) * 100) : 0;
 
     const dailyTrend = [];
-    for (let d = 1; d <= daysInMonth; d++) {
-      dailyTrend.push({ day: d, count: dailyMap[d] || 0 });
+    for (let d = 1; d <= daysInTrendMonth; d++) {
+      dailyTrend.push({ day: d, bookings: finalBookingMap[d] || 0, sales: finalSalesMap[d] || 0 });
     }
 
     return {
@@ -3438,6 +3476,54 @@ function getInventoryAnalysis(sessionId, dateFilter) {
 }
 
 /**
+ * Stock In (Purchase) Analysis — STOCK_IN transactions grouped by SKU
+ * InvTransactions col 2=type, 4=skuName, 7=qty, 6=toLocation, 15=enteredBy, 18=invoiceNo
+ */
+function getStockInAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.INV_TXN_SHEET);
+    if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
+
+    const allRows = sheet.getDataRange().getValues();
+    const rows    = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header, date=col1
+
+    const skuTotals   = {}; // skuName -> total qty
+    let   totalUnits  = 0;
+    let   totalTxns   = 0;
+
+    rows.forEach(function(row) {
+      const type    = String(row[2] || '').trim().toUpperCase();
+      if (type !== 'STOCK_IN') return;
+
+      const skuName = String(row[4] || '').trim() || 'Unknown';
+      const qty     = Number(row[7]) || 0;
+      if (qty <= 0) return;
+
+      skuTotals[skuName] = (skuTotals[skuName] || 0) + qty;
+      totalUnits += qty;
+      totalTxns++;
+    });
+
+    const items = Object.keys(skuTotals)
+      .map(function(k) { return { skuName: k, qty: skuTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    return {
+      success: true,
+      data: { items: items, totalUnits: totalUnits, totalTxns: totalTxns }
+    };
+  } catch(e) {
+    Logger.log('getStockInAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
  * Get accessory breakdown by model
  * FIXED: Column indices and checks for Account Check = Yes AND accessory = Yes
  */
@@ -3561,9 +3647,20 @@ function filterByDateRange(data, dateFilter, dateColumnIndex) {
       weekAgo.setDate(weekAgo.getDate() - 7);
       include = rowDate >= weekAgo && rowDate <= today;
     } else if (dateFilter === 'month') {
-      const monthAgo = new Date(today);
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      include = rowDate >= monthAgo && rowDate <= today;
+      // Current calendar month (1st to last day of current month)
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+      include = rowDate >= firstDay && rowDate <= lastDay;
+    } else if (dateFilter.indexOf('month:') === 0) {
+      // Specific month e.g. 'month:2026-03'
+      const parts    = dateFilter.substring(6).split('-');
+      const yr       = parseInt(parts[0]);
+      const mo       = parseInt(parts[1]) - 1; // 0-indexed
+      const firstDay = new Date(yr, mo, 1);
+      const lastDay  = new Date(yr, mo + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+      include = rowDate >= firstDay && rowDate <= lastDay;
     } else {
       include = true;
     }

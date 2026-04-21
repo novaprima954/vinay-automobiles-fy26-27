@@ -25,11 +25,7 @@ document.addEventListener('DOMContentLoaded', async function() {
   console.log('✅ User:', currentUser.name, '| Role:', currentUser.role);
 
   // Set dynamic month name on filter button (e.g. "April 2026")
-  var monthBtn = document.getElementById('monthFilterBtn');
-  if (monthBtn) {
-    var now = new Date();
-    monthBtn.textContent = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
-  }
+  setMonthBtnLabel('month');
 
   // Load dashboard
   await loadDashboard();
@@ -168,25 +164,36 @@ function renderSalesDashboard(data) {
     </div>
     ` : ''}
 
-    <!-- Daily Sales Trend (current month) -->
-    ${data.dailyTrend && data.dailyTrend.some(function(d){return d.count>0;}) ? `
+    <!-- Daily Bookings vs Retail Sales (current / selected month) -->
+    ${data.dailyTrend && data.dailyTrend.some(function(d){return (d.bookings||d.count||0)>0;}) ? `
     <div class="section">
-      <div class="section-header">📅 Daily Bookings — This Month</div>
-      <div style="margin-top:10px;">
+      <div class="section-header">📅 Daily Activity — This Month</div>
+      <!-- Legend -->
+      <div style="display:flex;gap:16px;font-size:12px;color:#666;margin-bottom:10px;">
+        <span><span style="display:inline-block;width:12px;height:12px;background:#81C784;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>Bookings</span>
+        <span><span style="display:inline-block;width:12px;height:12px;background:#667eea;border-radius:3px;vertical-align:middle;margin-right:4px;"></span>Retail Sales</span>
+      </div>
+      <div>
         ${(function(){
-          var today = new Date().getDate();
-          var max = Math.max.apply(null, data.dailyTrend.map(function(d){return d.count;})) || 1;
+          var todayDate = new Date().getDate();
+          var maxB = Math.max.apply(null, data.dailyTrend.map(function(d){ return d.bookings || d.count || 0; })) || 1;
           return data.dailyTrend.map(function(d){
-            var pct = Math.round((d.count / max) * 100);
-            var isToday = d.day === today;
-            var hasSale = d.count > 0;
+            var bookings = d.bookings !== undefined ? d.bookings : (d.count || 0);
+            var sales    = d.sales    !== undefined ? d.sales    : 0;
+            var bPct = Math.round((bookings / maxB) * 100);
+            var sPct = Math.round((sales    / maxB) * 100);
+            var isToday = d.day === todayDate;
+            var hasAny  = bookings > 0;
             return '<div style="display:flex;align-items:center;margin-bottom:5px;">' +
               '<div style="width:24px;font-size:11px;color:' + (isToday?'#667eea':'#aaa') + ';font-weight:' + (isToday?'700':'400') + ';text-align:right;margin-right:8px;">' + d.day + '</div>' +
-              '<div style="flex:1;background:#f0f0f0;border-radius:4px;height:16px;overflow:hidden;">' +
-                (hasSale ? '<div style="width:' + pct + '%;height:100%;background:' + (isToday?'linear-gradient(90deg,#667eea,#764ba2)':'#81C784') + ';border-radius:4px;"></div>' : '') +
+              '<div style="flex:1;position:relative;background:#f0f0f0;border-radius:4px;height:16px;overflow:hidden;">' +
+                (bookings > 0 ? '<div style="position:absolute;left:0;top:0;width:' + bPct + '%;height:100%;background:#81C784;border-radius:4px;"></div>' : '') +
+                (sales    > 0 ? '<div style="position:absolute;left:0;top:0;width:' + sPct + '%;height:100%;background:#667eea;border-radius:4px;opacity:0.9;"></div>' : '') +
               '</div>' +
-              '<div style="width:18px;font-size:11px;font-weight:600;color:#333;text-align:right;margin-left:6px;">' + (hasSale ? d.count : '') + '</div>' +
-              '</div>';
+              '<div style="width:36px;font-size:11px;font-weight:600;color:#333;text-align:right;margin-left:6px;">' +
+                (hasAny ? '<span style="color:#4CAF50;">' + bookings + '</span>' + (sales > 0 ? '/<span style="color:#667eea;">' + sales + '</span>' : '') : '') +
+              '</div>' +
+            '</div>';
           }).join('');
         })()}
       </div>
@@ -692,6 +699,12 @@ function renderAdminDashboard(data) {
       </div>
     </div>
 
+    <!-- Stock In / Purchase Analysis (Admin Only) -->
+    <div class="section" id="stockInSection">
+      <div class="section-header">📥 Stock In Analysis</div>
+      <div id="stockInContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
     <!-- Discount Analysis (Admin Only – Password Protected) -->
     <div class="section" id="discountSection">
       <div class="section-header">💸 Discount Analysis
@@ -737,6 +750,9 @@ function renderAdminDashboard(data) {
   `;
 
   content.style.display = 'block';
+
+  // Load Stock In analysis immediately (no password needed)
+  loadStockInAnalysis();
 
   // Auto-unlock if already authenticated in this session
   if (discountUnlocked) {
@@ -814,6 +830,65 @@ async function loadDiscountAnalysis() {
     console.error('Discount analysis error:', e);
     container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">Error loading discount data</div>';
   }
+}
+
+/**
+ * Fetch and render Stock In (Purchase) Analysis
+ */
+async function loadStockInAnalysis() {
+  const container = document.getElementById('stockInContent');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div>';
+  try {
+    const response = await API.call('getStockInAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      renderStockInAnalysis(response.data);
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">Error loading stock data</div>';
+  }
+}
+
+/**
+ * Render Stock In analysis
+ */
+function renderStockInAnalysis(d) {
+  var container = document.getElementById('stockInContent');
+  if (!container) return;
+
+  if (!d.items || d.items.length === 0) {
+    container.innerHTML = '<div style="color:#999;text-align:center;padding:20px;font-size:13px;">No stock received in this period</div>';
+    return;
+  }
+
+  var maxQty = Math.max.apply(null, d.items.map(function(x) { return x.qty; })) || 1;
+
+  var rows = d.items.map(function(item) {
+    var bp = Math.round((item.qty / maxQty) * 100);
+    return '<div style="margin-bottom:10px;">' +
+      '<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px;">' +
+        '<span style="font-weight:600;">' + item.skuName + '</span>' +
+        '<span style="background:#e8f5e9;color:#2e7d32;font-weight:700;padding:2px 8px;border-radius:10px;font-size:12px;">' + item.qty + ' units</span>' +
+      '</div>' +
+      '<div style="background:#f0f0f0;border-radius:6px;height:8px;overflow:hidden;">' +
+        '<div style="width:' + bp + '%;height:100%;background:linear-gradient(90deg,#43a047,#2e7d32);border-radius:6px;"></div>' +
+      '</div></div>';
+  }).join('');
+
+  container.innerHTML =
+    '<div style="display:flex;gap:12px;margin-bottom:16px;">' +
+      '<div style="flex:1;background:#e8f5e9;border-radius:8px;padding:10px 12px;text-align:center;">' +
+        '<div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Total Units</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#2e7d32;">' + d.totalUnits + '</div>' +
+      '</div>' +
+      '<div style="flex:1;background:#e3f2fd;border-radius:8px;padding:10px 12px;text-align:center;">' +
+        '<div style="font-size:11px;color:#555;font-weight:600;text-transform:uppercase;margin-bottom:4px;">Transactions</div>' +
+        '<div style="font-size:22px;font-weight:700;color:#1565c0;">' + d.totalTxns + '</div>' +
+      '</div>' +
+    '</div>' +
+    rows;
 }
 
 /**
@@ -1207,11 +1282,114 @@ function closeModal() {
 }
 
 /**
+ * Set the month filter button label based on the filter value
+ */
+function setMonthBtnLabel(filter) {
+  var btn = document.getElementById('monthFilterBtn');
+  if (!btn) return;
+  if (filter === 'month') {
+    var now = new Date();
+    btn.textContent = now.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  } else if (filter && filter.indexOf('month:') === 0) {
+    var parts = filter.substring(6).split('-');
+    var d = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1);
+    btn.textContent = d.toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+  }
+}
+
+/**
+ * Open a floating month/year picker when the month filter button is clicked
+ */
+function openMonthPicker(event) {
+  event.stopPropagation();
+
+  // Remove any existing picker
+  var existing = document.getElementById('monthPickerPopover');
+  if (existing) { existing.remove(); return; }
+
+  // Determine current selected month value for the input default
+  var inputVal = '';
+  if (currentFilter === 'month') {
+    var now = new Date();
+    inputVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  } else if (currentFilter && currentFilter.indexOf('month:') === 0) {
+    inputVal = currentFilter.substring(6); // e.g. '2026-03'
+  }
+
+  var popover = document.createElement('div');
+  popover.id = 'monthPickerPopover';
+  popover.style.cssText = 'position:absolute;background:white;border-radius:10px;box-shadow:0 4px 20px rgba(0,0,0,0.18);padding:16px 18px;z-index:500;min-width:220px;';
+
+  // Position below the button
+  var btn = document.getElementById('monthFilterBtn');
+  var rect = btn.getBoundingClientRect();
+  popover.style.top  = (rect.bottom + window.scrollY + 8) + 'px';
+  popover.style.left = (rect.left  + window.scrollX)      + 'px';
+
+  popover.innerHTML =
+    '<div style="font-size:13px;font-weight:700;color:#333;margin-bottom:10px;">Select Month</div>' +
+    '<input type="month" id="monthPickerInput" value="' + inputVal + '" ' +
+      'style="border:2px solid #667eea;border-radius:8px;padding:8px 12px;font-size:14px;width:100%;box-sizing:border-box;outline:none;">' +
+    '<div style="display:flex;gap:8px;margin-top:12px;">' +
+      '<button onclick="applyMonthFilter()" ' +
+        'style="flex:1;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;">' +
+        'Apply' +
+      '</button>' +
+      '<button onclick="applyMonthFilter(\'current\')" ' +
+        'style="flex:1;background:#f0f0f0;color:#333;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:600;cursor:pointer;">' +
+        'Current' +
+      '</button>' +
+    '</div>';
+
+  document.body.appendChild(popover);
+
+  // Close on outside click
+  setTimeout(function() {
+    document.addEventListener('click', function closePicker(e) {
+      if (!popover.contains(e.target)) {
+        popover.remove();
+        document.removeEventListener('click', closePicker);
+      }
+    });
+  }, 50);
+}
+
+/**
+ * Apply selected month from picker
+ */
+function applyMonthFilter(preset) {
+  var popover = document.getElementById('monthPickerPopover');
+  if (preset === 'current') {
+    currentFilter = 'month';
+    setMonthBtnLabel('month');
+  } else {
+    var input = document.getElementById('monthPickerInput');
+    if (!input || !input.value) return;
+    // input.value is 'YYYY-MM'
+    var now = new Date();
+    var curVal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    if (input.value === curVal) {
+      currentFilter = 'month';
+    } else {
+      currentFilter = 'month:' + input.value;
+    }
+    setMonthBtnLabel(currentFilter);
+  }
+  if (popover) popover.remove();
+
+  // Mark month button active
+  document.querySelectorAll('.filter-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.getElementById('monthFilterBtn').classList.add('active');
+
+  loadDashboard();
+}
+
+/**
  * Change date filter
  */
 function changeFilter(filter) {
   currentFilter = filter;
-  
+
   // Update active button
   document.querySelectorAll('.filter-btn').forEach(btn => {
     btn.classList.remove('active');
@@ -1219,7 +1397,12 @@ function changeFilter(filter) {
       btn.classList.add('active');
     }
   });
-  
+
+  // Reset month button label if switching to non-month filter
+  if (filter !== 'month' && !(filter && filter.indexOf('month:') === 0)) {
+    setMonthBtnLabel('month'); // reset label to current month name
+  }
+
   // Reload dashboard
   loadDashboard();
 }
