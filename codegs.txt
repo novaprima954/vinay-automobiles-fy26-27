@@ -2516,17 +2516,39 @@ function getSalesDashboard(sessionId, dateFilter) {
     const now = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentMonth = monthNames[now.getMonth()] + '-' + now.getFullYear();
-    
+
+    // Normalize a Targets sheet month cell → "Jan-2026" string
+    // Handles: Date objects, "Jan-2026", "Jan 2026", "January-2026", "01-2026" etc.
+    function normalizeTargetMonth(val) {
+      if (!val) return '';
+      if (val instanceof Date) {
+        return monthNames[val.getMonth()] + '-' + val.getFullYear();
+      }
+      var s = val.toString().trim();
+      // Already in correct format
+      if (/^[A-Za-z]{3}-\d{4}$/.test(s)) return s;
+      // "Jan 2026" → "Jan-2026"
+      var m = s.match(/^([A-Za-z]+)[^A-Za-z0-9]+(\d{4})$/);
+      if (m) {
+        var abbr = m[1].substring(0, 3);
+        abbr = abbr.charAt(0).toUpperCase() + abbr.slice(1).toLowerCase();
+        return abbr + '-' + m[2];
+      }
+      return s;
+    }
+
     Logger.log('Current month for target lookup: ' + currentMonth);
-    
+
     // Find user's target
     let target = 0;
     for (let i = 1; i < targetsData.length; i++) {
-      const targetMonth = targetsData[i][0]; // Column A: Month
-      const targetExec = targetsData[i][1];  // Column B: Executive
+      const targetMonth = normalizeTargetMonth(targetsData[i][0]); // Column A: Month
+      const targetExec  = (targetsData[i][1] || '').toString().trim(); // Column B: Executive
       const targetValue = targetsData[i][2]; // Column C: Target
-      
-      if (targetMonth === currentMonth && targetExec === user.name) {
+
+      Logger.log('Targets row ' + i + ': month=' + targetMonth + ', exec=' + targetExec);
+
+      if (targetMonth === currentMonth && targetExec === user.name.trim()) {
         target = parseInt(targetValue) || 0;
         Logger.log('Found target: ' + target);
         break;
