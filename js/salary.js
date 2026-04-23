@@ -9,6 +9,8 @@ let uploadedRecords = [];
 let currentUploadType = 'EPF';
 let currentPaymentType = 'Incentive';
 let currentReportType = 'employee';
+let currentIncentiveMode = 'manual';   // 'manual' | 'excel'
+let uploadedIncentiveRecords = [];
 
 // ==========================================
 // INITIALIZATION
@@ -149,7 +151,7 @@ function getLast12Months() {
 
 function populateMonthSelects() {
   const months = getLast12Months();
-  const ids = ['uploadMonth', 'inc_month', 'rep_month'];
+  const ids = ['uploadMonth', 'inc_month', 'inc_excel_month', 'rep_month'];
   ids.forEach(function (id) {
     const sel = document.getElementById(id);
     if (!sel) return;
@@ -537,7 +539,7 @@ function parseEPFSheet(workbook) {
       epf: Number(r[14]) || 0,
       pt: Number(r[15]) || 0,
       otherDeduction: Number(r[16]) || 0,
-      netPay: Number(r[17]) || 0
+      netPay: Number(r[12]) || 0   // moved from col R (r[17]) to col M (r[12])
     });
   }
   return records;
@@ -789,6 +791,180 @@ async function addBonusRecord() {
 
 
 // ==========================================
+// INCENTIVE EXCEL UPLOAD
+// ==========================================
+
+function switchIncentiveMode(mode) {
+  currentIncentiveMode = mode;
+  document.getElementById('incManualBtn').classList.toggle('active', mode === 'manual');
+  document.getElementById('incExcelBtn').classList.toggle('active', mode === 'excel');
+  document.getElementById('incManualSection').style.display = mode === 'manual' ? 'block' : 'none';
+  document.getElementById('incExcelSection').style.display = mode === 'excel' ? 'block' : 'none';
+  // Reset excel upload state when switching
+  if (mode === 'excel') {
+    document.getElementById('incPreviewSection').style.display = 'none';
+    document.getElementById('incExcelMsg').innerHTML = '';
+    uploadedIncentiveRecords = [];
+  }
+}
+
+async function parseIncentiveFile() {
+  const fileInput = document.getElementById('incFile');
+  const month = document.getElementById('inc_excel_month').value;
+
+  if (!month) { showMsg('incExcelMsg', 'Please select a month', 'error'); return; }
+  if (!fileInput.files || !fileInput.files[0]) { showMsg('incExcelMsg', 'Please select a file', 'error'); return; }
+
+  showMsg('incExcelMsg', 'Parsing file...', 'info');
+  try {
+    const data = await readFileAsArrayBuffer(fileInput.files[0]);
+    const workbook = XLSX.read(data, { type: 'array' });
+    const records = parseIncentiveSheet(workbook);
+
+    if (!records || records.length === 0) {
+      showMsg('incExcelMsg', 'No data rows found. Check file format: Col A=Emp Code, B=Name, C=Amount, D=EPF/REF', 'error');
+      return;
+    }
+
+    uploadedIncentiveRecords = matchIncentiveToEmployees(records);
+    renderIncentiveUploadPreview(uploadedIncentiveRecords, month);
+    showMsg('incExcelMsg', 'Parsed ' + uploadedIncentiveRecords.length + ' records.', 'success');
+  } catch (e) {
+    showMsg('incExcelMsg', 'Error parsing file: ' + e.message, 'error');
+  }
+}
+
+function parseIncentiveSheet(workbook) {
+  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+  // Find header row — look for 'EMP' or 'CODE' or 'NAME'
+  let headerRow = rows.findIndex(function(r) {
+    return r.some(function(c) {
+      var s = String(c).toUpperCase();
+      return s.includes('EMP') || s.includes('CODE');
+    });
+  });
+  if (headerRow === -1) headerRow = 0; // first row is header
+
+  const dataStart = headerRow + 1;
+  const records = [];
+
+  for (var i = dataStart; i < rows.length; i++) {
+    var r = rows[i];
+    var empCode = String(r[0] || '').trim();
+    var name    = String(r[1] || '').trim();
+    var amount  = Number(r[2]) || 0;
+    var modeRaw = String(r[3] || '').trim().toUpperCase();
+
+    if (!empCode && !name) continue;
+    if (name.toUpperCase().includes('TOTAL')) break;
+    if (amount <= 0) continue;
+
+    var paymentMode = (modeRaw === 'EPF' || modeRaw === 'REF') ? modeRaw : 'EPF';
+
+    records.push({ empCode: empCode, name: name, amount: amount, paymentMode: paymentMode });
+  }
+  return records;
+}
+
+function matchIncentiveToEmployees(records) {
+  return records.map(function(rec) {
+    var match = null;
+    // Match by empCode first, then by name
+    if (rec.empCode) {
+      match = salaryEmployees.find(function(e) { return e.empCode === rec.empCode; });
+    }
+    if (!match && rec.name) {
+      match = salaryEmployees.find(function(e) {
+        return e.name.trim().toLowerCase() === rec.name.trim().toLowerCase();
+      });
+    }
+    return Object.assign({}, rec, {
+      empCode:     match ? match.empCode : rec.empCode,
+      uan:         match ? (match.uan || '') : '',
+      matchStatus: match ? 'matched' : 'unmatched',
+      matchedName: match ? match.name : ''
+    });
+  });
+}
+
+function renderIncentiveUploadPreview(records, month) {
+  var section   = document.getElementById('incPreviewSection');
+  var titleEl   = document.getElementById('incPreviewTitle');
+  var thead     = document.getElementById('incPreviewHead');
+  var tbody     = document.getElementById('incPreviewBody');
+
+  titleEl.textContent = 'Incentive Upload Preview — ' + monthLabel(month);
+
+  thead.innerHTML = '<tr>' +
+    '<th>#</th><th>Emp Code</th><th>Name (File)</th><th>Amount</th><th>Mode</th><th>Match Status</th>' +
+    '</tr>';
+
+  tbody.innerHTML = records.map(function(rec, i) {
+    var statusCell = rec.matchStatus === 'matched'
+      ? '<span class="status-matched">✅ ' + escHtml(rec.empCode) + ' — ' + escHtml(rec.matchedName) + '</span>'
+      : '<span class="status-unmatched">⚠️ Not found — add employee first</span>';
+    return '<tr' + (rec.matchStatus !== 'matched' ? ' style="background:#fff3e0"' : '') + '>' +
+      '<td>' + (i + 1) + '</td>' +
+      '<td>' + escHtml(rec.empCode) + '</td>' +
+      '<td>' + escHtml(rec.name) + '</td>' +
+      '<td>' + formatCurrency(rec.amount) + '</td>' +
+      '<td><span style="background:' + (rec.paymentMode==='EPF'?'#e8f4fd':'#fff3e0') + ';color:' + (rec.paymentMode==='EPF'?'#1a73e8':'#e65100') + ';padding:2px 8px;border-radius:8px;font-size:12px;font-weight:600;">' + escHtml(rec.paymentMode) + '</span></td>' +
+      '<td>' + statusCell + '</td>' +
+      '</tr>';
+  }).join('');
+
+  section.style.display = 'block';
+}
+
+async function confirmSaveIncentiveUpload() {
+  var month = document.getElementById('inc_excel_month').value;
+  if (!month) { showMsg('incPreviewMsg', 'No month selected', 'error'); return; }
+
+  var unmatched = uploadedIncentiveRecords.filter(function(r) { return r.matchStatus !== 'matched'; });
+  if (unmatched.length > 0) {
+    showMsg('incPreviewMsg', '⚠️ Cannot save: ' + unmatched.length + ' employee(s) not found in master — add them first: ' +
+      unmatched.map(function(r) { return r.name; }).join(', '), 'error');
+    return;
+  }
+
+  showMsg('incPreviewMsg', 'Saving ' + uploadedIncentiveRecords.length + ' incentive records...', 'info');
+
+  // Build records in saveSalaryUpload format (type='Incentive', amount=netPay)
+  var toSave = uploadedIncentiveRecords.map(function(rec) {
+    return {
+      type: 'Incentive',
+      empCode: rec.empCode,
+      name: rec.matchedName || rec.name,
+      uan: rec.uan || '',
+      paymentMode: rec.paymentMode,
+      amount: rec.amount,
+      netPay: rec.amount,
+      gross: 0, presentDays: 0, basic: 0, hra: 0,
+      conveyance: 0, medical: 0, education: 0, wash: 0,
+      ot: 0, netSalary: 0, esic: 0, epf: 0,
+      pt: 0, otherDeduction: 0,
+      remarks: 'Excel Upload'
+    };
+  });
+
+  try {
+    var res = await API.saveSalaryUpload(month, toSave);
+    if (res.success) {
+      showMsg('incPreviewMsg', '✅ ' + (res.saved || toSave.length) + ' incentive records saved for ' + monthLabel(month), 'success');
+      document.getElementById('incPreviewSection').style.display = 'none';
+      document.getElementById('incFile').value = '';
+      uploadedIncentiveRecords = [];
+    } else {
+      showMsg('incPreviewMsg', 'Error: ' + (res.message || 'Failed to save'), 'error');
+    }
+  } catch (e) {
+    showMsg('incPreviewMsg', 'Error: ' + e.message, 'error');
+  }
+}
+
+// ==========================================
 // REPORTS TAB
 // ==========================================
 
@@ -872,35 +1048,59 @@ async function generateEmployeeReport() {
       html += '</div>';
     }
 
-    // Salary records
-    const salaryRecs = records.filter(function (r) { return r.type === 'Salary-Bank' || r.type === 'Salary-Cash'; });
-    if (salaryRecs.length > 0) {
-      html += '<div class="card"><div class="card-title">Salary Records</div><div class="table-wrap"><table>';
-      html += '<thead><tr><th>Month</th><th>Type</th><th>Days</th><th>Gross</th><th>Net Salary</th><th>Deductions</th><th>Net Pay</th><th>Mode</th></tr></thead>';
+    // Salary records — split by type (EPF/REF)
+    const epfRecs  = records.filter(function(r) { return r.type === 'Salary-Bank'; });
+    const refRecs  = records.filter(function(r) { return r.type === 'Salary-Cash'; });
+
+    if (epfRecs.length > 0) {
+      html += '<div class="card"><div class="card-title">EPF Salary Records</div><div class="table-wrap"><table>';
+      html += '<thead><tr><th>Month</th><th>Days</th><th>Gross</th><th>Net Salary</th><th>ESIC</th><th>EPF</th><th>PT</th><th>Net Pay</th></tr></thead>';
       html += '<tbody>';
-      salaryRecs.forEach(function (r) {
-        const deductions = Number(r.esic || 0) + Number(r.epf || 0) + Number(r.pt || 0);
+      let tNet = 0;
+      epfRecs.forEach(function(r) {
+        tNet += Number(r.netPay || 0);
         html += '<tr>' +
           '<td>' + monthLabel(r.month) + '</td>' +
-          '<td>' + escHtml(r.type) + '</td>' +
           '<td>' + (r.presentDays || 0) + '</td>' +
           '<td>' + formatCurrency(r.gross) + '</td>' +
           '<td>' + formatCurrency(r.netSalary) + '</td>' +
-          '<td>' + formatCurrency(deductions) + '</td>' +
-          '<td>' + formatCurrency(r.netPay) + '</td>' +
-          '<td>' + escHtml(r.paymentMode || '') + '</td>' +
+          '<td>' + formatCurrency(r.esic) + '</td>' +
+          '<td>' + formatCurrency(r.epf) + '</td>' +
+          '<td>' + formatCurrency(r.pt) + '</td>' +
+          '<td><strong>' + formatCurrency(r.netPay) + '</strong></td>' +
           '</tr>';
       });
+      html += '<tr class="totals-row"><td colspan="7"><strong>TOTAL (' + epfRecs.length + ' months)</strong></td><td><strong>' + formatCurrency(tNet) + '</strong></td></tr>';
+      html += '</tbody></table></div></div>';
+    }
+
+    if (refRecs.length > 0) {
+      html += '<div class="card"><div class="card-title">REF Salary Records</div><div class="table-wrap"><table>';
+      html += '<thead><tr><th>Month</th><th>Present Days</th><th>Pay Rate</th><th>Net Pay</th></tr></thead>';
+      html += '<tbody>';
+      let tNet = 0;
+      refRecs.forEach(function(r) {
+        tNet += Number(r.netPay || 0);
+        html += '<tr>' +
+          '<td>' + monthLabel(r.month) + '</td>' +
+          '<td>' + (r.presentDays || 0) + '</td>' +
+          '<td>' + formatCurrency(r.gross) + '</td>' +
+          '<td><strong>' + formatCurrency(r.netPay) + '</strong></td>' +
+          '</tr>';
+      });
+      html += '<tr class="totals-row"><td colspan="3"><strong>TOTAL (' + refRecs.length + ' months)</strong></td><td><strong>' + formatCurrency(tNet) + '</strong></td></tr>';
       html += '</tbody></table></div></div>';
     }
 
     // Incentive records
     const incRecs = records.filter(function (r) { return r.type === 'Incentive'; });
     if (incRecs.length > 0) {
+      let tInc = 0;
       html += '<div class="card"><div class="card-title">Incentive Records</div><div class="table-wrap"><table>';
       html += '<thead><tr><th>Month</th><th>Amount</th><th>Mode</th><th>Remarks</th><th>Date Entered</th></tr></thead>';
       html += '<tbody>';
       incRecs.forEach(function (r) {
+        tInc += Number(r.amount || 0);
         html += '<tr>' +
           '<td>' + monthLabel(r.month) + '</td>' +
           '<td>' + formatCurrency(r.amount) + '</td>' +
@@ -909,6 +1109,7 @@ async function generateEmployeeReport() {
           '<td>' + escHtml((r.enteredDate || '').split(' ')[0]) + '</td>' +
           '</tr>';
       });
+      html += '<tr class="totals-row"><td colspan="4"><strong>TOTAL (' + incRecs.length + ')</strong></td><td><strong>' + formatCurrency(tInc) + '</strong></td></tr>';
       html += '</tbody></table></div></div>';
     }
 
@@ -1029,10 +1230,10 @@ async function generateMonthlyReport() {
       html += '</tbody></table></div></div>';
     }
 
-    // Cash salary table
+    // REF salary table
     if (cashRecs.length > 0) {
       html += '<div class="card"><div class="card-title">REF Salary</div><div class="table-wrap"><table>';
-      html += '<thead><tr><th>Emp Code</th><th>Name</th><th>Days</th><th>Pay Rate</th><th>Net Pay</th></tr></thead>';
+      html += '<thead><tr><th>Emp Code</th><th>Name</th><th>Present Days</th><th>Pay Rate</th><th>Net Pay</th></tr></thead>';
       html += '<tbody>';
       let tDays = 0, tGross = 0, tNet = 0;
       cashRecs.forEach(function (r) {
@@ -1044,32 +1245,33 @@ async function generateMonthlyReport() {
           '<td>' + escHtml(r.name) + '</td>' +
           '<td>' + (r.presentDays || 0) + '</td>' +
           '<td>' + formatCurrency(r.gross) + '</td>' +
-          '<td>' + formatCurrency(r.netPay) + '</td>' +
+          '<td><strong>' + formatCurrency(r.netPay) + '</strong></td>' +
           '</tr>';
       });
       html += '<tr class="totals-row"><td colspan="2"><strong>TOTAL (' + cashRecs.length + ')</strong></td>' +
         '<td>' + tDays + '</td>' +
         '<td>' + formatCurrency(tGross) + '</td>' +
-        '<td>' + formatCurrency(tNet) + '</td></tr>';
+        '<td><strong>' + formatCurrency(tNet) + '</strong></td></tr>';
       html += '</tbody></table></div></div>';
     }
 
     // Incentive table
     if (incRecs.length > 0) {
       html += '<div class="card"><div class="card-title">Incentives</div><div class="table-wrap"><table>';
-      html += '<thead><tr><th>Name</th><th>Amount</th><th>Mode</th><th>Remarks</th></tr></thead>';
+      html += '<thead><tr><th>Emp Code</th><th>Name</th><th>Amount</th><th>Mode</th><th>Remarks</th></tr></thead>';
       html += '<tbody>';
       let tAmt = 0;
       incRecs.forEach(function (r) {
         tAmt += Number(r.amount || 0);
         html += '<tr>' +
+          '<td>' + escHtml(r.empCode || '') + '</td>' +
           '<td>' + escHtml(r.name) + '</td>' +
           '<td>' + formatCurrency(r.amount) + '</td>' +
           '<td>' + escHtml(r.paymentMode || '') + '</td>' +
           '<td>' + escHtml(r.remarks || '') + '</td>' +
           '</tr>';
       });
-      html += '<tr class="totals-row"><td><strong>TOTAL (' + incRecs.length + ')</strong></td><td>' + formatCurrency(tAmt) + '</td><td></td><td></td></tr>';
+      html += '<tr class="totals-row"><td colspan="2"><strong>TOTAL (' + incRecs.length + ')</strong></td><td><strong>' + formatCurrency(tAmt) + '</strong></td><td></td><td></td></tr>';
       html += '</tbody></table></div></div>';
     }
 

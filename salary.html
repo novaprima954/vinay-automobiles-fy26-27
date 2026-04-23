@@ -426,35 +426,86 @@
           <!-- Incentive Form -->
           <div id="incentiveForm">
             <div class="card-title">Add Incentive</div>
-            <div id="incMsg"></div>
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Month*</label>
-                <select id="inc_month"></select>
+
+            <!-- Mode sub-tabs -->
+            <div style="display:flex; gap:8px; margin-bottom:18px; flex-wrap:wrap;">
+              <button class="btn-toggle active" id="incManualBtn" onclick="switchIncentiveMode('manual')">&#128221; Manual</button>
+              <button class="btn-toggle" id="incExcelBtn" onclick="switchIncentiveMode('excel')">&#128228; Excel Upload</button>
+            </div>
+
+            <!-- ── Manual Entry ── -->
+            <div id="incManualSection">
+              <div id="incMsg"></div>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label>Month*</label>
+                  <select id="inc_month"></select>
+                </div>
+                <div class="form-group">
+                  <label>Employee*</label>
+                  <select id="inc_emp"><option value="">-- Select Employee --</option></select>
+                </div>
+                <div class="form-group">
+                  <label>Amount*</label>
+                  <input type="number" id="inc_amount" placeholder="0" min="0">
+                </div>
+                <div class="form-group">
+                  <label>Payment Mode*</label>
+                  <select id="inc_mode">
+                    <option value="EPF">EPF</option>
+                    <option value="REF">REF</option>
+                  </select>
+                </div>
+                <div class="form-group full-width">
+                  <label>Remarks</label>
+                  <input type="text" id="inc_remarks" placeholder="Optional remarks">
+                </div>
               </div>
-              <div class="form-group">
-                <label>Employee*</label>
-                <select id="inc_emp"><option value="">-- Select Employee --</option></select>
-              </div>
-              <div class="form-group">
-                <label>Amount*</label>
-                <input type="number" id="inc_amount" placeholder="0" min="0">
-              </div>
-              <div class="form-group">
-                <label>Payment Mode*</label>
-                <select id="inc_mode">
-                  <option value="EPF">EPF</option>
-                  <option value="REF">REF</option>
-                </select>
-              </div>
-              <div class="form-group full-width">
-                <label>Remarks</label>
-                <input type="text" id="inc_remarks" placeholder="Optional remarks">
+              <div style="margin-top:16px">
+                <button class="btn-primary" onclick="addIncentiveRecord()">Add Incentive</button>
               </div>
             </div>
-            <div style="margin-top:16px">
-              <button class="btn-primary" onclick="addIncentiveRecord()">Add Incentive</button>
+
+            <!-- ── Excel Upload ── -->
+            <div id="incExcelSection" style="display:none">
+              <div id="incExcelMsg"></div>
+
+              <!-- Format hint -->
+              <div style="background:#f0f4ff;border:1px solid #c7d5ff;border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px;color:#333;">
+                &#128203; Expected format: <strong>Col A</strong> = Emp Code &nbsp;|&nbsp;
+                <strong>Col B</strong> = Name &nbsp;|&nbsp;
+                <strong>Col C</strong> = Amount &nbsp;|&nbsp;
+                <strong>Col D</strong> = EPF <em>or</em> REF
+              </div>
+
+              <div class="form-grid" style="max-width:500px; margin-bottom:14px;">
+                <div class="form-group">
+                  <label>Month*</label>
+                  <select id="inc_excel_month"></select>
+                </div>
+                <div class="form-group">
+                  <label>Upload File (.xlsx / .xls)*</label>
+                  <input type="file" id="incFile" accept=".xlsx,.xls">
+                </div>
+              </div>
+              <button class="btn-primary" onclick="parseIncentiveFile()">&#128194; Parse File</button>
+
+              <!-- Preview -->
+              <div id="incPreviewSection" style="display:none; margin-top:18px;">
+                <div class="card-title" id="incPreviewTitle"></div>
+                <div id="incPreviewMsg"></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead id="incPreviewHead"></thead>
+                    <tbody id="incPreviewBody"></tbody>
+                  </table>
+                </div>
+                <div style="margin-top:14px">
+                  <button class="btn-primary" onclick="confirmSaveIncentiveUpload()">&#9989; Confirm &amp; Save All</button>
+                </div>
+              </div>
             </div>
+
           </div>
 
           <!-- Bonus Form -->
