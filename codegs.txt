@@ -6580,10 +6580,13 @@ function uploadV301File(sessionId, base64Data, fileName) {
       const invoiceNo = values[2] || '';      // Column C
       const modelName = values[3] || '';      // Column D
       const frameNo = values[4] || '';        // Column E
+      const engineNo = values[5] || '';       // Column F - Engine Number
       const customerName = values[6] || '';   // Column G
       const mobileNo = values[8] || '';       // Column I
       const hpCompany = values[9] || '';      // Column J - HP Company
+      const invoiceAmount = values[11] || ''; // Column L - Invoice Amount
       const refCustomer = values[12] || '';   // Column M
+      const customerAddress = values[13] || ''; // Column N - Customer Address
       
       // Skip if invoice number already exists
       if (existingInvoices[invoiceNo.toString()]) {
@@ -6599,20 +6602,29 @@ function uploadV301File(sessionId, base64Data, fileName) {
       
       // Build row for HSRP sheet
       // Columns: Sr No, Invoice No, Invoice Date, Status, Mobile No, Customer Name, Frame No, Registration No, Ref Customer, Model Name, Order Date, Fitment Date, HP Company
+      // Cols N-R (indices 13-17) left blank; S-U (indices 18-20) = Engine No, Invoice Amount, Customer Address
       const newRow = [
-          maxSrNo,                  // A: Sr No
-          invoiceNo,                // B: Invoice No
-          invoiceDate,              // C: Invoice Date
-          '',                       // D: Status (blank initially)
-          mobileNo,                 // E: Mobile No
-          customerName,             // F: Customer Name
-          frameNo,                  // G: Frame No
-          '',                       // H: Registration No (blank)
-          (customerName.toUpperCase().includes('SEVA MOTORS') ? 'SEVA MOTORS' : (refCustomer || 'Vinay Automobiles')),  // I: Ref Customer
-          modelName,                // J: Model Name
-          '',                       // K: Order Date (blank initially, set during Step 2)
-          '',                       // L: Fitment Date (blank)
-          hpCompany                 // M: HP Company (stored, not displayed)
+          maxSrNo,                  // A (0): Sr No
+          invoiceNo,                // B (1): Invoice No
+          invoiceDate,              // C (2): Invoice Date
+          '',                       // D (3): Status (blank initially)
+          mobileNo,                 // E (4): Mobile No
+          customerName,             // F (5): Customer Name
+          frameNo,                  // G (6): Frame No
+          '',                       // H (7): Registration No (blank)
+          (customerName.toUpperCase().includes('SEVA MOTORS') ? 'SEVA MOTORS' : (refCustomer || 'Vinay Automobiles')),  // I (8): Ref Customer
+          modelName,                // J (9): Model Name
+          '',                       // K (10): Order Date (blank initially, set during Step 2)
+          '',                       // L (11): Fitment Date (blank)
+          hpCompany,                // M (12): HP Company (stored, not displayed)
+          '',                       // N (13): blank
+          '',                       // O (14): blank
+          '',                       // P (15): blank
+          '',                       // Q (16): blank
+          '',                       // R (17): blank
+          engineNo,                 // S (18): Engine Number
+          invoiceAmount,            // T (19): Invoice Amount
+          customerAddress           // U (20): Customer Address
       ];
       
       rowsToAdd.push(newRow);
@@ -6627,7 +6639,7 @@ function uploadV301File(sessionId, base64Data, fileName) {
     // Append rows to sheet
     if (rowsToAdd.length > 0) {
       const startRow = hsrpSheet.getLastRow() + 1;
-      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 13).setValues(rowsToAdd);
+      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 21).setValues(rowsToAdd);
       SpreadsheetApp.flush();
     }
     
