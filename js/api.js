@@ -712,6 +712,22 @@ const API = {
     });
   },
 
+  /**
+   * Get Busy Upload data (Vehicle Invoice Master)
+   */
+  async getBusyUploadData(filterType, fromDate, toDate, fromInvoice, toInvoice) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getBusyUploadData', {
+      sessionId:   session.sessionId,
+      filterType:  filterType  || '',
+      fromDate:    fromDate    || '',
+      toDate:      toDate      || '',
+      fromInvoice: fromInvoice || '',
+      toInvoice:   toInvoice   || ''
+    });
+  },
+
   // ==========================================
   // VEHICLE MILEAGE FUNCTIONS
   // ==========================================

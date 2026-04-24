@@ -20,7 +20,8 @@ const ROLE_CARDS = {
     { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
     { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' },
     { title: 'Financier Details', icon: '🏦', color: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', link: 'financier.html', description: 'HP Finance tracking' },
-    { title: 'Employee Tracker', icon: '👤', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'salary.html', description: 'Salary, incentive & bonus' }
+    { title: 'Employee Tracker', icon: '👤', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'salary.html', description: 'Salary, incentive & bonus' },
+    { title: 'Busy Upload', icon: '📤', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'busy-upload.html', description: 'Export Vehicle Invoice Master' }
   ],
   sales: [
     { title: 'Dashboard', icon: '📊', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'dashboard.html', description: 'View your performance' },
@@ -38,7 +39,8 @@ const ROLE_CARDS = {
     { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
     { title: 'Financier Details', icon: '🏦', color: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', link: 'financier.html', description: 'HP Finance tracking' },
     { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' },
-    { title: 'Employee Tracker', icon: '👤', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'salary.html', description: 'Salary, incentive & bonus' }
+    { title: 'Employee Tracker', icon: '👤', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'salary.html', description: 'Salary, incentive & bonus' },
+    { title: 'Busy Upload', icon: '📤', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'busy-upload.html', description: 'Export Vehicle Invoice Master' }
   ],
   accessories: [
     { title: 'Accessories', icon: '🔧', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'accessories.html', description: 'Manage accessories' },

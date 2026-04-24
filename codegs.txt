@@ -246,6 +246,9 @@ function handleRequest(e) {
       case 'exportHSRPToPdf':
         result = exportHSRPToPdf(params.sessionId, params.fromDate, params.toDate);
         break;
+      case 'getBusyUploadData':
+        result = getBusyUploadData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
@@ -7324,6 +7327,83 @@ function exportHSRPToPdf(sessionId, fromDate, toDate) {
       success: false,
       message: 'Error generating PDF: ' + error.toString()
     };
+  }
+}
+
+/**
+ * Busy Upload - Get HSRP data for Vehicle Invoice Master Excel export
+ * Filter by date range OR invoice number range
+ * Returns: customerName, refCustomer, customerAddress, mobileNo, invoiceNo, invoiceDate
+ */
+function getBusyUploadData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const sheet = getSheet('HSRP');
+    const data  = sheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try {
+        const d = new Date(val);
+        return Utilities.formatDate(d, 'Asia/Kolkata', 'dd-MMM-yyyy');
+      } catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue; // skip empty rows
+
+      const invoiceNo      = (row[1]  || '').toString().trim();
+      const invoiceDateRaw = row[2];
+      const customerName   = (row[5]  || '').toString().trim();
+      const refCustomer    = (row[8]  || '').toString().trim();
+      const customerAddr   = (row[20] || '').toString().trim();
+      const mobileNo       = (row[4]  || '').toString().trim();
+
+      // --- Filter by invoice date ---
+      if (filterType === 'date') {
+        if (!invoiceDateRaw) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDateRaw); } catch(e) { continue; }
+        rowDate.setHours(0, 0, 0, 0);
+        if (fromDate) {
+          var fd = new Date(fromDate); fd.setHours(0,0,0,0);
+          if (rowDate < fd) continue;
+        }
+        if (toDate) {
+          var td = new Date(toDate); td.setHours(23,59,59,999);
+          if (rowDate > td) continue;
+        }
+
+      // --- Filter by invoice number range ---
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      records.push({
+        invoiceNo:       invoiceNo,
+        invoiceDate:     fmtDate(invoiceDateRaw),
+        customerName:    customerName,
+        refCustomer:     refCustomer,
+        customerAddress: customerAddr,
+        mobileNo:        mobileNo
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getBusyUploadData error: ' + e.toString());
+    return { success: false, message: e.toString() };
   }
 }
 
