@@ -2846,9 +2846,13 @@ function getAccountsDashboardView(sessionId, dateFilter) {
         
         // Executive sales count
         if (!executiveStats[executive]) {
-          executiveStats[executive] = 0;
+          executiveStats[executive] = { completedSales: 0, fullAccessories: 0 };
         }
-        executiveStats[executive]++;
+        executiveStats[executive].completedSales++;
+        // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
+        if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
+          executiveStats[executive].fullAccessories++;
+        }
         
         // Executive accessories count
         if (!executiveAccessoryStats[executive]) {
@@ -2894,7 +2898,8 @@ function getAccountsDashboardView(sessionId, dateFilter) {
     const executiveSales = Object.keys(executiveStats).map(function(exec) {
       return {
         executive: exec,
-        completedSales: executiveStats[exec]
+        completedSales: executiveStats[exec].completedSales,
+        fullAccessories: executiveStats[exec].fullAccessories
       };
     }).sort(function(a, b) {
       return b.completedSales - a.completedSales;
@@ -3153,12 +3158,17 @@ function getAdminDashboard(sessionId, dateFilter) {
       if (!executiveStats[executive]) {
         executiveStats[executive] = {
           totalSales: 0,
-          completedSales: 0
+          completedSales: 0,
+          fullAccessories: 0
         };
       }
       executiveStats[executive].totalSales++;
       if (accountCheck === 'Yes') {
         executiveStats[executive].completedSales++;
+        // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
+        if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
+          executiveStats[executive].fullAccessories++;
+        }
       }
 
       // Count accessories, model, operator only when Account Check = Yes
@@ -3194,7 +3204,8 @@ function getAdminDashboard(sessionId, dateFilter) {
     const executiveList = Object.keys(executiveStats).map(exec => ({
       executive: exec,
       totalSales: executiveStats[exec].totalSales,
-      completedSales: executiveStats[exec].completedSales
+      completedSales: executiveStats[exec].completedSales,
+      fullAccessories: executiveStats[exec].fullAccessories
     })).sort((a, b) => b.completedSales - a.completedSales);
 
     // Convert model counts to sorted array
@@ -3282,7 +3293,7 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     const validation = validateSession(sessionId);
     if (!validation.success) return validation;
     const user = validation.user;
-    if (user.role !== 'admin') return { success: false, message: 'Access denied' };
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const rawData = sheet.getDataRange().getValues();
@@ -3293,6 +3304,7 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     let maxDiscount = 0;
     const byModel = {};
     const byExec  = {};
+    const byExecNoApache = {};
     const buckets = { zero: 0, small: 0, medium: 0, large: 0, xlarge: 0 };
     const allDeals = [];
     const monthlyMap = {};
@@ -3329,6 +3341,14 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         byExec[executive].count++;
         byExec[executive].totalDiscount += disc;
         if (disc > byExec[executive].maxDiscount) byExec[executive].maxDiscount = disc;
+
+        // byExecNoApache: same but exclude rows where model contains 'Apache'
+        if (model.toLowerCase().indexOf('apache') === -1) {
+          if (!byExecNoApache[executive]) byExecNoApache[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+          byExecNoApache[executive].count++;
+          byExecNoApache[executive].totalDiscount += disc;
+          if (disc > byExecNoApache[executive].maxDiscount) byExecNoApache[executive].maxDiscount = disc;
+        }
       }
 
       if (disc === 0)          buckets.zero++;
@@ -3366,6 +3386,14 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         maxDiscount:   d.maxDiscount };
     }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
 
+    const byExecNoApacheArr = Object.keys(byExecNoApache).map(function(e) {
+      var d = byExecNoApache[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
     const top10 = allDeals.filter(function(d) { return d.discount > 0; })
       .sort(function(a, b) { return b.discount - a.discount; }).slice(0, 10);
 
@@ -3387,6 +3415,7 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         discountPct:                 totalGross > 0 ? Math.round((totalDiscount / totalGross) * 1000) / 10 : 0,
         byModel:                     byModelArr,
         byExecutive:                 byExecArr,
+        byExecutiveNoApache:         byExecNoApacheArr,
         buckets:                     buckets,
         top10:                       top10,
         monthly:                     monthly
@@ -3407,7 +3436,8 @@ function getInventoryAnalysis(sessionId, dateFilter) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) return validation;
-    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+    const invRole = validation.user.role;
+    if (invRole !== 'admin' && invRole !== 'accounts') return { success: false, message: 'Access denied' };
 
     const ss    = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = ss.getSheetByName(CONFIG.SHEETS.INV_TXN_SHEET);
@@ -3421,6 +3451,7 @@ function getInventoryAnalysis(sessionId, dateFilter) {
     const issueTotals = {};   // skuName -> qty
     const otcTotals   = {};   // skuName -> qty
     const adTotals    = {};   // adName -> { skuName -> qty }
+    const otcByExec   = {};   // executiveName -> { skuName -> qty }
 
     rows.forEach(function(row) {
       const type    = String(row[2] || '').trim().toUpperCase();
@@ -3434,6 +3465,10 @@ function getInventoryAnalysis(sessionId, dateFilter) {
 
       } else if (type === 'OTC_SALE') {
         otcTotals[skuName] = (otcTotals[skuName] || 0) + qty;
+        // Track by executive (col 10)
+        var execName = String(row[10] || '').trim() || 'Unknown';
+        if (!otcByExec[execName]) otcByExec[execName] = {};
+        otcByExec[execName][skuName] = (otcByExec[execName][skuName] || 0) + qty;
 
       } else if (type === 'AD_SALE') {
         const adName = String(row[9] || '').trim() || 'Unknown';
@@ -3465,9 +3500,20 @@ function getInventoryAnalysis(sessionId, dateFilter) {
         return tb - ta;
       });
 
+    // Build otcByExecutive sorted array
+    const otcByExecutive = Object.keys(otcByExec)
+      .map(function(exec) {
+        var items = Object.keys(otcByExec[exec])
+          .map(function(sku) { return { skuName: sku, qty: otcByExec[exec][sku] }; })
+          .sort(function(a, b) { return b.qty - a.qty; });
+        var total = items.reduce(function(s, x) { return s + x.qty; }, 0);
+        return { executive: exec, items: items, total: total };
+      })
+      .sort(function(a, b) { return b.total - a.total; });
+
     return {
       success: true,
-      data: { issue: issue, otc: otc, adSale: adSale }
+      data: { issue: issue, otc: otc, adSale: adSale, otcByExecutive: otcByExecutive }
     };
   } catch(e) {
     Logger.log('getInventoryAnalysis error: ' + e.toString());

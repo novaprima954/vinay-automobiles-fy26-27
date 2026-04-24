@@ -7,6 +7,8 @@ let currentSessionId = null;
 let currentFilter = 'month'; // Default to 'This Month'
 let dashboardData = null;
 let discountUnlocked = false; // persists within session so filter changes don't re-lock
+let discountExcludeApache = false; // Apache toggle state
+let lastDiscountData = null;  // cached discount data for re-render on toggle
 
 document.addEventListener('DOMContentLoaded', async function() {
   console.log('=== DASHBOARD PAGE ===');
@@ -334,13 +336,13 @@ function renderAccountsDashboard(data) {
     <div class="section">
       <div class="section-header">👥 Executive-wise Sales (Account Check: Yes)</div>
       ${data.executiveSales && data.executiveSales.length > 0 ? data.executiveSales.map((exec, index) => `
-        <div class="list-item" onclick="showExecutiveModels('${exec.executive}', 'models')">
+        <div class="list-item" onclick="showExecutiveModels('${exec.executive}', 'models')" style="cursor:pointer;">
           <div class="list-item-main">
             <div class="list-item-title">
               ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
               ${exec.executive}
             </div>
-            <div class="list-item-subtitle">Click to see model breakdown</div>
+            <div class="list-item-subtitle">🎯 Full Acc: ${exec.fullAccessories || 0} | Tap for model breakdown</div>
           </div>
           <div class="list-item-value">${exec.completedSales}</div>
         </div>
@@ -393,9 +395,105 @@ function renderAccountsDashboard(data) {
         </div>
       `).join('') : '<div class="empty-state">All caught up! ✅</div>'}
     </div>
+
+    <!-- Discount by Executive (async load) -->
+    <div class="section" id="acctDiscountSection">
+      <div class="section-header">💸 Discount by Executive</div>
+      <div id="acctDiscountContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
+    <!-- AD Sales from Inventory (async load) -->
+    <div class="section" id="acctAdSaleSection">
+      <div class="section-header">🤝 AD Sales</div>
+      <div id="acctAdSaleContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
   `;
-  
+
   content.style.display = 'block';
+
+  // Load async sections
+  loadAccountsDiscountByExec();
+  loadAccountsAdSales();
+}
+
+/**
+ * Load Discount by Executive for Accounts dashboard (no password, exec table only)
+ */
+async function loadAccountsDiscountByExec() {
+  const container = document.getElementById('acctDiscountContent');
+  if (!container) return;
+  try {
+    const response = await API.call('getDiscountAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      const fmt = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
+      const execData = response.data.byExecutive || [];
+      if (execData.length === 0) {
+        container.innerHTML = '<div style="color:#999;text-align:center;padding:15px;">No discount data in this period</div>';
+        return;
+      }
+      const rows = execData.map(function(e) {
+        return '<tr style="border-bottom:1px solid #f0f0f0;">' +
+          '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
+          '<td style="padding:8px;text-align:right;">' + e.deals + '</td>' +
+          '<td style="padding:8px;text-align:right;color:#dc3545;font-weight:600;">' + fmt(e.totalDiscount) + '</td>' +
+          '<td style="padding:8px;text-align:right;">' + fmt(e.avgDiscount) + '</td>' +
+          '<td style="padding:8px;text-align:right;">' + fmt(e.maxDiscount) + '</td>' +
+          '</tr>';
+      }).join('');
+      container.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+        '<thead><tr style="background:#f8f9fa;">' +
+          '<th style="padding:8px;text-align:left;border-bottom:2px solid #dee2e6;">Executive</th>' +
+          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Deals</th>' +
+          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Total Disc</th>' +
+          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Avg</th>' +
+          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Max</th>' +
+        '</tr></thead>' +
+        '<tbody>' + rows + '</tbody></table></div>';
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading discount data</div>';
+  }
+}
+
+/**
+ * Load AD Sales from Inventory for Accounts dashboard
+ */
+async function loadAccountsAdSales() {
+  const container = document.getElementById('acctAdSaleContent');
+  if (!container) return;
+  try {
+    const response = await API.call('getInventoryAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      const d = response.data;
+      if (!d.adSale || d.adSale.length === 0) {
+        container.innerHTML = '<div style="color:#999;text-align:center;padding:15px;">No AD Sales in this period</div>';
+        return;
+      }
+      var adRows = d.adSale.map(function(ad) {
+        var itemsHtml = ad.items.map(function(item) {
+          return '<div style="display:flex;justify-content:space-between;padding:6px 0 6px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;">' +
+            '<span style="color:#555;">' + item.skuName + '</span>' +
+            '<span style="font-weight:600;color:#667eea;">' + item.qty + ' units</span>' +
+          '</div>';
+        }).join('');
+        var totalQty = ad.items.reduce(function(s, x) { return s + x.qty; }, 0);
+        return '<div style="border:1px solid #e9ecef;border-radius:8px;margin-bottom:12px;overflow:hidden;">' +
+          '<div style="background:#f8f9fa;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">' +
+            '<span style="font-weight:700;color:#333;font-size:14px;">🏪 ' + ad.adName + '</span>' +
+            '<span style="font-size:12px;color:#666;">' + totalQty + ' total units</span>' +
+          '</div>' +
+          itemsHtml +
+        '</div>';
+      }).join('');
+      container.innerHTML = adRows;
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading AD sales data</div>';
+  }
 }
 
 /**
@@ -510,13 +608,13 @@ function renderAdminDashboard(data) {
     <div class="section">
       <div class="section-header">👥 By Executive (Account Check: Yes)</div>
       ${data.executiveList.map((exec, index) => `
-        <div class="list-item">
+        <div class="list-item" onclick="showExecutiveModels('${exec.executive}', 'models')" style="cursor:pointer;">
           <div class="list-item-main">
             <div class="list-item-title">
               ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
               ${exec.executive}
             </div>
-            <div class="list-item-subtitle">Total bookings: ${exec.totalSales}</div>
+            <div class="list-item-subtitle">Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0} | Tap for models</div>
           </div>
           <div class="list-item-value">${exec.completedSales}</div>
         </div>
@@ -977,6 +1075,28 @@ function renderInventoryAnalysis(d) {
     adRows = '<div style="color:#999;text-align:center;padding:15px;font-size:13px;">No AD Sales in this period</div>';
   }
 
+  // --- Executive OTC section ---
+  var execOtcRows = '';
+  if (d.otcByExecutive && d.otcByExecutive.length > 0) {
+    execOtcRows = d.otcByExecutive.map(function(exec) {
+      var itemsHtml = exec.items.map(function(item) {
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0 6px 12px;border-bottom:1px solid #f5f5f5;font-size:13px;">' +
+          '<span style="color:#555;">' + item.skuName + '</span>' +
+          '<span style="font-weight:600;color:#e65100;">' + item.qty + ' units</span>' +
+        '</div>';
+      }).join('');
+      return '<div style="border:1px solid #e9ecef;border-radius:8px;margin-bottom:12px;overflow:hidden;">' +
+        '<div style="background:#fff3e0;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">' +
+          '<span style="font-weight:700;color:#333;font-size:14px;">👤 ' + exec.executive + '</span>' +
+          '<span style="font-size:12px;color:#666;">' + exec.total + ' total units</span>' +
+        '</div>' +
+        itemsHtml +
+      '</div>';
+    }).join('');
+  } else {
+    execOtcRows = '<div style="color:#999;text-align:center;padding:15px;font-size:13px;">No executive OTC data in this period</div>';
+  }
+
   container.innerHTML = `
     <!-- ISSUE Section -->
     <div style="font-weight:700;color:#333;margin:10px 0 12px;font-size:14px;">📤 Stock Issued (ISSUE)</div>
@@ -990,6 +1110,12 @@ function renderInventoryAnalysis(d) {
 
     <hr style="border:none;border-top:2px solid #f0f0f0;margin:18px 0;">
 
+    <!-- Executive OTC Section -->
+    <div style="font-weight:700;color:#333;margin:0 0 12px;font-size:14px;">🧑‍💼 OTC Sales by Executive</div>
+    <div style="margin-bottom:20px;">${execOtcRows}</div>
+
+    <hr style="border:none;border-top:2px solid #f0f0f0;margin:18px 0;">
+
     <!-- AD Sale Section -->
     <div style="font-weight:700;color:#333;margin:0 0 12px;font-size:14px;">🤝 AD Sales</div>
     <div>${adRows}</div>
@@ -997,9 +1123,18 @@ function renderInventoryAnalysis(d) {
 }
 
 /**
+ * Toggle Apache filter on discount by executive table
+ */
+function toggleApacheFilter() {
+  discountExcludeApache = !discountExcludeApache;
+  if (lastDiscountData) renderDiscountAnalysis(lastDiscountData);
+}
+
+/**
  * Render all discount analysis sections
  */
 function renderDiscountAnalysis(d) {
+  lastDiscountData = d; // cache for toggle re-render
   const fmt  = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
   const pct  = function(n) { return (Math.round(n * 10) / 10).toFixed(1) + '%'; };
 
@@ -1052,7 +1187,8 @@ function renderDiscountAnalysis(d) {
       '</tr>';
   }).join('');
 
-  const execRows = d.byExecutive.map(function(e) {
+  const activeExecData = discountExcludeApache ? (d.byExecutiveNoApache || d.byExecutive) : d.byExecutive;
+  const execRows = activeExecData.map(function(e) {
     return '<tr style="border-bottom:1px solid #f0f0f0;">' +
       '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
       '<td style="padding:8px;text-align:right;">' + e.deals + '</td>' +
@@ -1132,7 +1268,15 @@ function renderDiscountAnalysis(d) {
     </div>
 
     <!-- By Executive -->
-    <div style="font-weight:700;color:#333;margin:20px 0 10px;font-size:14px;">👥 Discount by Executive</div>
+    <div style="display:flex;align-items:center;gap:10px;margin:20px 0 10px;flex-wrap:wrap;">
+      <span style="font-weight:700;color:#333;font-size:14px;">👥 Discount by Executive</span>
+      <label onclick="toggleApacheFilter()" style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#f8f9fa;padding:4px 10px;border-radius:20px;border:1px solid #ddd;user-select:none;">
+        <span style="font-size:12px;color:#666;">Excl. Apache</span>
+        <div style="width:36px;height:20px;background:${discountExcludeApache ? '#667eea' : '#ccc'};border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;">
+          <div style="position:absolute;top:2px;left:${discountExcludeApache ? '16' : '2'}px;width:16px;height:16px;background:white;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+        </div>
+      </label>
+    </div>
     <div style="overflow-x:auto;">
       <table style="width:100%;border-collapse:collapse;font-size:13px;">
         <thead><tr style="background:#f8f9fa;">
