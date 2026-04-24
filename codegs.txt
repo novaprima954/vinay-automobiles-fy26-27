@@ -249,6 +249,9 @@ function handleRequest(e) {
       case 'getBusyUploadData':
         result = getBusyUploadData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
         break;
+      case 'getVSeriesExportData':
+        result = getVSeriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
@@ -7403,6 +7406,119 @@ function getBusyUploadData(sessionId, filterType, fromDate, toDate, fromInvoice,
 
   } catch(e) {
     Logger.log('getBusyUploadData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * V Series Export — HSRP data joined with main Data sheet for accessories + executive name
+ * Main Data sheet: row[1]=executive, row[60]=frameNumber, row[12]=Guard, row[13]=Grip, row[14]=SeatCover, row[15]=Matin
+ * HSRP sheet: col6=frameNo, col8=refCustomer, col9=modelName, col12=hpCompany, col18=engineNo, col19=invoiceAmount
+ */
+function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    // --- Build frame number index from main Data sheet ---
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const dataRows  = dataSheet.getDataRange().getValues();
+    const frameIndex = {}; // frameNumber (lowercase) -> { executive, guard, grip, seatCover, matin }
+    for (var di = 1; di < dataRows.length; di++) {
+      var dr = dataRows[di];
+      var fn = (dr[60] || '').toString().trim();
+      if (fn) {
+        frameIndex[fn.toLowerCase()] = {
+          executive: (dr[1]  || '').toString().trim(),
+          guard:     (dr[12] || '').toString().trim(),
+          grip:      (dr[13] || '').toString().trim(),
+          seatCover: (dr[14] || '').toString().trim(),
+          matin:     (dr[15] || '').toString().trim()
+        };
+      }
+    }
+
+    // --- Read & filter HSRP sheet ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MMM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1]  || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5]  || '').toString().trim();
+      var frameNo      = (row[6]  || '').toString().trim();
+      var refCustomer  = (row[8]  || '').toString().trim();
+      var modelName    = (row[9]  || '').toString().trim();
+      var hpCompany    = (row[12] || '').toString().trim();
+      var engineNo     = (row[18] || '').toString().trim();
+      var invoiceAmt   = row[19] || '';
+
+      // --- Apply filter ---
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0); if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      // --- Look up Data sheet by frame number ---
+      var dataLookup = frameIndex[frameNo.toLowerCase()] || null;
+
+      // --- Accessories (K): VA → check Guard+Grip+SeatCover+Matin; others → 'N' ---
+      var accessories = 'N';
+      var isVinay = refCustomer.toLowerCase().indexOf('vinay automobiles') !== -1;
+      if (isVinay && dataLookup) {
+        if (dataLookup.guard === 'Yes' && dataLookup.grip === 'Yes' &&
+            dataLookup.seatCover === 'Yes' && dataLookup.matin === 'Yes') {
+          accessories = 'Y';
+        }
+      }
+
+      // --- Broker name (M): VA → executive name; others → refCustomer ---
+      var brokerName = '';
+      if (isVinay) {
+        brokerName = dataLookup ? dataLookup.executive : '';
+      } else {
+        brokerName = refCustomer;
+      }
+
+      records.push({
+        invoiceNo:     invoiceNo,
+        invoiceDate:   fmtDate(invoiceDate),
+        customerName:  customerName,
+        frameNo:       frameNo,
+        modelName:     modelName,
+        engineNo:      engineNo,
+        hpCompany:     hpCompany,
+        invoiceAmount: invoiceAmt,
+        accessories:   accessories,
+        brokerName:    brokerName
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getVSeriesExportData error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }
