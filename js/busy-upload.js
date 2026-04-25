@@ -197,7 +197,7 @@ function buildVSeriesExcel(records) {
     'Customer Name',    // G
     'HP Company',       // H
     'Insurance',        // I
-    '',                 // J (blank)
+    'Scheme',           // J
     'Accessories',      // K
     'Invoice Amount',   // L
     'Broker Name',      // M
@@ -221,7 +221,7 @@ function buildVSeriesExcel(records) {
       r.customerName   || '',                      // G: Customer Name
       r.hpCompany      || '',                      // H: HP Company
       'SBI General Insurance',                     // I: Insurance
-      '',                                          // J: Blank
+      'No',                                        // J: Scheme
       r.accessories    || 'N',                     // K: Accessories Y/N
       r.invoiceAmount  || '',                      // L: Invoice Amount
       r.brokerName     || '',                      // M: Broker Name
