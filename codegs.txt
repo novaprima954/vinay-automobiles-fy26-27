@@ -70,9 +70,6 @@ function handleRequest(e) {
       case 'getSalesData':
         result = getSalesData(params.sessionId);
         break;
-      case 'getAccountsDashboard':
-        result = getAccountsDashboard(params.sessionId, params.month);
-        break;
       case 'getAccountsByStatus':
         result = getAccountsByStatus(params.sessionId, params.month, params.status);
         break;
@@ -3311,7 +3308,7 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     const byModel = {};
     const byExec  = {};
     const byExecNoApache = {};
-    const buckets = { zero: 0, small: 0, medium: 0, large: 0, xlarge: 0 };
+    const buckets = { zero: 0, small: 0, medium: 0, large: 0 };
     const allDeals = [];
     const monthlyMap = {};
 
@@ -3359,9 +3356,8 @@ function getDiscountAnalysis(sessionId, dateFilter) {
 
       if (disc === 0)          buckets.zero++;
       else if (disc <= 1000)   buckets.small++;
-      else if (disc <= 5000)   buckets.medium++;
-      else if (disc <= 10000)  buckets.large++;
-      else                     buckets.xlarge++;
+      else if (disc <= 1500)   buckets.medium++;
+      else                     buckets.large++;
 
       allDeals.push({ date: rowDateFmt, customer: custName, model: model, executive: executive, discount: disc, finalPrice: finalPrice, grossPrice: grossPrice });
       if (rowMonth) {

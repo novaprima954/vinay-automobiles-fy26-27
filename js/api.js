@@ -141,9 +141,29 @@ const API = {
   
   /**
    * Get accounts dashboard data
+   * When called from dashboard page, pass dateFilter; from accounts page, pass month
    */
-  async getAccountsDashboard(sessionId, month) {
-    return await this.call('getAccountsDashboard', { sessionId, month });
+  async getAccountsDashboard(sessionId, monthOrFilter) {
+    const isDateFilter = ['month','week','today','all'].includes(monthOrFilter) ||
+                         (monthOrFilter && monthOrFilter.indexOf('month:') === 0);
+    if (isDateFilter) {
+      return await this.call('getAccountsDashboard', { sessionId, dateFilter: monthOrFilter });
+    }
+    return await this.call('getAccountsDashboard', { sessionId, month: monthOrFilter });
+  },
+
+  /**
+   * Get executive model/accessory breakdown
+   */
+  async getExecutiveBreakdown(executiveName, breakdownType, dateFilter) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return await this.call('getExecutiveBreakdown', {
+      sessionId: session.sessionId,
+      executiveName: executiveName,
+      breakdownType: breakdownType,
+      dateFilter: dateFilter || ''
+    });
   },
 
   /**

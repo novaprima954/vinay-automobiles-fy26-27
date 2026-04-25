@@ -7,8 +7,10 @@ let currentSessionId = null;
 let currentFilter = 'month'; // Default to 'This Month'
 let dashboardData = null;
 let discountUnlocked = false; // persists within session so filter changes don't re-lock
-let discountExcludeApache = false; // Apache toggle state
-let lastDiscountData = null;  // cached discount data for re-render on toggle
+let discountExcludeApache = false;         // Apache toggle state (admin)
+let lastDiscountData = null;               // cached discount data for re-render on toggle (admin)
+let discountExcludeApacheAccounts = false; // Apache toggle state (accounts)
+let lastAccountsDiscountData = null;       // cached discount data for accounts
 
 document.addEventListener('DOMContentLoaded', async function() {
   console.log('=== DASHBOARD PAGE ===');
@@ -417,6 +419,55 @@ function renderAccountsDashboard(data) {
 }
 
 /**
+ * Toggle Apache filter on accounts discount exec table
+ */
+function toggleApacheFilterAccounts() {
+  discountExcludeApacheAccounts = !discountExcludeApacheAccounts;
+  if (lastAccountsDiscountData) renderAccountsDiscountExecTable(lastAccountsDiscountData);
+}
+
+/**
+ * Render accounts discount exec table with Apache toggle
+ */
+function renderAccountsDiscountExecTable(d) {
+  const container = document.getElementById('acctDiscountContent');
+  if (!container) return;
+  const fmt = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
+  const execData = discountExcludeApacheAccounts
+    ? (d.byExecutiveNoApache || d.byExecutive || [])
+    : (d.byExecutive || []);
+
+  const rows = execData.length > 0 ? execData.map(function(e) {
+    return '<tr style="border-bottom:1px solid #f0f0f0;">' +
+      '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + e.deals + '</td>' +
+      '<td style="padding:8px;text-align:right;color:#dc3545;font-weight:600;">' + fmt(e.totalDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(e.avgDiscount) + '</td>' +
+      '<td style="padding:8px;text-align:right;">' + fmt(e.maxDiscount) + '</td>' +
+      '</tr>';
+  }).join('') : '<tr><td colspan="5" style="padding:15px;text-align:center;color:#999;">No discount data in this period</td></tr>';
+
+  container.innerHTML =
+    '<div style="margin-bottom:10px;">' +
+      '<label onclick="toggleApacheFilterAccounts()" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;background:#f8f9fa;padding:4px 10px;border-radius:20px;border:1px solid #ddd;user-select:none;">' +
+        '<span style="font-size:12px;color:#666;">Excl. Apache</span>' +
+        '<div style="width:36px;height:20px;background:' + (discountExcludeApacheAccounts ? '#667eea' : '#ccc') + ';border-radius:10px;position:relative;flex-shrink:0;">' +
+          '<div style="position:absolute;top:2px;left:' + (discountExcludeApacheAccounts ? '16' : '2') + 'px;width:16px;height:16px;background:white;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>' +
+        '</div>' +
+      '</label>' +
+    '</div>' +
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead><tr style="background:#f8f9fa;">' +
+      '<th style="padding:8px;text-align:left;border-bottom:2px solid #dee2e6;">Executive</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Deals</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Total Disc</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Avg</th>' +
+      '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Max</th>' +
+    '</tr></thead>' +
+    '<tbody>' + rows + '</tbody></table></div>';
+}
+
+/**
  * Load Discount by Executive for Accounts dashboard (no password, exec table only)
  */
 async function loadAccountsDiscountByExec() {
@@ -425,30 +476,8 @@ async function loadAccountsDiscountByExec() {
   try {
     const response = await API.call('getDiscountAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
     if (response.success) {
-      const fmt = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
-      const execData = response.data.byExecutive || [];
-      if (execData.length === 0) {
-        container.innerHTML = '<div style="color:#999;text-align:center;padding:15px;">No discount data in this period</div>';
-        return;
-      }
-      const rows = execData.map(function(e) {
-        return '<tr style="border-bottom:1px solid #f0f0f0;">' +
-          '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
-          '<td style="padding:8px;text-align:right;">' + e.deals + '</td>' +
-          '<td style="padding:8px;text-align:right;color:#dc3545;font-weight:600;">' + fmt(e.totalDiscount) + '</td>' +
-          '<td style="padding:8px;text-align:right;">' + fmt(e.avgDiscount) + '</td>' +
-          '<td style="padding:8px;text-align:right;">' + fmt(e.maxDiscount) + '</td>' +
-          '</tr>';
-      }).join('');
-      container.innerHTML = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">' +
-        '<thead><tr style="background:#f8f9fa;">' +
-          '<th style="padding:8px;text-align:left;border-bottom:2px solid #dee2e6;">Executive</th>' +
-          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Deals</th>' +
-          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Total Disc</th>' +
-          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Avg</th>' +
-          '<th style="padding:8px;text-align:right;border-bottom:2px solid #dee2e6;">Max</th>' +
-        '</tr></thead>' +
-        '<tbody>' + rows + '</tbody></table></div>';
+      lastAccountsDiscountData = response.data;
+      renderAccountsDiscountExecTable(response.data);
     } else {
       container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
     }
@@ -1161,9 +1190,8 @@ function renderDiscountAnalysis(d) {
   const bucketsHTML = [
     { label: 'No Discount (₹0)',   count: d.buckets.zero,   color: '#4CAF50' },
     { label: '₹1 – ₹1,000',        count: d.buckets.small,  color: '#2196F3' },
-    { label: '₹1,001 – ₹5,000',    count: d.buckets.medium, color: '#FF9800' },
-    { label: '₹5,001 – ₹10,000',   count: d.buckets.large,  color: '#F44336' },
-    { label: 'Above ₹10,000',      count: d.buckets.xlarge, color: '#9C27B0' }
+    { label: '₹1,001 – ₹1,500',    count: d.buckets.medium, color: '#FF9800' },
+    { label: 'Above ₹1,500',       count: d.buckets.large,  color: '#F44336' }
   ].map(function(b) {
     var bp = d.totalDeals > 0 ? Math.round((b.count / d.totalDeals) * 100) : 0;
     return '<div style="margin-bottom:10px;">' +
