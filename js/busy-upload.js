@@ -261,6 +261,161 @@ function buildVSeriesExcel(records) {
 }
 
 // ==========================================
+// HARITA INSURANCE EXPORT (frontend-only)
+// Input: RazorPay statement xlsx
+// Col J=Date, Col K=Narration, Col R=AccName, Col V=Amount
+// ==========================================
+
+async function generateHaritaInsuranceExport() {
+  const fileInput  = document.getElementById('harita_file');
+  const startInput = document.getElementById('harita_startVoucher');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    showStatus('harita', 'Please select a file.', 'error'); return;
+  }
+  const startVoucher = parseInt(startInput.value, 10);
+  if (isNaN(startVoucher) || startVoucher < 1) {
+    showStatus('harita', 'Please enter a valid starting voucher number.', 'error'); return;
+  }
+
+  showStatus('harita', '⏳ Processing file...', 'info');
+  document.getElementById('harita_generateBtn').disabled = true;
+
+  try {
+    const ab = await fileInput.files[0].arrayBuffer();
+    const wb = XLSX.read(ab, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // Row 0 is header — start from row 1
+    const records = [];
+    for (var i = 1; i < rawData.length; i++) {
+      var row = rawData[i];
+      // Skip empty rows (no date and no acc name)
+      var dateVal = row[9];  // Col J
+      var accName = (row[17] || '').toString().trim(); // Col R
+      if (!dateVal && !accName) continue;
+
+      records.push({
+        date:      formatDateDDMMYYYY(dateVal),
+        narration: (row[10] || '').toString().trim(), // Col K
+        accName:   accName,
+        amount:    row[21] || ''                       // Col V
+      });
+    }
+
+    document.getElementById('harita_generateBtn').disabled = false;
+
+    if (records.length === 0) {
+      showStatus('harita', 'No data rows found in file.', 'error'); return;
+    }
+
+    buildHaritaExcel(records, startVoucher);
+    showStatus('harita', '✅ Downloaded — ' + records.length + ' transactions (' + (records.length * 2) + ' rows)', 'success');
+
+  } catch(e) {
+    document.getElementById('harita_generateBtn').disabled = false;
+    showStatus('harita', 'Error: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+function formatDateDDMMYYYY(val) {
+  if (!val && val !== 0) return '';
+
+  // JS Date object (from cellDates: true)
+  if (val instanceof Date) {
+    return String(val.getDate()).padStart(2, '0') + '/' +
+           String(val.getMonth() + 1).padStart(2, '0') + '/' +
+           val.getFullYear();
+  }
+
+  // Excel date serial number
+  if (typeof val === 'number') {
+    try {
+      var parsed = XLSX.SSF.parse_date_code(val);
+      return String(parsed.d).padStart(2, '0') + '/' +
+             String(parsed.m).padStart(2, '0') + '/' + parsed.y;
+    } catch(e) {}
+  }
+
+  // String — handle M/D/YYYY or MM/DD/YYYY
+  var str = val.toString().trim();
+  var mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (mdy) {
+    // Assume M/D/YYYY (US format from RazorPay)
+    return String(mdy[2]).padStart(2, '0') + '/' +
+           String(mdy[1]).padStart(2, '0') + '/' + mdy[3];
+  }
+
+  // Fallback: try native Date parse
+  try {
+    var d = new Date(str);
+    if (!isNaN(d)) {
+      return String(d.getDate()).padStart(2, '0') + '/' +
+             String(d.getMonth() + 1).padStart(2, '0') + '/' +
+             d.getFullYear();
+    }
+  } catch(e) {}
+
+  return str; // return as-is if all parsing fails
+}
+
+function buildHaritaExcel(records, startVoucher) {
+  var outputRows = [];
+
+  // Header row
+  outputRows.push([
+    'VCH Series', 'Voucher Date', 'Voucher Number', 'GST Nature',
+    'Acc Name', 'Amount DR', 'Amount CR', 'Short Narration'
+  ]);
+
+  records.forEach(function(r, i) {
+    var voucherNo = startVoucher + i;
+
+    // Row 1: main DR entry
+    outputRows.push([
+      'RTO/INSU',       // A: VCH Series
+      r.date,           // B: Voucher Date
+      voucherNo,        // C: Voucher Number
+      'Not Applicable', // D: GST Nature
+      r.accName,        // E: Acc Name (from col R)
+      r.amount,         // F: Amount DR
+      '',               // G: Amount CR (blank)
+      r.narration       // H: Short Narration
+    ]);
+
+    // Row 2: HARITA INSURANCE CR entry
+    outputRows.push([
+      '',               // A
+      '',               // B
+      '',               // C
+      '',               // D
+      'HARITA INSURANCE', // E: Acc Name
+      '',               // F: Amount DR (blank)
+      r.amount,         // G: Amount CR
+      r.narration       // H: Short Narration
+    ]);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(outputRows);
+  ws['!cols'] = [
+    { wch: 12 }, // A
+    { wch: 13 }, // B
+    { wch: 16 }, // C
+    { wch: 16 }, // D
+    { wch: 28 }, // E
+    { wch: 12 }, // F
+    { wch: 12 }, // G
+    { wch: 26 }  // H
+  ];
+
+  var outWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(outWb, ws, 'Harita Insurance');
+  XLSX.writeFile(outWb, 'Harita_Insurance_Export_' + todayDateSuffix() + '.xlsx');
+}
+
+// ==========================================
 // NAVIGATION
 // ==========================================
 

@@ -191,6 +191,28 @@
       </div>
     </div>
 
+    <!-- Harita Insurance Export -->
+    <div class="card">
+      <div class="card-header">🏥 Harita Insurance Export</div>
+      <div class="card-body">
+
+        <div class="form-group">
+          <label>Upload RazorPay Statement File (.xlsx / .xls)</label>
+          <input type="file" id="harita_file" accept=".xlsx,.xls,.csv"
+            style="width:100%;padding:10px 12px;border:2px dashed #ccc;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fafafa;cursor:pointer;">
+        </div>
+
+        <div class="form-group">
+          <label>Starting Voucher Number</label>
+          <input type="number" id="harita_startVoucher" placeholder="e.g. 1" min="1"
+            style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;">
+        </div>
+
+        <button class="btn-generate" id="harita_generateBtn" onclick="generateHaritaInsuranceExport()">⬇️ Process &amp; Download Excel</button>
+        <div id="harita_statusMsg" class="status-msg"></div>
+      </div>
+    </div>
+
   </div>
 
   <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
