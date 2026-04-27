@@ -7586,7 +7586,8 @@ function getFinancierData(params, sessionId) {
         amountReceived:  row[14] !== '' && row[14] !== null && row[14] !== undefined ? row[14] : '',
         receivedDate:    fmtDateInput(row[15]),
         doDate:          fmtDateInput(row[16]),
-        doNumber:        row[17] || ''
+        doNumber:        row[17] || '',
+        proposalNo:      row[21] || ''
       });
     }
 
@@ -7606,7 +7607,7 @@ function saveFinancierData(params, sessionId) {
       return { success: false, message: 'Access denied' };
     }
 
-    const { invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber } = params;
+    const { invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber, proposalNo } = params;
     if (!invoiceNo) return { success: false, message: 'Invoice No is required' };
 
     const sheet = getSheet('HSRP');
@@ -7628,6 +7629,7 @@ function saveFinancierData(params, sessionId) {
     sheet.getRange(targetRow, 16).setValue(receivedDate || '');
     sheet.getRange(targetRow, 17).setValue(doDate       || '');
     sheet.getRange(targetRow, 18).setValue(doNumber     || '');
+    sheet.getRange(targetRow, 22).setValue(proposalNo   || '');
     SpreadsheetApp.flush();
 
     return { success: true, message: 'Saved successfully' };
@@ -7674,6 +7676,7 @@ function batchSaveFinancierData(params, sessionId) {
       sheet.getRange(targetRow, 16).setValue(rec.receivedDate || '');
       sheet.getRange(targetRow, 17).setValue(rec.doDate       || '');
       sheet.getRange(targetRow, 18).setValue(rec.doNumber     || '');
+      sheet.getRange(targetRow, 22).setValue(rec.proposalNo   || '');
       saved++;
     }
 

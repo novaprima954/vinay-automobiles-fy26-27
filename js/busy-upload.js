@@ -375,9 +375,9 @@ function buildHaritaExcel(records, startVoucher) {
 
     // Row 1: main DR entry
     outputRows.push([
-      'RTO/INSU',       // A: VCH Series
-      r.date,           // B: Voucher Date
-      voucherNo,        // C: Voucher Number
+      'RTO/INSU',           // A: VCH Series
+      r.date,               // B: Voucher Date
+      'INS/' + voucherNo,   // C: Voucher Number
       'Not Applicable', // D: GST Nature
       r.accName,        // E: Acc Name (from col R)
       r.amount,         // F: Amount DR

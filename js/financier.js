@@ -211,7 +211,7 @@ function renderTable(data) {
   const tbody = document.getElementById('financierBody');
 
   if (!data || data.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:40px;color:#666;">No records found</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16" style="text-align:center;padding:40px;color:#666;">No records found</td></tr>';
     return;
   }
 
@@ -228,6 +228,7 @@ function renderTable(data) {
     html += '<td style="white-space:nowrap;font-weight:600;">' + (invoiceStr || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.invoiceDate || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.customerName || '—') + '</td>';
+    html += '<td><input type="text"   id="propno-'  + idx + '" value="' + (record.proposalNo   || '') + '" style="' + inputStyle() + 'min-width:110px;" placeholder="Proposal No"></td>';
     html += '<td><input type="text"   id="dono-'    + idx + '" value="' + (record.doNumber     || '') + '" style="' + inputStyle() + 'min-width:90px;" placeholder="DO No"></td>';
     html += '<td><input type="number" id="disb-' + idx + '" value="' + (record.disbursalAmount !== '' && record.disbursalAmount !== null && record.disbursalAmount !== undefined ? record.disbursalAmount : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
     html += '<td><input type="number" id="rcvd-' + idx + '" value="' + (record.amountReceived  !== '' && record.amountReceived  !== null && record.amountReceived  !== undefined ? record.amountReceived  : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
@@ -238,6 +239,7 @@ function renderTable(data) {
     html += '<td style="white-space:nowrap;">' + (record.financier || '—') + '</td>';
     html += '<td style="text-align:center;font-weight:700;white-space:nowrap;" id="diff-' + idx + '">' + diffText + '</td>';
     html += '<td style="text-align:center;"><button id="savebtn-' + idx + '" onclick="saveRow(' + idx + ')" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button></td>';
+    // (Mobile=cells[9], Model=cells[10], RefCust=cells[11], Financier=cells[12], Diff=cells[13], Save=cells[14])
     html += '</tr>';
   });
 
@@ -271,6 +273,7 @@ async function saveRow(idx) {
   const receivedDate = document.getElementById('rcvdate-' + idx).value.trim();
   const doDate       = row.getAttribute('data-dodate') || '';
   const doNumber     = document.getElementById('dono-'    + idx).value.trim();
+  const proposalNo   = document.getElementById('propno-'  + idx).value.trim();
 
   let disbursalAmount = '';
   let amountReceived  = '';
@@ -291,7 +294,7 @@ async function saveRow(idx) {
   try {
     const res = await API.call('saveFinancierData', {
       sessionId: session.sessionId,
-      invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber
+      invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber, proposalNo
     });
     if (res.success) {
       showMessage('Saved — Invoice ' + invoiceNo, 'success');
@@ -326,15 +329,16 @@ async function saveAllRows() {
     const receivedDate       = (document.getElementById('rcvdate-' + idx) || {}).value || '';
     const doDate             = row.getAttribute('data-dodate') || '';
     const doNumber           = (document.getElementById('dono-'    + idx) || {}).value || '';
+    const proposalNo         = (document.getElementById('propno-'  + idx) || {}).value || '';
 
     // Only include rows with at least one field filled
-    if (!disbursalAmountRaw && !amountReceivedRaw && !receivedDate && !doNumber) return;
+    if (!disbursalAmountRaw && !amountReceivedRaw && !receivedDate && !doNumber && !proposalNo) return;
 
     toSave.push({
       invoiceNo,
       disbursalAmount: disbursalAmountRaw !== '' ? (parseFloat(disbursalAmountRaw) || '') : '',
       amountReceived:  amountReceivedRaw  !== '' ? (parseFloat(amountReceivedRaw)  || '') : '',
-      receivedDate, doDate, doNumber
+      receivedDate, doDate, doNumber, proposalNo
     });
   });
 
@@ -370,15 +374,16 @@ function exportToExcel() {
   const rows = document.querySelectorAll('tr[id^="frow-"]');
   if (rows.length === 0) { showMessage('No data to export.', 'error'); return; }
 
-  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'DO Number', 'Disbursal Amount', 'Amount Received', 'Received Date', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'Difference']];
+  const wsData = [['Sr No', 'Invoice No', 'Invoice Date', 'Customer Name', 'Proposal Number', 'DO Number', 'Disbursal Amount', 'Amount Received', 'Received Date', 'Mobile', 'Model', 'Ref Customer', 'Financier', 'Difference']];
 
   rows.forEach(function(row) {
     const idx = row.id.replace('frow-', '');
     const cells = row.querySelectorAll('td');
-    const disbVal  = (document.getElementById('disb-'    + idx) || {}).value || '';
-    const rcvdVal  = (document.getElementById('rcvd-'    + idx) || {}).value || '';
-    const rcvDate  = (document.getElementById('rcvdate-' + idx) || {}).value || '';
-    const donoVal  = (document.getElementById('dono-'    + idx) || {}).value || '';
+    const propnoVal = (document.getElementById('propno-'  + idx) || {}).value || '';
+    const donoVal   = (document.getElementById('dono-'    + idx) || {}).value || '';
+    const disbVal   = (document.getElementById('disb-'    + idx) || {}).value || '';
+    const rcvdVal   = (document.getElementById('rcvd-'    + idx) || {}).value || '';
+    const rcvDate   = (document.getElementById('rcvdate-' + idx) || {}).value || '';
     const d = parseFloat(disbVal);
     const r = parseFloat(rcvdVal);
     const diff = (!isNaN(d) && disbVal !== '' ? d : 0) - (!isNaN(r) && rcvdVal !== '' ? r : 0);
@@ -388,15 +393,16 @@ function exportToExcel() {
       cells[0].textContent.trim(),   // Sr No
       cells[1].textContent.trim(),   // Invoice No
       cells[2].textContent.trim(),   // Invoice Date
-      cells[3].textContent.trim(),   // Customer
+      cells[3].textContent.trim(),   // Customer Name
+      propnoVal,                     // Proposal Number
       donoVal,                       // DO Number
       disbVal  !== '' ? parseFloat(disbVal)  : '',
       rcvdVal  !== '' ? parseFloat(rcvdVal)  : '',
       rcvDate,
-      cells[8].textContent.trim(),   // Mobile
-      cells[9].textContent.trim(),   // Model
-      cells[10].textContent.trim(),  // Ref Customer
-      cells[11].textContent.trim(),  // Financier
+      cells[9].textContent.trim(),   // Mobile (shifted +1)
+      cells[10].textContent.trim(),  // Model  (shifted +1)
+      cells[11].textContent.trim(),  // Ref Customer (shifted +1)
+      cells[12].textContent.trim(),  // Financier (shifted +1)
       diffDisplay
     ]);
   });
@@ -405,7 +411,7 @@ function exportToExcel() {
   const ws = XLSX.utils.aoa_to_sheet(wsData);
 
   // Column widths
-  ws['!cols'] = [6,14,14,24,14,20,18,20,16,16,14,14,14,14].map(function(w){ return {wch: w}; });
+  ws['!cols'] = [6,14,14,24,18,14,20,18,14,16,16,14,14,14].map(function(w){ return {wch: w}; });
 
   XLSX.utils.book_append_sheet(wb, ws, 'Financier Details');
   XLSX.writeFile(wb, 'Financier_Details_' + new Date().toISOString().split('T')[0] + '.xlsx');
