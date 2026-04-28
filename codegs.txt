@@ -7632,6 +7632,8 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
     function round2(n) { return Math.round(n * 100) / 100; }
 
     const records = [];
+    var dbgFiltered = 0, dbgNoFrame = 0, dbgNoData = 0, dbgNoPM = 0, dbgNoAcc = 0;
+    var dbgSampleFrames = [], dbgSampleModels = [], dbgPMKeys = Object.keys(priceMap).slice(0, 5);
 
     for (var i = 1; i < hsrpData.length; i++) {
       var row = hsrpData[i];
@@ -7643,7 +7645,7 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
       var frameNo      = (row[6] || '').toString().trim();
       var modelName    = (row[9] || '').toString().trim();
 
-      if (!invoiceNo || !frameNo) continue;
+      if (!invoiceNo || !frameNo) { dbgNoFrame++; continue; }
 
       // Apply date / invoice filter
       if (filterType === 'date') {
@@ -7657,13 +7659,18 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
       }
 
+      dbgFiltered++;
+      if (dbgSampleFrames.length < 3) dbgSampleFrames.push(frameNo);
+      if (dbgSampleModels.length < 3) dbgSampleModels.push(modelName);
+
       var dl = frameIndex[frameNo.toLowerCase()];
-      if (!dl) continue;  // no accessories data for this invoice
+      if (!dl) { dbgNoData++; continue; }
 
       var pm = lookupPrice(modelName);
-      if (!pm) continue;  // no price master entry for this model
+      if (!pm) { dbgNoPM++; continue; }
 
-      var fmtInvDate = fmtDate(invoiceDate);
+      var fmtInvDate  = fmtDate(invoiceDate);
+      var prevCount   = records.length;
 
       // Accessory definitions: [dataValue, itemLabel, priceFromMaster]
       var accList = [
@@ -7715,9 +7722,23 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
           amount:       pm.serviceCharge
         });
       }
+
+      if (records.length === prevCount) dbgNoAcc++; // invoice matched but produced no rows
     }
 
-    return { success: true, data: records, count: records.length };
+    var debug = {
+      filtered: dbgFiltered,
+      noFrameInHSRP: dbgNoFrame,
+      noDataSheetMatch: dbgNoData,
+      noPriceMasterMatch: dbgNoPM,
+      noAccessoriesTaken: dbgNoAcc,
+      sampleHSRPFrames: dbgSampleFrames,
+      sampleHSRPModels: dbgSampleModels,
+      samplePMKeys: dbgPMKeys
+    };
+    Logger.log('getStdAccessoriesExportData debug: ' + JSON.stringify(debug));
+
+    return { success: true, data: records, count: records.length, debug: debug };
 
   } catch(e) {
     Logger.log('getStdAccessoriesExportData error: ' + e.toString());

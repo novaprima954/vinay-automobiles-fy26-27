@@ -281,7 +281,22 @@ async function generateStdAccessoriesExport() {
     document.getElementById('std_generateBtn').disabled = false;
 
     if (!response.success) { showStatus('std', '⚠️ ' + (response.message || 'Failed'), 'error'); return; }
-    if (!response.data || response.data.length === 0) { showStatus('std', 'No accessory records found.', 'error'); return; }
+    if (!response.data || response.data.length === 0) {
+      var d = response.debug || {};
+      var msg = 'No records found. ';
+      if (d.filtered !== undefined) {
+        msg += 'Invoices in range: ' + d.filtered + '. ';
+        if (d.noFrameInHSRP)       msg += 'No frame: '         + d.noFrameInHSRP      + '. ';
+        if (d.noDataSheetMatch)    msg += 'No Data sheet row: ' + d.noDataSheetMatch   + '. ';
+        if (d.noPriceMasterMatch)  msg += 'No PriceMaster: '   + d.noPriceMasterMatch + '. ';
+        if (d.noAccessoriesTaken)  msg += 'No accessories: '   + d.noAccessoriesTaken + '. ';
+        if (d.sampleHSRPModels && d.sampleHSRPModels.length)
+          msg += 'Models: [' + d.sampleHSRPModels.join(', ') + ']. ';
+        if (d.samplePMKeys && d.samplePMKeys.length)
+          msg += 'PM keys: [' + d.samplePMKeys.join(', ') + '].';
+      }
+      showStatus('std', msg, 'error'); return;
+    }
 
     buildStdAccessoriesExcel(response.data);
     showStatus('std', '✅ Downloaded — ' + response.data.length + ' rows', 'success');
