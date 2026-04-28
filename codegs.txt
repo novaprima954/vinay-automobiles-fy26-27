@@ -7554,8 +7554,9 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
     // Key: lowercased "model variant" (or just "model" as fallback)
     const pmSheet = getSheet('PriceMaster');
     const pmData  = pmSheet.getDataRange().getValues();
-    const priceMap = {};      // full key  → priceEntry
-    const priceMapModel = {}; // model-only key → priceEntry (fallback)
+    const priceMap        = {}; // "model variant" lowercase → entry
+    const priceMapVariant = {}; // variant-only lowercase → entry (fallback)
+    const priceMapModel   = {}; // model-only lowercase → entry (fallback)
 
     for (var pi = 1; pi < pmData.length; pi++) {
       var pr = pmData[pi];
@@ -7577,27 +7578,35 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         backRest:      parseFloat(pr[17]) || 0
       };
 
-      var fullKey  = (pmVariant ? pmModel + ' ' + pmVariant : pmModel).toLowerCase();
-      var modelKey = pmModel.toLowerCase();
+      var fullKey    = (pmModel + (pmVariant ? ' ' + pmVariant : '')).toLowerCase();
+      var variantKey = pmVariant.toLowerCase();
+      var modelKey   = pmModel.toLowerCase();
       priceMap[fullKey] = entry;
+      if (pmVariant && !priceMapVariant[variantKey]) priceMapVariant[variantKey] = entry;
       if (!priceMapModel[modelKey]) priceMapModel[modelKey] = entry;
     }
 
+    // Look up PriceMaster using Data sheet col G model name
     function lookupPrice(modelName) {
+      if (!modelName) return null;
       var mn = modelName.toLowerCase();
-      // 1. Exact full key match
-      if (priceMap[mn]) return priceMap[mn];
-      // 2. Model-only key match
-      if (priceMapModel[mn]) return priceMapModel[mn];
-      // 3. PriceMaster full key is contained in modelName (e.g. "Activa 6G DLX" contains "activa 6g dlx")
+      if (priceMap[mn])        return priceMap[mn];        // exact full match
+      if (priceMapVariant[mn]) return priceMapVariant[mn]; // variant-only match
+      if (priceMapModel[mn])   return priceMapModel[mn];   // model-only match
+      // partial contains match
       var keys = Object.keys(priceMap);
       for (var k = 0; k < keys.length; k++) {
         if (mn.indexOf(keys[k]) !== -1 || keys[k].indexOf(mn) !== -1) return priceMap[keys[k]];
       }
+      // partial variant match
+      var vkeys = Object.keys(priceMapVariant);
+      for (var v = 0; v < vkeys.length; v++) {
+        if (mn.indexOf(vkeys[v]) !== -1 || vkeys[v].indexOf(mn) !== -1) return priceMapVariant[vkeys[v]];
+      }
       return null;
     }
 
-    // --- Build Data sheet frame index ---
+    // --- Build Data sheet frame index (col BI=60 for frame, col G=6 for model) ---
     const dataSheet = getSheet(CONFIG.SHEETS.DATA);
     const dataRows  = dataSheet.getDataRange().getValues();
     const frameIndex = {};
@@ -7606,6 +7615,7 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
       var fn = (dr[60] || '').toString().trim();
       if (!fn) continue;
       frameIndex[fn.toLowerCase()] = {
+        modelName:  (dr[6]  || '').toString().trim(), // col G = variant/model for PriceMaster
         guard:      (dr[12] || '').toString().trim(),
         grip:       (dr[13] || '').toString().trim(),
         seatCover:  (dr[14] || '').toString().trim(),
@@ -7631,21 +7641,20 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
 
     function round2(n) { return Math.round(n * 100) / 100; }
 
-    const records = [];
-    var dbgFiltered = 0, dbgNoFrame = 0, dbgNoData = 0, dbgNoPM = 0, dbgNoAcc = 0;
-    var dbgSampleFrames = [], dbgSampleModels = [], dbgPMKeys = Object.keys(priceMap).slice(0, 5);
+    const records      = []; // VA customer rows (individual accessories)
+    const nonVaInvoices = []; // non-VA invoices needing manual amount entry
 
     for (var i = 1; i < hsrpData.length; i++) {
       var row = hsrpData[i];
       if (!row[0]) continue;
 
-      var invoiceNo    = (row[1] || '').toString().trim();
+      var invoiceNo    = (row[1]  || '').toString().trim();
       var invoiceDate  = row[2];
-      var customerName = (row[5] || '').toString().trim();
-      var frameNo      = (row[6] || '').toString().trim();
-      var modelName    = (row[9] || '').toString().trim();
+      var customerName = (row[5]  || '').toString().trim();
+      var frameNo      = (row[6]  || '').toString().trim();
+      var refCustomer  = (row[8]  || '').toString().trim();
 
-      if (!invoiceNo || !frameNo) { dbgNoFrame++; continue; }
+      if (!invoiceNo) continue;
 
       // Apply date / invoice filter
       if (filterType === 'date') {
@@ -7659,20 +7668,38 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
       }
 
-      dbgFiltered++;
-      if (dbgSampleFrames.length < 3) dbgSampleFrames.push(frameNo);
-      if (dbgSampleModels.length < 3) dbgSampleModels.push(modelName);
+      var fmtInvDate = fmtDate(invoiceDate);
 
+      // --- Non-VA customer: no Data sheet entry expected; ask user for manual amounts ---
+      var isVinay = refCustomer.toLowerCase().indexOf('vinay automobiles') !== -1;
+      if (!isVinay || !frameNo) {
+        nonVaInvoices.push({
+          invoiceNo:    invoiceNo,
+          invoiceDate:  fmtInvDate,
+          customerName: customerName,
+          refCustomer:  refCustomer
+        });
+        continue;
+      }
+
+      // --- VA customer: look up Data sheet by frame number ---
       var dl = frameIndex[frameNo.toLowerCase()];
-      if (!dl) { dbgNoData++; continue; }
+      if (!dl) {
+        // Frame not found in Data sheet — treat as non-VA for manual entry
+        nonVaInvoices.push({
+          invoiceNo:    invoiceNo,
+          invoiceDate:  fmtInvDate,
+          customerName: customerName,
+          refCustomer:  refCustomer
+        });
+        continue;
+      }
 
-      var pm = lookupPrice(modelName);
-      if (!pm) { dbgNoPM++; continue; }
+      // --- Look up PriceMaster using Data sheet col G model name ---
+      var pm = lookupPrice(dl.modelName);
+      if (!pm) continue; // no pricing found, skip silently
 
-      var fmtInvDate  = fmtDate(invoiceDate);
-      var prevCount   = records.length;
-
-      // Accessory definitions: [dataValue, itemLabel, priceFromMaster]
+      // --- Emit one row per accessory taken ---
       var accList = [
         { val: dl.guard,      label: 'Guard',        price: pm.guard      },
         { val: dl.grip,       label: 'Grip Cover',   price: pm.grip       },
@@ -7722,23 +7749,9 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
           amount:       pm.serviceCharge
         });
       }
-
-      if (records.length === prevCount) dbgNoAcc++; // invoice matched but produced no rows
     }
 
-    var debug = {
-      filtered: dbgFiltered,
-      noFrameInHSRP: dbgNoFrame,
-      noDataSheetMatch: dbgNoData,
-      noPriceMasterMatch: dbgNoPM,
-      noAccessoriesTaken: dbgNoAcc,
-      sampleHSRPFrames: dbgSampleFrames,
-      sampleHSRPModels: dbgSampleModels,
-      samplePMKeys: dbgPMKeys
-    };
-    Logger.log('getStdAccessoriesExportData debug: ' + JSON.stringify(debug));
-
-    return { success: true, data: records, count: records.length, debug: debug };
+    return { success: true, vaData: records, nonVaInvoices: nonVaInvoices };
 
   } catch(e) {
     Logger.log('getStdAccessoriesExportData error: ' + e.toString());

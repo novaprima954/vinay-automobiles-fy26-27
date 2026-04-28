@@ -267,12 +267,17 @@ function buildVSeriesExcel(records) {
 // STANDARD ACCESSORIES EXPORT
 // ==========================================
 
+// Cached fetch results
+var _stdVaData      = [];
+var _stdNonVaInvoices = [];
+
 async function generateStdAccessoriesExport() {
   const params = getFilterParams('std');
   if (params.error) { showStatus('std', params.error, 'error'); return; }
 
-  showStatus('std', '⏳ Fetching data...', 'info');
+  showStatus('std', '⏳ Fetching invoices...', 'info');
   document.getElementById('std_generateBtn').disabled = true;
+  document.getElementById('std_nonVaSection').style.display = 'none';
 
   try {
     const response = await API.getStdAccessoriesExportData(
@@ -281,32 +286,100 @@ async function generateStdAccessoriesExport() {
     document.getElementById('std_generateBtn').disabled = false;
 
     if (!response.success) { showStatus('std', '⚠️ ' + (response.message || 'Failed'), 'error'); return; }
-    if (!response.data || response.data.length === 0) {
-      var d = response.debug || {};
-      var msg = 'No records found. ';
-      if (d.filtered !== undefined) {
-        msg += 'Invoices in range: ' + d.filtered + '. ';
-        if (d.noFrameInHSRP)       msg += 'No frame: '         + d.noFrameInHSRP      + '. ';
-        if (d.noDataSheetMatch)    msg += 'No Data sheet row: ' + d.noDataSheetMatch   + '. ';
-        if (d.noPriceMasterMatch)  msg += 'No PriceMaster: '   + d.noPriceMasterMatch + '. ';
-        if (d.noAccessoriesTaken)  msg += 'No accessories: '   + d.noAccessoriesTaken + '. ';
-        if (d.sampleHSRPModels && d.sampleHSRPModels.length)
-          msg += 'Models: [' + d.sampleHSRPModels.join(', ') + ']. ';
-        if (d.samplePMKeys && d.samplePMKeys.length)
-          msg += 'PM keys: [' + d.samplePMKeys.join(', ') + '].';
-      }
-      showStatus('std', msg, 'error'); return;
+
+    _stdVaData       = response.vaData       || [];
+    _stdNonVaInvoices = response.nonVaInvoices || [];
+
+    var vaCount    = _stdVaData.length;
+    var nonVaCount = _stdNonVaInvoices.length;
+
+    if (vaCount === 0 && nonVaCount === 0) {
+      showStatus('std', 'No invoices found in this range.', 'error'); return;
     }
 
-    buildStdAccessoriesExcel(response.data);
-    showStatus('std', '✅ Downloaded — ' + response.data.length + ' rows', 'success');
+    if (nonVaCount === 0) {
+      // Only VA records — download directly
+      buildStdAccessoriesExcel(_stdVaData, []);
+      showStatus('std', '✅ Downloaded — ' + vaCount + ' accessory rows', 'success');
+      return;
+    }
+
+    // Non-VA invoices present — show manual entry form
+    renderNonVaForm(_stdNonVaInvoices);
+    document.getElementById('std_nonVaSection').style.display = 'block';
+    var msg = '✅ Fetched. VA rows: ' + vaCount + '. ';
+    msg += 'Non-VA invoices: ' + nonVaCount + ' — enter amounts below then click Download.';
+    showStatus('std', msg, 'info');
+
   } catch(e) {
     document.getElementById('std_generateBtn').disabled = false;
     showStatus('std', 'Error: ' + e.message, 'error');
   }
 }
 
-function buildStdAccessoriesExcel(records) {
+function renderNonVaForm(invoices) {
+  var iStyle = 'width:100%;padding:6px 8px;border:1.5px solid #e0e0e0;border-radius:6px;font-size:13px;box-sizing:border-box;';
+  var html = '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+  html += '<thead><tr style="background:#f0f0f0;">';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Invoice No</th>';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Date</th>';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Customer</th>';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Service Charge (₹)</th>';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Std Accessories (₹)</th>';
+  html += '</tr></thead><tbody>';
+
+  invoices.forEach(function(inv, i) {
+    html += '<tr>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;white-space:nowrap;">' + (inv.invoiceNo || '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">'                  + (inv.invoiceDate || '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;">'                                      + (inv.customerName || '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;"><input type="number" id="nonva_sc_' + i + '" min="0" placeholder="0" style="' + iStyle + '"></td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;"><input type="number" id="nonva_sa_' + i + '" min="0" placeholder="0" style="' + iStyle + '"></td>';
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('std_nonVaTable').innerHTML = html;
+}
+
+function downloadStdExcel() {
+  // Collect non-VA manual rows
+  var nonVaRows = [];
+  _stdNonVaInvoices.forEach(function(inv, i) {
+    var scVal = parseFloat((document.getElementById('nonva_sc_' + i) || {}).value) || 0;
+    var saVal = parseFloat((document.getElementById('nonva_sa_' + i) || {}).value) || 0;
+    if (scVal > 0) {
+      nonVaRows.push({
+        invoiceDate:  inv.invoiceDate,
+        invoiceNo:    inv.invoiceNo,
+        customerName: inv.customerName,
+        itemName:     'Service Charge',
+        quantity:     1,
+        unitPrice:    Math.round((scVal / 1.18) * 100) / 100,
+        amount:       scVal
+      });
+    }
+    if (saVal > 0) {
+      nonVaRows.push({
+        invoiceDate:  inv.invoiceDate,
+        invoiceNo:    inv.invoiceNo,
+        customerName: inv.customerName,
+        itemName:     'Standard Accessories',
+        quantity:     1,
+        unitPrice:    Math.round((saVal / 1.18) * 100) / 100,
+        amount:       saVal
+      });
+    }
+  });
+
+  var total = _stdVaData.length + nonVaRows.length;
+  if (total === 0) { showStatus('std', 'No data to download — enter at least one amount.', 'error'); return; }
+
+  buildStdAccessoriesExcel(_stdVaData, nonVaRows);
+  showStatus('std', '✅ Downloaded — ' + total + ' rows (' + _stdVaData.length + ' VA + ' + nonVaRows.length + ' non-VA)', 'success');
+}
+
+function buildStdAccessoriesExcel(vaRecords, nonVaRecords) {
+  var records = (vaRecords || []).concat(nonVaRecords || []);
   const header = [
     'Series',      // A
     'Date',        // B
