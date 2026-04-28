@@ -191,6 +191,31 @@
       </div>
     </div>
 
+    <!-- Standard Accessories Export -->
+    <div class="card">
+      <div class="card-header">🧩 Standard Accessories Export</div>
+      <div class="card-body">
+        <div class="filter-tabs">
+          <button class="filter-tab" data-prefix="std" data-type="date" onclick="showFilterType('std','date')">📅 By Invoice Date</button>
+          <button class="filter-tab" data-prefix="std" data-type="invoice" onclick="showFilterType('std','invoice')">🔢 By Invoice Number</button>
+        </div>
+        <div id="std_dateFilterGroup">
+          <div class="form-row">
+            <div class="form-group"><label>From Date</label><input type="date" id="std_fromDate"></div>
+            <div class="form-group"><label>To Date</label><input type="date" id="std_toDate"></div>
+          </div>
+        </div>
+        <div id="std_invoiceFilterGroup" style="display:none;">
+          <div class="form-row">
+            <div class="form-group"><label>From Invoice No</label><input type="text" id="std_fromInvoice" placeholder="e.g. VA0001"></div>
+            <div class="form-group"><label>To Invoice No</label><input type="text" id="std_toInvoice" placeholder="e.g. VA0050"></div>
+          </div>
+        </div>
+        <button class="btn-generate" id="std_generateBtn" onclick="generateStdAccessoriesExport()">⬇️ Generate &amp; Download Excel</button>
+        <div id="std_statusMsg" class="status-msg"></div>
+      </div>
+    </div>
+
     <!-- Harita Insurance Export -->
     <div class="card">
       <div class="card-header">🏥 Harita Insurance Export</div>
@@ -219,6 +244,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/busy-upload.js?v=2"></script>
+  <script src="js/busy-upload.js?v=3"></script>
 </body>
 </html>

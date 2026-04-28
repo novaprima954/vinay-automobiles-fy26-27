@@ -764,6 +764,22 @@ const API = {
     });
   },
 
+  /**
+   * Get Standard Accessories Export data (HSRP + Data sheet + PriceMaster)
+   */
+  async getStdAccessoriesExportData(filterType, fromDate, toDate, fromInvoice, toInvoice) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getStdAccessoriesExportData', {
+      sessionId:   session.sessionId,
+      filterType:  filterType  || '',
+      fromDate:    fromDate    || '',
+      toDate:      toDate      || '',
+      fromInvoice: fromInvoice || '',
+      toInvoice:   toInvoice   || ''
+    });
+  },
+
   // ==========================================
   // VEHICLE MILEAGE FUNCTIONS
   // ==========================================

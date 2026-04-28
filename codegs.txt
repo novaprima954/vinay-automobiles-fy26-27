@@ -249,6 +249,9 @@ function handleRequest(e) {
       case 'getVSeriesExportData':
         result = getVSeriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
         break;
+      case 'getStdAccessoriesExportData':
+        result = getStdAccessoriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
@@ -7515,6 +7518,209 @@ function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoi
 
   } catch(e) {
     Logger.log('getVSeriesExportData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ==========================================
+// STANDARD ACCESSORIES EXPORT
+// ==========================================
+
+/**
+ * For each filtered HSRP invoice, join to Data sheet by frame number,
+ * look up each accessory taken (Yes/qty) against PriceMaster, and
+ * return one row per accessory item + service charge if applicable.
+ *
+ * PriceMaster columns (0-indexed):
+ *   0=Model, 1=Variant, 2=ExShowroom, 3=RTO, 4=Insurance,
+ *   5=ServiceCharge, 6=MandAccessories, 7=Guard, 8=GripCover,
+ *   9=SeatCover, 10=Matin, 11=TankCover, 12=HandleHook, 13=Helmet,
+ *   14=Total, 15=RainCoverPrice, 16=BuzzerPrice, 17=BackRestPrice
+ *
+ * Data sheet accessory columns (0-indexed):
+ *   12=Guard, 13=GripCover, 14=SeatCover, 15=Matin, 16=TankCover,
+ *   17=HandleHook, 18=Helmet(1/2/No), 61=RainCover, 62=Buzzer, 63=BackRest
+ */
+function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    // --- Build PriceMaster lookup map ---
+    // Key: lowercased "model variant" (or just "model" as fallback)
+    const pmSheet = getSheet('PriceMaster');
+    const pmData  = pmSheet.getDataRange().getValues();
+    const priceMap = {};      // full key  → priceEntry
+    const priceMapModel = {}; // model-only key → priceEntry (fallback)
+
+    for (var pi = 1; pi < pmData.length; pi++) {
+      var pr = pmData[pi];
+      var pmModel   = (pr[0]  || '').toString().trim();
+      var pmVariant = (pr[1]  || '').toString().trim();
+      if (!pmModel) continue;
+
+      var entry = {
+        serviceCharge: parseFloat(pr[5])  || 0,
+        guard:         parseFloat(pr[7])  || 0,
+        grip:          parseFloat(pr[8])  || 0,
+        seatCover:     parseFloat(pr[9])  || 0,
+        matin:         parseFloat(pr[10]) || 0,
+        tankCover:     parseFloat(pr[11]) || 0,
+        handleHook:    parseFloat(pr[12]) || 0,
+        helmet:        parseFloat(pr[13]) || 0,
+        rainCover:     parseFloat(pr[15]) || 0,
+        buzzer:        parseFloat(pr[16]) || 0,
+        backRest:      parseFloat(pr[17]) || 0
+      };
+
+      var fullKey  = (pmVariant ? pmModel + ' ' + pmVariant : pmModel).toLowerCase();
+      var modelKey = pmModel.toLowerCase();
+      priceMap[fullKey] = entry;
+      if (!priceMapModel[modelKey]) priceMapModel[modelKey] = entry;
+    }
+
+    function lookupPrice(modelName) {
+      var mn = modelName.toLowerCase();
+      // 1. Exact full key match
+      if (priceMap[mn]) return priceMap[mn];
+      // 2. Model-only key match
+      if (priceMapModel[mn]) return priceMapModel[mn];
+      // 3. PriceMaster full key is contained in modelName (e.g. "Activa 6G DLX" contains "activa 6g dlx")
+      var keys = Object.keys(priceMap);
+      for (var k = 0; k < keys.length; k++) {
+        if (mn.indexOf(keys[k]) !== -1 || keys[k].indexOf(mn) !== -1) return priceMap[keys[k]];
+      }
+      return null;
+    }
+
+    // --- Build Data sheet frame index ---
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const dataRows  = dataSheet.getDataRange().getValues();
+    const frameIndex = {};
+    for (var di = 1; di < dataRows.length; di++) {
+      var dr = dataRows[di];
+      var fn = (dr[60] || '').toString().trim();
+      if (!fn) continue;
+      frameIndex[fn.toLowerCase()] = {
+        guard:      (dr[12] || '').toString().trim(),
+        grip:       (dr[13] || '').toString().trim(),
+        seatCover:  (dr[14] || '').toString().trim(),
+        matin:      (dr[15] || '').toString().trim(),
+        tankCover:  (dr[16] || '').toString().trim(),
+        handleHook: (dr[17] || '').toString().trim(),
+        helmet:     (dr[18] || '').toString().trim(),
+        rainCover:  (dr[61] || '').toString().trim(),
+        buzzer:     (dr[62] || '').toString().trim(),
+        backRest:   (dr[63] || '').toString().trim()
+      };
+    }
+
+    // --- Read & filter HSRP ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MMM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    function round2(n) { return Math.round(n * 100) / 100; }
+
+    const records = [];
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1] || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5] || '').toString().trim();
+      var frameNo      = (row[6] || '').toString().trim();
+      var modelName    = (row[9] || '').toString().trim();
+
+      if (!invoiceNo || !frameNo) continue;
+
+      // Apply date / invoice filter
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0);      if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      var dl = frameIndex[frameNo.toLowerCase()];
+      if (!dl) continue;  // no accessories data for this invoice
+
+      var pm = lookupPrice(modelName);
+      if (!pm) continue;  // no price master entry for this model
+
+      var fmtInvDate = fmtDate(invoiceDate);
+
+      // Accessory definitions: [dataValue, itemLabel, priceFromMaster]
+      var accList = [
+        { val: dl.guard,      label: 'Guard',        price: pm.guard      },
+        { val: dl.grip,       label: 'Grip Cover',   price: pm.grip       },
+        { val: dl.seatCover,  label: 'Seat Cover',   price: pm.seatCover  },
+        { val: dl.matin,      label: 'Matin',        price: pm.matin      },
+        { val: dl.tankCover,  label: 'Tank Cover',   price: pm.tankCover  },
+        { val: dl.handleHook, label: 'Handle Hook',  price: pm.handleHook },
+        { val: dl.helmet,     label: 'Helmet',       price: pm.helmet,    isHelmet: true },
+        { val: dl.rainCover,  label: 'Rain Cover',   price: pm.rainCover  },
+        { val: dl.buzzer,     label: 'Buzzer',       price: pm.buzzer     },
+        { val: dl.backRest,   label: 'Back Rest',    price: pm.backRest   }
+      ];
+
+      for (var a = 0; a < accList.length; a++) {
+        var acc = accList[a];
+        var qty = 0;
+        var dv  = acc.val.toLowerCase();
+        if (acc.isHelmet) {
+          if (dv === '2') qty = 2;
+          else if (dv === '1' || dv === 'yes') qty = 1;
+        } else {
+          if (dv === 'yes') qty = 1;
+        }
+        if (qty === 0) continue;
+        var amount = round2(acc.price * qty);
+        if (amount === 0) continue;
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     acc.label,
+          quantity:     qty,
+          unitPrice:    round2(acc.price / 1.18),
+          amount:       amount
+        });
+      }
+
+      // Service charge row (if > 0)
+      if (pm.serviceCharge > 0) {
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     'Service Charge',
+          quantity:     1,
+          unitPrice:    round2(pm.serviceCharge / 1.18),
+          amount:       pm.serviceCharge
+        });
+      }
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getStdAccessoriesExportData error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }

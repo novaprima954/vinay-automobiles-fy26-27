@@ -35,9 +35,12 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('vim_toDate').value   = ld;
   document.getElementById('vs_fromDate').value  = fd;
   document.getElementById('vs_toDate').value    = ld;
+  document.getElementById('std_fromDate').value = fd;
+  document.getElementById('std_toDate').value   = ld;
 
   showFilterType('vim', 'date');
   showFilterType('vs',  'date');
+  showFilterType('std', 'date');
 });
 
 // ==========================================
@@ -258,6 +261,93 @@ function buildVSeriesExcel(records) {
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'V Series Export');
   XLSX.writeFile(wb, 'V_Series_Export_' + todayDateSuffix() + '.xlsx');
+}
+
+// ==========================================
+// STANDARD ACCESSORIES EXPORT
+// ==========================================
+
+async function generateStdAccessoriesExport() {
+  const params = getFilterParams('std');
+  if (params.error) { showStatus('std', params.error, 'error'); return; }
+
+  showStatus('std', '⏳ Fetching data...', 'info');
+  document.getElementById('std_generateBtn').disabled = true;
+
+  try {
+    const response = await API.getStdAccessoriesExportData(
+      params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice
+    );
+    document.getElementById('std_generateBtn').disabled = false;
+
+    if (!response.success) { showStatus('std', '⚠️ ' + (response.message || 'Failed'), 'error'); return; }
+    if (!response.data || response.data.length === 0) { showStatus('std', 'No accessory records found.', 'error'); return; }
+
+    buildStdAccessoriesExcel(response.data);
+    showStatus('std', '✅ Downloaded — ' + response.data.length + ' rows', 'success');
+  } catch(e) {
+    document.getElementById('std_generateBtn').disabled = false;
+    showStatus('std', 'Error: ' + e.message, 'error');
+  }
+}
+
+function buildStdAccessoriesExcel(records) {
+  const header = [
+    'Series',      // A
+    'Date',        // B
+    'Invoice No',  // C
+    'Sale Type',   // D
+    'Party Name',  // E
+    'MC_Name',     // F
+    'Item Name',   // G
+    'Quantity',    // H
+    'Unit',        // I
+    'Price',       // J
+    'CGST %',      // K
+    'SGST %',      // L
+    'Amount'       // M
+  ];
+
+  const rows = [header];
+
+  records.forEach(function(r) {
+    rows.push([
+      'STD',                                    // A
+      r.invoiceDate,                            // B
+      'STD/' + (r.invoiceNo || '') + '/26-27',  // C
+      'GST SALES',                              // D
+      r.customerName || '',                     // E
+      'Main Store',                             // F
+      r.itemName     || '',                     // G
+      r.quantity,                               // H
+      'Pcs.',                                   // I
+      r.unitPrice,                              // J  (price master rate / 1.18)
+      9,                                        // K
+      9,                                        // L
+      r.amount                                  // M  (price master rate × qty)
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  ws['!cols'] = [
+    { wch: 8  }, // A Series
+    { wch: 14 }, // B Date
+    { wch: 22 }, // C Invoice No
+    { wch: 12 }, // D Sale Type
+    { wch: 28 }, // E Party Name
+    { wch: 12 }, // F MC_Name
+    { wch: 16 }, // G Item Name
+    { wch: 10 }, // H Quantity
+    { wch: 8  }, // I Unit
+    { wch: 12 }, // J Price
+    { wch: 8  }, // K CGST %
+    { wch: 8  }, // L SGST %
+    { wch: 12 }  // M Amount
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Std Accessories');
+  XLSX.writeFile(wb, 'Std_Accessories_Export_' + todayDateSuffix() + '.xlsx');
 }
 
 // ==========================================
