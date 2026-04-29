@@ -1499,7 +1499,19 @@ function updateAccountsRecord(sessionId, updateData) {
       sheet.getRange(targetRow, 58).setValue(updateData.priceMatched);
       Logger.log('  ✅ Saved Price Matched to BF (58): ' + updateData.priceMatched);
     }
-    
+
+    // Engine/Chassis Number → Column BH (60) — accounts can approve/correct
+    if (updateData.engineNumber !== undefined) {
+      sheet.getRange(targetRow, 60).setValue(updateData.engineNumber || '');
+      Logger.log('  ✅ Saved Engine/Chassis Number to BH (60): "' + updateData.engineNumber + '"');
+    }
+
+    // Frame Number → Column BI (61) — accounts can approve/correct
+    if (updateData.frameNumber !== undefined) {
+      sheet.getRange(targetRow, 61).setValue(updateData.frameNumber || '');
+      Logger.log('  ✅ Saved Frame Number to BI (61): "' + updateData.frameNumber + '"');
+    }
+
     SpreadsheetApp.flush();
     
     Logger.log('=== updateAccountsRecord SUCCESS ===');

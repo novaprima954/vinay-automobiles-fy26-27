@@ -427,9 +427,11 @@ async function populateDetails(record) {
   document.getElementById('protectedVariant').textContent = record.variant || '-';
   document.getElementById('protectedColour').textContent = record.colour || '-';
   document.getElementById('protectedDeliveryDate').textContent = record.deliveryDate || '-';
-  document.getElementById('protectedEngineNumber').textContent = record.engineNumber || 'Not Saved';
-  document.getElementById('protectedFrameNumber').textContent = record.frameNumber || 'Not Saved';
   document.getElementById('protectedSalesRemark').textContent = record.salesRemark || 'N/A';
+
+  // Editable engine/frame inputs (accounts can approve/correct these)
+  document.getElementById('editEngineNumber').value = record.engineNumber || '';
+  document.getElementById('editFrameNumber').value  = record.frameNumber  || '';
   
   // Editable sales fields
   document.getElementById('discount').value = record.discount || '';
@@ -715,12 +717,12 @@ async function handleUpdate(e) {
   // VALIDATION: Check Engine and Frame numbers are filled (before Account Check = Yes)
   const accountCheck = document.getElementById('accountCheck').value;
   if (accountCheck === 'Yes') {
-    // Get engine and frame numbers from window scope (set when record is loaded)
-    const engineNumber = window.currentEngineNumber || '';
-    const frameNumber = window.currentFrameNumber || '';
-    
-    if (!engineNumber || engineNumber.trim() === '' || !frameNumber || frameNumber.trim() === '') {
-      alert('❌ Engine and Frame Numbers Required!\n\nCannot mark Account Check as "Yes" because Engine Number and/or Frame Number are missing.\n\nPlease ask Sales Team to save Engine and Frame Number using the Vehicle Scanner feature.');
+    // Read from the editable input fields (accounts can fill/correct these)
+    const engineNumber = (document.getElementById('editEngineNumber').value || '').trim();
+    const frameNumber  = (document.getElementById('editFrameNumber').value  || '').trim();
+
+    if (!engineNumber || !frameNumber) {
+      alert('❌ Engine and Frame Numbers Required!\n\nCannot mark Account Check as "Yes" because Engine Number and/or Frame Number are missing.\n\nPlease enter the Engine/Chassis Number and Frame Number in the fields above.');
       return;
     }
   }
@@ -822,40 +824,84 @@ async function handleUpdate(e) {
     data.priceMatched = _pvMatched ? 'Yes' : (_pvNote ? 'No \u2014 ' + _pvNote : 'No');  // Column BF
   }
   
-  console.log('💾 Updating account record:');
+  // Attach engine/frame from the editable inputs
+  data.engineNumber = (document.getElementById('editEngineNumber').value || '').trim();
+  data.frameNumber  = (document.getElementById('editFrameNumber').value  || '').trim();
+
+  console.log('💾 Preparing account record update:');
   console.log('   Receipt No:', data.receiptNo);
+  console.log('   Engine Number:', data.engineNumber);
+  console.log('   Frame Number:', data.frameNumber);
   console.log('   Accountant Name:', data.accountantName);
-  console.log('   Financier Name:', data.financierName);
-  console.log('   Receipt No 1:', data.receiptNo1);
-  console.log('   Receipt 1 Amount:', data.receipt1Amount);
-  console.log('   Variant:', data.variant);
-  console.log('   Colour:', data.colour);
-  console.log('   Finance Commission:', data.financeComm);
-  console.log('   Price Master:', data.priceMaster);
-  console.log('   Price Matched:', data.priceMatched);
   console.log('   Full data:', data);
-  
+
+  // Show approval modal so accountant can confirm engine/frame before saving
+  window._pendingSaveData = data;
+  showApprovalModal();
+}
+
+/**
+ * Show the Frame & Chassis approval modal
+ */
+function showApprovalModal() {
+  const data = window._pendingSaveData || {};
+  document.getElementById('modalEngineNumber').value = data.engineNumber || '';
+  document.getElementById('modalFrameNumber').value  = data.frameNumber  || '';
+  const modal = document.getElementById('approvalModal');
+  modal.style.display = 'flex';
+}
+
+/**
+ * Close the approval modal without saving
+ */
+function closeApprovalModal() {
+  document.getElementById('approvalModal').style.display = 'none';
+  window._pendingSaveData = null;
+}
+
+/**
+ * Confirm the approved engine/frame numbers and proceed with saving
+ */
+async function confirmApprovalAndSave() {
+  const data = window._pendingSaveData;
+  if (!data) return;
+
+  // Read the (possibly edited) values from the modal
+  const approvedEngine = (document.getElementById('modalEngineNumber').value || '').trim();
+  const approvedFrame  = (document.getElementById('modalFrameNumber').value  || '').trim();
+
+  // Write approved values back to the form inputs and to data
+  document.getElementById('editEngineNumber').value = approvedEngine;
+  document.getElementById('editFrameNumber').value  = approvedFrame;
+  data.engineNumber = approvedEngine;
+  data.frameNumber  = approvedFrame;
+
+  // Close modal
+  document.getElementById('approvalModal').style.display = 'none';
+  window._pendingSaveData = null;
+
+  // Now save
   try {
     const updateBtn = document.getElementById('updateBtn');
     if (updateBtn) {
       updateBtn.disabled = true;
       updateBtn.textContent = '💾 Updating...';
     }
-    
+
     const sessionId = SessionManager.getSessionId();
     const response = await API.updateAccountsRecord(sessionId, data);
-    
+
     if (updateBtn) {
       updateBtn.disabled = false;
       updateBtn.textContent = '💾 Update Record';
     }
-    
+
     if (response.success) {
       showMessage('✅ Record updated successfully!', 'success');
-      
+
       // Reload dashboard
       loadDashboard();
-      
+
       // If Account Check was set to Yes, enable view-only mode
       if (data.accountCheck === 'Yes') {
         const viewOnlyBanner = document.getElementById('viewOnlyBanner');
