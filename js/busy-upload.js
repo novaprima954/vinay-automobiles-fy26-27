@@ -633,10 +633,21 @@ async function generateVahanExport() {
 function buildVahanExcel(records, startVoucher) {
   var wb = XLSX.utils.book_new();
 
-  // Build sheet data as array-of-arrays (no header row — Busy import format)
-  var outputRows = [];
+  // Build sheet data with header row
+  var outputRows = [[
+    'Voucher Series',  // A
+    'Voucher Date',    // B
+    'Voucher Number',  // C
+    'GST Nature',      // D
+    'Account Name',    // E
+    'Amount DR',       // F
+    'Amount CR',       // G
+    'Short Narration', // H
+    'Vehicle Name',    // I
+    'HP Company'       // J
+  ]];
   var voucherNo  = startVoucher;
-  var excelRow   = 1; // 1-indexed; row 1 = first data row (no headers)
+  var excelRow   = 2; // 1-indexed; row 1 = header, data starts at row 2
 
   records.forEach(function(r) {
     var voucherStr = 'RTO/' + voucherNo;
