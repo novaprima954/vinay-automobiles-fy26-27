@@ -252,6 +252,9 @@ function handleRequest(e) {
       case 'getStdAccessoriesExportData':
         result = getStdAccessoriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
         break;
+      case 'getVahanExportData':
+        result = getVahanExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
@@ -7767,6 +7770,73 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
 
   } catch(e) {
     Logger.log('getStdAccessoriesExportData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ==========================================
+// VAHAN EXPORT
+// ==========================================
+
+/**
+ * Get HSRP records for Vahan Export (RTO/INSU voucher format)
+ * Returns: invoiceNo, invoiceDate (dd-MM-yyyy), customerName, modelName, hpCompany
+ */
+function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1]  || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5]  || '').toString().trim();
+      var modelName    = (row[9]  || '').toString().trim();
+      var hpCompany    = (row[12] || '').toString().trim();
+
+      // --- Apply filter ---
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0); if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      records.push({
+        invoiceNo:    invoiceNo,
+        invoiceDate:  fmtDate(invoiceDate),
+        customerName: customerName,
+        modelName:    modelName,
+        hpCompany:    hpCompany
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getVahanExportData error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }

@@ -780,6 +780,22 @@ const API = {
     });
   },
 
+  /**
+   * Get Vahan Export data (HSRP — RTO/INSU voucher format)
+   */
+  async getVahanExportData(filterType, fromDate, toDate, fromInvoice, toInvoice) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getVahanExportData', {
+      sessionId:   session.sessionId,
+      filterType:  filterType  || '',
+      fromDate:    fromDate    || '',
+      toDate:      toDate      || '',
+      fromInvoice: fromInvoice || '',
+      toInvoice:   toInvoice   || ''
+    });
+  },
+
   // ==========================================
   // VEHICLE MILEAGE FUNCTIONS
   // ==========================================

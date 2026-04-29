@@ -35,12 +35,15 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('vim_toDate').value   = ld;
   document.getElementById('vs_fromDate').value  = fd;
   document.getElementById('vs_toDate').value    = ld;
-  document.getElementById('std_fromDate').value = fd;
-  document.getElementById('std_toDate').value   = ld;
+  document.getElementById('std_fromDate').value   = fd;
+  document.getElementById('std_toDate').value     = ld;
+  document.getElementById('vahan_fromDate').value = fd;
+  document.getElementById('vahan_toDate').value   = ld;
 
-  showFilterType('vim', 'date');
-  showFilterType('vs',  'date');
-  showFilterType('std', 'date');
+  showFilterType('vim',   'date');
+  showFilterType('vs',    'date');
+  showFilterType('std',   'date');
+  showFilterType('vahan', 'date');
 });
 
 // ==========================================
@@ -591,6 +594,106 @@ function buildHaritaExcel(records, startVoucher) {
   var outWb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(outWb, ws, 'Harita Insurance');
   XLSX.writeFile(outWb, 'Harita_Insurance_Export_' + todayDateSuffix() + '.xlsx');
+}
+
+// ==========================================
+// VAHAN EXPORT
+// ==========================================
+
+async function generateVahanExport() {
+  const params = getFilterParams('vahan');
+  if (params.error) { showStatus('vahan', params.error, 'error'); return; }
+
+  const startVoucher = parseInt(document.getElementById('vahan_startVoucher').value, 10);
+  if (!startVoucher || startVoucher < 1) {
+    showStatus('vahan', 'Please enter a valid starting voucher number.', 'error');
+    return;
+  }
+
+  showStatus('vahan', '⏳ Fetching data...', 'info');
+  document.getElementById('vahan_generateBtn').disabled = true;
+
+  try {
+    const response = await API.getVahanExportData(
+      params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice
+    );
+    document.getElementById('vahan_generateBtn').disabled = false;
+
+    if (!response.success) { showStatus('vahan', '⚠️ ' + (response.message || 'Failed'), 'error'); return; }
+    if (!response.data || response.data.length === 0) { showStatus('vahan', 'No records found.', 'error'); return; }
+
+    buildVahanExcel(response.data, startVoucher);
+    showStatus('vahan', '✅ Downloaded — ' + response.data.length + ' records', 'success');
+  } catch(e) {
+    document.getElementById('vahan_generateBtn').disabled = false;
+    showStatus('vahan', 'Error: ' + e.message, 'error');
+  }
+}
+
+function buildVahanExcel(records, startVoucher) {
+  var wb = XLSX.utils.book_new();
+
+  // Build sheet data as array-of-arrays (no header row — Busy import format)
+  var outputRows = [];
+  var voucherNo  = startVoucher;
+  var excelRow   = 1; // 1-indexed; row 1 = first data row (no headers)
+
+  records.forEach(function(r) {
+    var voucherStr = 'RTO/' + voucherNo;
+
+    // Row 1 — customer debit line
+    outputRows.push([
+      'RTO/INSU',           // A — Voucher Series
+      r.invoiceDate,        // B — Voucher Date
+      voucherStr,           // C — Voucher Number
+      'Not Applicable',     // D — GST Nature
+      r.customerName,       // E — Account Name (customer)
+      '',                   // F — Amount DR (filled manually)
+      '',                   // G — (blank on row 1)
+      '',                   // H — Short Narration
+      r.modelName,          // I — Vehicle Name
+      r.hpCompany           // J — HP Company
+    ]);
+
+    var row1ExcelRef = excelRow; // remember row number for formula
+    excelRow++;
+
+    // Row 2 — RTO TAX A/C credit line
+    outputRows.push([
+      '',                   // A
+      '',                   // B
+      '',                   // C
+      '',                   // D
+      'RTO TAX A/C',        // E — Account Name (contra)
+      '',                   // F
+      { f: 'F' + row1ExcelRef }, // G — formula =F<row1> (auto-fills when accountant fills F)
+      '',                   // H
+      '',                   // I
+      ''                    // J
+    ]);
+    excelRow++;
+
+    voucherNo++;
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(outputRows);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 12 }, // A — Voucher Series
+    { wch: 13 }, // B — Voucher Date
+    { wch: 12 }, // C — Voucher Number
+    { wch: 16 }, // D — GST Nature
+    { wch: 32 }, // E — Account Name
+    { wch: 12 }, // F — Amount DR
+    { wch: 12 }, // G — Amount CR (formula)
+    { wch: 20 }, // H — Short Narration
+    { wch: 20 }, // I — Vehicle Name
+    { wch: 18 }  // J — HP Company
+  ];
+
+  XLSX.utils.book_append_sheet(wb, ws, 'Vahan Export');
+  XLSX.writeFile(wb, 'Vahan_Export_' + todayDateSuffix() + '.xlsx');
 }
 
 // ==========================================

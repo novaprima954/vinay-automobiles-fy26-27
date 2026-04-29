@@ -227,6 +227,37 @@
       </div>
     </div>
 
+    <!-- Vahan Export -->
+    <div class="card">
+      <div class="card-header">🚗 Vahan Export</div>
+      <div class="card-body">
+        <div class="filter-tabs">
+          <button class="filter-tab" data-prefix="vahan" data-type="date"    onclick="showFilterType('vahan','date')">📅 By Invoice Date</button>
+          <button class="filter-tab" data-prefix="vahan" data-type="invoice" onclick="showFilterType('vahan','invoice')">🔢 By Invoice Number</button>
+        </div>
+        <div id="vahan_dateFilterGroup">
+          <div class="form-row">
+            <div class="form-group"><label>From Date</label><input type="date" id="vahan_fromDate"></div>
+            <div class="form-group"><label>To Date</label><input type="date" id="vahan_toDate"></div>
+          </div>
+        </div>
+        <div id="vahan_invoiceFilterGroup" style="display:none;">
+          <div class="form-row">
+            <div class="form-group"><label>From Invoice No</label><input type="text" id="vahan_fromInvoice" placeholder="e.g. VA0001"></div>
+            <div class="form-group"><label>To Invoice No</label><input type="text" id="vahan_toInvoice" placeholder="e.g. VA0050"></div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Starting Voucher Number</label>
+          <input type="number" id="vahan_startVoucher" placeholder="e.g. 117" min="1"
+            style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+        </div>
+        <button class="btn-generate" id="vahan_generateBtn" onclick="generateVahanExport()">⬇️ Generate &amp; Download Excel</button>
+        <div id="vahan_statusMsg" class="status-msg"></div>
+      </div>
+    </div>
+
     <!-- Harita Insurance Export -->
     <div class="card">
       <div class="card-header">🏥 Harita Insurance Export</div>
@@ -255,6 +286,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/busy-upload.js?v=5"></script>
+  <script src="js/busy-upload.js?v=6"></script>
 </body>
 </html>
