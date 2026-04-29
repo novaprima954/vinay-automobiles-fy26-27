@@ -7580,7 +7580,7 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
       if (!pmModel) continue;
 
       var entry = {
-        pmDisplayName:   pmModel + (pmVariant ? ' ' + pmVariant : ''),
+        pmDisplayName:   pmModel,
         mandAccessories: parseFloat(pr[6])  || 0,
         guard:           parseFloat(pr[7])  || 0,
         grip:            parseFloat(pr[8])  || 0,
@@ -7769,17 +7769,18 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         });
       }
 
-      // Service charge — use PriceMaster value if available, else default 1380
-      var scAmount = (pm.serviceCharge > 0) ? pm.serviceCharge : 1380;
-      records.push({
-        invoiceDate:  fmtInvDate,
-        invoiceNo:    invoiceNo,
-        customerName: customerName,
-        itemName:     'Service Charge',
-        quantity:     1,
-        unitPrice:    round2(scAmount / 1.18),
-        amount:       scAmount
-      });
+      // Service charge — taken directly from PriceMaster
+      if (pm.serviceCharge > 0) {
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     'Service Charge',
+          quantity:     1,
+          unitPrice:    round2(pm.serviceCharge / 1.18),
+          amount:       pm.serviceCharge
+        });
+      }
     }
 
     return { success: true, vaData: records, nonVaInvoices: nonVaInvoices };
