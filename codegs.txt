@@ -7769,15 +7769,16 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         });
       }
 
-      // Service charge — fixed at 1380 for all VA customers
+      // Service charge — use PriceMaster value if available, else default 1380
+      var scAmount = (pm.serviceCharge > 0) ? pm.serviceCharge : 1380;
       records.push({
         invoiceDate:  fmtInvDate,
         invoiceNo:    invoiceNo,
         customerName: customerName,
         itemName:     'Service Charge',
         quantity:     1,
-        unitPrice:    round2(1380 / 1.18),
-        amount:       1380
+        unitPrice:    round2(scAmount / 1.18),
+        amount:       scAmount
       });
     }
 
