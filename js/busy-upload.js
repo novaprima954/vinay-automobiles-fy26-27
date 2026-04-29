@@ -327,16 +327,16 @@ function renderNonVaForm(invoices) {
   html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Invoice No</th>';
   html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Date</th>';
   html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Customer</th>';
-  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Service Charge (₹)</th>';
+  html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Model</th>';
   html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Std Accessories (₹)</th>';
   html += '</tr></thead><tbody>';
 
   invoices.forEach(function(inv, i) {
     html += '<tr>';
-    html += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;white-space:nowrap;">' + (inv.invoiceNo || '') + '</td>';
-    html += '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">'                  + (inv.invoiceDate || '') + '</td>';
-    html += '<td style="padding:5px 8px;border:1px solid #ddd;">'                                      + (inv.customerName || '') + '</td>';
-    html += '<td style="padding:5px 8px;border:1px solid #ddd;"><input type="number" id="nonva_sc_' + i + '" min="0" placeholder="0" style="' + iStyle + '"></td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;white-space:nowrap;">' + (inv.invoiceNo    || '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">'                 + (inv.invoiceDate || '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;">'                                    + (inv.customerName|| '') + '</td>';
+    html += '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">'                 + (inv.modelName   || '') + '</td>';
     html += '<td style="padding:5px 8px;border:1px solid #ddd;"><input type="number" id="nonva_sa_' + i + '" min="0" placeholder="0" style="' + iStyle + '"></td>';
     html += '</tr>';
   });
@@ -345,22 +345,12 @@ function renderNonVaForm(invoices) {
 }
 
 function downloadStdExcel() {
-  // Collect non-VA manual rows
+  // Collect non-VA rows — service charge always 1380; std accessories from manual input
   var nonVaRows = [];
   _stdNonVaInvoices.forEach(function(inv, i) {
-    var scVal = parseFloat((document.getElementById('nonva_sc_' + i) || {}).value) || 0;
     var saVal = parseFloat((document.getElementById('nonva_sa_' + i) || {}).value) || 0;
-    if (scVal > 0) {
-      nonVaRows.push({
-        invoiceDate:  inv.invoiceDate,
-        invoiceNo:    inv.invoiceNo,
-        customerName: inv.customerName,
-        itemName:     'Service Charge',
-        quantity:     1,
-        unitPrice:    Math.round((scVal / 1.18) * 100) / 100,
-        amount:       scVal
-      });
-    }
+
+    // Standard Accessories — manual input
     if (saVal > 0) {
       nonVaRows.push({
         invoiceDate:  inv.invoiceDate,
@@ -372,6 +362,17 @@ function downloadStdExcel() {
         amount:       saVal
       });
     }
+
+    // Service Charge — fixed 1380 for all non-VA customers
+    nonVaRows.push({
+      invoiceDate:  inv.invoiceDate,
+      invoiceNo:    inv.invoiceNo,
+      customerName: inv.customerName,
+      itemName:     'Service Charge',
+      quantity:     1,
+      unitPrice:    Math.round((1380 / 1.18) * 100) / 100,
+      amount:       1380
+    });
   });
 
   var total = _stdVaData.length + nonVaRows.length;

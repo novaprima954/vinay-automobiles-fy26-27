@@ -7580,17 +7580,18 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
       if (!pmModel) continue;
 
       var entry = {
-        serviceCharge: parseFloat(pr[5])  || 0,
-        guard:         parseFloat(pr[7])  || 0,
-        grip:          parseFloat(pr[8])  || 0,
-        seatCover:     parseFloat(pr[9])  || 0,
-        matin:         parseFloat(pr[10]) || 0,
-        tankCover:     parseFloat(pr[11]) || 0,
-        handleHook:    parseFloat(pr[12]) || 0,
-        helmet:        parseFloat(pr[13]) || 0,
-        rainCover:     parseFloat(pr[15]) || 0,
-        buzzer:        parseFloat(pr[16]) || 0,
-        backRest:      parseFloat(pr[17]) || 0
+        pmDisplayName:   pmModel + (pmVariant ? ' ' + pmVariant : ''),
+        mandAccessories: parseFloat(pr[6])  || 0,
+        guard:           parseFloat(pr[7])  || 0,
+        grip:            parseFloat(pr[8])  || 0,
+        seatCover:       parseFloat(pr[9])  || 0,
+        matin:           parseFloat(pr[10]) || 0,
+        tankCover:       parseFloat(pr[11]) || 0,
+        handleHook:      parseFloat(pr[12]) || 0,
+        helmet:          parseFloat(pr[13]) || 0,
+        rainCover:       parseFloat(pr[15]) || 0,
+        buzzer:          parseFloat(pr[16]) || 0,
+        backRest:        parseFloat(pr[17]) || 0
       };
 
       var fullKey    = (pmModel + (pmVariant ? ' ' + pmVariant : '')).toLowerCase();
@@ -7692,6 +7693,7 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
           invoiceNo:    invoiceNo,
           invoiceDate:  fmtInvDate,
           customerName: customerName,
+          modelName:    (row[9] || '').toString().trim(),
           refCustomer:  refCustomer
         });
         continue;
@@ -7705,6 +7707,7 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
           invoiceNo:    invoiceNo,
           invoiceDate:  fmtInvDate,
           customerName: customerName,
+          modelName:    (row[9] || '').toString().trim(),
           refCustomer:  refCustomer
         });
         continue;
@@ -7715,17 +7718,18 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
       if (!pm) continue; // no pricing found, skip silently
 
       // --- Emit one row per accessory taken ---
+      var dn = pm.pmDisplayName; // e.g. "Jupiter 110" or "Ronin"
       var accList = [
-        { val: dl.guard,      label: 'Guard',        price: pm.guard      },
-        { val: dl.grip,       label: 'Grip Cover',   price: pm.grip       },
-        { val: dl.seatCover,  label: 'Seat Cover',   price: pm.seatCover  },
-        { val: dl.matin,      label: 'Matin',        price: pm.matin      },
-        { val: dl.tankCover,  label: 'Tank Cover',   price: pm.tankCover  },
-        { val: dl.handleHook, label: 'Handle Hook',  price: pm.handleHook },
-        { val: dl.helmet,     label: 'Helmet',       price: pm.helmet,    isHelmet: true },
-        { val: dl.rainCover,  label: 'Rain Cover',   price: pm.rainCover  },
-        { val: dl.buzzer,     label: 'Buzzer',       price: pm.buzzer     },
-        { val: dl.backRest,   label: 'Back Rest',    price: pm.backRest   }
+        { val: dl.guard,      label: dn + ' Guard',     price: pm.guard      },
+        { val: dl.grip,       label: 'Grip Cover',      price: pm.grip       },
+        { val: dl.seatCover,  label: dn + ' SeatCover', price: pm.seatCover  },
+        { val: dl.matin,      label: dn + ' Matin',     price: pm.matin      },
+        { val: dl.tankCover,  label: 'Tank Cover',      price: pm.tankCover  },
+        { val: dl.handleHook, label: 'Handle Hook',     price: pm.handleHook },
+        { val: dl.helmet,     label: 'Helmet',          price: pm.helmet,    isHelmet: true },
+        { val: dl.rainCover,  label: 'Rain Cover',      price: pm.rainCover  },
+        { val: dl.buzzer,     label: 'Buzzer',          price: pm.buzzer     },
+        { val: dl.backRest,   label: 'Back Rest',       price: pm.backRest   }
       ];
 
       for (var a = 0; a < accList.length; a++) {
@@ -7752,18 +7756,29 @@ function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fr
         });
       }
 
-      // Service charge row (if > 0)
-      if (pm.serviceCharge > 0) {
+      // Standard Accessories row (from PriceMaster MandAccessories col 6)
+      if (pm.mandAccessories > 0) {
         records.push({
           invoiceDate:  fmtInvDate,
           invoiceNo:    invoiceNo,
           customerName: customerName,
-          itemName:     'Service Charge',
+          itemName:     'Standard Accessories',
           quantity:     1,
-          unitPrice:    round2(pm.serviceCharge / 1.18),
-          amount:       pm.serviceCharge
+          unitPrice:    round2(pm.mandAccessories / 1.18),
+          amount:       pm.mandAccessories
         });
       }
+
+      // Service charge — fixed at 1380 for all VA customers
+      records.push({
+        invoiceDate:  fmtInvDate,
+        invoiceNo:    invoiceNo,
+        customerName: customerName,
+        itemName:     'Service Charge',
+        quantity:     1,
+        unitPrice:    round2(1380 / 1.18),
+        amount:       1380
+      });
     }
 
     return { success: true, vaData: records, nonVaInvoices: nonVaInvoices };
