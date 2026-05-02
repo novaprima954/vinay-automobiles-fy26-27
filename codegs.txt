@@ -7808,6 +7808,20 @@ function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice
       return { success: false, message: 'Access denied' };
     }
 
+    // --- Build PriceMaster ExShowroom → RTO map (first match per rounded exShowroom) ---
+    const pmSheet   = getSheet('PriceMaster');
+    const pmData    = pmSheet.getDataRange().getValues();
+    const exShowroomMap = {}; // key: rounded exShowroom → rto amount
+    for (var pi = 1; pi < pmData.length; pi++) {
+      var pr = pmData[pi];
+      if (!pr[0]) continue;
+      var exShowroom = Math.round(parseFloat(pr[2]) || 0);
+      var rto        = parseFloat(pr[3]) || 0;
+      if (exShowroom > 0 && !exShowroomMap[exShowroom]) {
+        exShowroomMap[exShowroom] = rto; // first match wins
+      }
+    }
+
     const hsrpSheet = getSheet('HSRP');
     const hsrpData  = hsrpSheet.getDataRange().getValues();
 
@@ -7828,6 +7842,8 @@ function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice
       var customerName = (row[5]  || '').toString().trim();
       var modelName    = (row[9]  || '').toString().trim();
       var hpCompany    = (row[12] || '').toString().trim();
+      var invoiceAmt   = Math.round(parseFloat(row[19]) || 0); // col T, rounded
+      var rtoAmount    = exShowroomMap[invoiceAmt] || 0;        // 0 if no match
 
       // --- Apply filter ---
       if (filterType === 'date') {
@@ -7842,11 +7858,13 @@ function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice
       }
 
       records.push({
-        invoiceNo:    invoiceNo,
-        invoiceDate:  fmtDate(invoiceDate),
-        customerName: customerName,
-        modelName:    modelName,
-        hpCompany:    hpCompany
+        invoiceNo:     invoiceNo,
+        invoiceDate:   fmtDate(invoiceDate),
+        customerName:  customerName,
+        modelName:     modelName,
+        hpCompany:     hpCompany,
+        invoiceAmount: invoiceAmt,
+        rtoAmount:     rtoAmount
       });
     }
 

@@ -645,43 +645,48 @@ function buildVahanExcel(records, startVoucher) {
     'Amount CR',       // G
     'Short Narration', // H
     'Vehicle Name',    // I
-    'HP Company'       // J
+    'HP Company',      // J
+    'Invoice Amount'   // K
   ]];
   var voucherNo  = startVoucher;
   var excelRow   = 2; // 1-indexed; row 1 = header, data starts at row 2
 
   records.forEach(function(r) {
     var voucherStr = 'RTO/' + voucherNo;
+    var rto        = r.rtoAmount    || 0;  // auto-matched from PriceMaster; 0 = no match
+    var invAmt     = r.invoiceAmount || 0; // HSRP col T, rounded
 
     // Row 1 — customer debit line
     outputRows.push([
-      'RTO/INSU',           // A — Voucher Series
-      r.invoiceDate,        // B — Voucher Date
-      voucherStr,           // C — Voucher Number
-      'Not Applicable',     // D — GST Nature
-      r.customerName,       // E — Account Name (customer)
-      '',                   // F — Amount DR (filled manually)
-      '',                   // G — (blank on row 1)
-      '',                   // H — Short Narration
-      r.modelName,          // I — Vehicle Name
-      r.hpCompany           // J — HP Company
+      'RTO/INSU',    // A — Voucher Series
+      r.invoiceDate, // B — Voucher Date
+      voucherStr,    // C — Voucher Number
+      'Not Applicable', // D — GST Nature
+      r.customerName,   // E — Account Name (customer)
+      rto,           // F — Amount DR (RTO from PriceMaster match; 0 if no match)
+      '',            // G — blank on row 1
+      '',            // H — Short Narration
+      r.modelName,   // I — Vehicle Name
+      r.hpCompany,   // J — HP Company
+      invAmt         // K — Invoice Amount (rounded)
     ]);
 
-    var row1ExcelRef = excelRow; // remember row number for formula
+    var row1ExcelRef = excelRow;
     excelRow++;
 
     // Row 2 — RTO TAX A/C credit line
     outputRows.push([
-      '',                   // A
-      '',                   // B
-      '',                   // C
-      '',                   // D
-      'RTO TAX A/C',        // E — Account Name (contra)
-      '',                   // F
-      { f: 'F' + row1ExcelRef }, // G — formula =F<row1> (auto-fills when accountant fills F)
-      '',                   // H
-      '',                   // I
-      ''                    // J
+      '',            // A
+      '',            // B
+      '',            // C
+      '',            // D
+      'RTO TAX A/C', // E — Account Name (contra)
+      '',            // F
+      { f: 'F' + row1ExcelRef }, // G — =F<row1> auto-fills from col F
+      '',            // H
+      '',            // I
+      '',            // J
+      ''             // K
     ]);
     excelRow++;
 
@@ -701,7 +706,8 @@ function buildVahanExcel(records, startVoucher) {
     { wch: 12 }, // G — Amount CR (formula)
     { wch: 20 }, // H — Short Narration
     { wch: 20 }, // I — Vehicle Name
-    { wch: 18 }  // J — HP Company
+    { wch: 18 }, // J — HP Company
+    { wch: 16 }  // K — Invoice Amount
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Vahan Export');
