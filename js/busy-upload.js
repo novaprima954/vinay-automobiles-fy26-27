@@ -646,7 +646,8 @@ function buildVahanExcel(records, startVoucher) {
     'Short Narration', // H
     'Vehicle Name',    // I
     'HP Company',      // J
-    'Invoice Amount'   // K
+    'Invoice Amount',  // K
+    'Ref Customer'     // L
   ]];
   var voucherNo  = startVoucher;
   var excelRow   = 2; // 1-indexed; row 1 = header, data starts at row 2
@@ -666,9 +667,10 @@ function buildVahanExcel(records, startVoucher) {
       rto,           // F — Amount DR (RTO from PriceMaster match; 0 if no match)
       '',            // G — blank on row 1
       '',            // H — Short Narration
-      r.modelName,   // I — Vehicle Name
-      r.hpCompany,   // J — HP Company
-      invAmt         // K — Invoice Amount (rounded)
+      r.modelName,    // I — Vehicle Name
+      r.hpCompany,    // J — HP Company
+      invAmt,         // K — Invoice Amount (rounded)
+      r.refCustomer   // L — Ref Customer
     ]);
 
     var row1ExcelRef = excelRow;
@@ -686,7 +688,8 @@ function buildVahanExcel(records, startVoucher) {
       '',            // H
       '',            // I
       '',            // J
-      ''             // K
+      '',            // K
+      ''             // L
     ]);
     excelRow++;
 
@@ -707,7 +710,8 @@ function buildVahanExcel(records, startVoucher) {
     { wch: 20 }, // H — Short Narration
     { wch: 20 }, // I — Vehicle Name
     { wch: 18 }, // J — HP Company
-    { wch: 16 }  // K — Invoice Amount
+    { wch: 16 }, // K — Invoice Amount
+    { wch: 22 }  // L — Ref Customer
   ];
 
   XLSX.utils.book_append_sheet(wb, ws, 'Vahan Export');
