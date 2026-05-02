@@ -743,7 +743,7 @@ async function handleUpdate(e) {
   
   // Collect accessory values
   const accessories = {};
-  ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet'].forEach(function(id) {
+  ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet', 'raincover', 'buzzer', 'backrest'].forEach(function(id) {
     const element = document.getElementById(id);
     if (element) {
       accessories[id] = element.value;
