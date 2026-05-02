@@ -7844,6 +7844,7 @@ function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice
       var hpCompany    = (row[12] || '').toString().trim();
       var invoiceAmt   = Math.round(parseFloat(row[19]) || 0); // col T, rounded
       var rtoAmount    = exShowroomMap[invoiceAmt] || 0;        // 0 if no match
+      if (hpCompany)   rtoAmount += 500;                        // HP surcharge
 
       // --- Apply filter ---
       if (filterType === 'date') {
