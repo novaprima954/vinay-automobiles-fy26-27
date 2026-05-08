@@ -7582,15 +7582,16 @@ function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoi
       var row = hsrpData[i];
       if (!row[0]) continue;
 
-      var invoiceNo    = (row[1]  || '').toString().trim();
-      var invoiceDate  = row[2];
-      var customerName = (row[5]  || '').toString().trim();
-      var frameNo      = (row[6]  || '').toString().trim();
-      var refCustomer  = (row[8]  || '').toString().trim();
-      var modelName    = (row[9]  || '').toString().trim();
-      var hpCompany    = (row[12] || '').toString().trim();
-      var engineNo     = (row[18] || '').toString().trim();
-      var invoiceAmt   = row[19] || '';
+      var invoiceNo      = (row[1]  || '').toString().trim();
+      var invoiceDate    = row[2];
+      var customerName   = (row[5]  || '').toString().trim();
+      var frameNo        = (row[6]  || '').toString().trim();
+      var registrationNo = (row[7]  || '').toString().trim();
+      var refCustomer    = (row[8]  || '').toString().trim();
+      var modelName      = (row[9]  || '').toString().trim();
+      var hpCompany      = (row[12] || '').toString().trim();
+      var engineNo       = (row[18] || '').toString().trim();
+      var invoiceAmt     = row[19] || '';
 
       // --- Apply filter ---
       if (filterType === 'date') {
@@ -7626,16 +7627,18 @@ function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoi
       }
 
       records.push({
-        invoiceNo:     invoiceNo,
-        invoiceDate:   fmtDate(invoiceDate),
-        customerName:  customerName,
-        frameNo:       frameNo,
-        modelName:     modelName,
-        engineNo:      engineNo,
-        hpCompany:     hpCompany,
-        invoiceAmount: invoiceAmt,
-        accessories:   accessories,
-        brokerName:    brokerName
+        invoiceNo:      invoiceNo,
+        invoiceDate:    fmtDate(invoiceDate),
+        customerName:   customerName,
+        frameNo:        frameNo,
+        modelName:      modelName,
+        engineNo:       engineNo,
+        hpCompany:      hpCompany,
+        invoiceAmount:  invoiceAmt,
+        accessories:    accessories,
+        brokerName:     brokerName,
+        refCustomer:    refCustomer,
+        registrationNo: registrationNo
       });
     }
 
