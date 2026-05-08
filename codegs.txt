@@ -3543,11 +3543,12 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
       const custName = (row[3] || '').toString().trim();
       const model    = (row[5] || '').toString().trim();
       const variant  = (row[6] || '').toString().trim();
+      const fullAcc  = (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') ? 'Y' : 'N';
       let dateStr = '';
       if (row[11]) {
         try { dateStr = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
       }
-      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant, fullAcc: fullAcc });
     }
 
     return { success: true, data: { executive: executiveName, customers: customers } };

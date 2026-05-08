@@ -1559,11 +1559,14 @@ async function toggleExecutiveDetail(executive, detailId, rowEl) {
       tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Del. Date</th>';
       tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Customer</th>';
       tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Model</th>';
+      tableHtml += '<th style="padding:6px 8px;text-align:center;border:1px solid #ddd;">Full Acc</th>';
       tableHtml += '</tr></thead><tbody>';
       customers.forEach(function(c) {
+        var fa = c.fullAcc === 'Y';
         tableHtml += '<tr><td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">' + (c.date || '—') + '</td>';
         tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;">' + (c.customerName || '') + '</td>';
-        tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;">' + (c.model || '') + '</td></tr>';
+        tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;">' + (c.model || '') + '</td>';
+        tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;text-align:center;font-weight:700;color:' + (fa ? '#28a745' : '#dc3545') + ';">' + (c.fullAcc || 'N') + '</td></tr>';
       });
       tableHtml += '</tbody></table></div>';
       detail.innerHTML = tableHtml;
@@ -1596,11 +1599,14 @@ async function loadMyExecDetail() {
       tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Del. Date</th>';
       tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Customer</th>';
       tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Model</th>';
+      tableHtml += '<th style="padding:7px 10px;text-align:center;border:1px solid #ddd;">Full Acc</th>';
       tableHtml += '</tr></thead><tbody>';
       customers.forEach(function(c) {
+        var fa = c.fullAcc === 'Y';
         tableHtml += '<tr><td style="padding:6px 10px;border:1px solid #ddd;white-space:nowrap;">' + (c.date || '—') + '</td>';
         tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;font-weight:600;">' + (c.customerName || '') + '</td>';
-        tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;">' + (c.model || '') + '</td></tr>';
+        tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;">' + (c.model || '') + '</td>';
+        tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;text-align:center;font-weight:700;color:' + (fa ? '#28a745' : '#dc3545') + ';">' + (c.fullAcc || 'N') + '</td></tr>';
       });
       tableHtml += '</tbody></table></div>';
       container.innerHTML = tableHtml;
