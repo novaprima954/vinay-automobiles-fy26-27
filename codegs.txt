@@ -162,6 +162,9 @@ function handleRequest(e) {
       case 'getFullAccessoriesDetail':
         result = getFullAccessoriesDetail(params.sessionId, params.dateFilter);
         break;
+      case 'getExecutiveSalesDetail':
+        result = getExecutiveSalesDetail(params.sessionId, params.executiveName, params.dateFilter);
+        break;
       case 'getInventoryAnalysis':
         result = getInventoryAnalysis(params.sessionId, params.dateFilter);
         break;
@@ -3463,7 +3466,12 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
     const validation = validateSession(sessionId);
     if (!validation.success) return validation;
     const user = validation.user;
-    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+    let filterExecutive = null;
+    if (user.role === 'executive') {
+      filterExecutive = user.name;
+    } else if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
 
     const sheet      = getSheet(CONFIG.SHEETS.DATA);
     const rawData    = sheet.getDataRange().getValues();
@@ -3478,6 +3486,7 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
           row[14] !== 'Yes' || row[15] !== 'Yes') continue;                 // all 4 core accessories
 
       const executive = (row[1] || '').toString().trim();
+      if (filterExecutive && executive !== filterExecutive) continue;       // executive self-view
       const custName  = (row[3] || '').toString().trim();
       const model     = (row[5] || '').toString().trim();
       const variant   = (row[6] || '').toString().trim();
@@ -3498,6 +3507,52 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
     return { success: true, data: result };
   } catch(e) {
     Logger.log('getFullAccessoriesDetail error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Executive Sales Detail: individual records for one executive where accountCheck=Yes.
+ * Executive role can see only their own data; admin/accounts can request any executive.
+ * Returns: { executive, customers: [{date, customerName, model, variant}] }
+ */
+function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+
+    // Executive role: force to own name only
+    if (user.role === 'executive') {
+      executiveName = user.name;
+    } else if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    const customers = [];
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;
+      if ((row[1] || '').toString().trim() !== executiveName) continue;
+
+      const custName = (row[3] || '').toString().trim();
+      const model    = (row[5] || '').toString().trim();
+      const variant  = (row[6] || '').toString().trim();
+      let dateStr = '';
+      if (row[11]) {
+        try { dateStr = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
+      }
+      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+    }
+
+    return { success: true, data: { executive: executiveName, customers: customers } };
+  } catch(e) {
+    Logger.log('getExecutiveSalesDetail error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }
@@ -7527,15 +7582,16 @@ function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoi
       var row = hsrpData[i];
       if (!row[0]) continue;
 
-      var invoiceNo    = (row[1]  || '').toString().trim();
-      var invoiceDate  = row[2];
-      var customerName = (row[5]  || '').toString().trim();
-      var frameNo      = (row[6]  || '').toString().trim();
-      var refCustomer  = (row[8]  || '').toString().trim();
-      var modelName    = (row[9]  || '').toString().trim();
-      var hpCompany    = (row[12] || '').toString().trim();
-      var engineNo     = (row[18] || '').toString().trim();
-      var invoiceAmt   = row[19] || '';
+      var invoiceNo      = (row[1]  || '').toString().trim();
+      var invoiceDate    = row[2];
+      var customerName   = (row[5]  || '').toString().trim();
+      var frameNo        = (row[6]  || '').toString().trim();
+      var registrationNo = (row[7]  || '').toString().trim();
+      var refCustomer    = (row[8]  || '').toString().trim();
+      var modelName      = (row[9]  || '').toString().trim();
+      var hpCompany      = (row[12] || '').toString().trim();
+      var engineNo       = (row[18] || '').toString().trim();
+      var invoiceAmt     = row[19] || '';
 
       // --- Apply filter ---
       if (filterType === 'date') {
@@ -7571,16 +7627,18 @@ function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoi
       }
 
       records.push({
-        invoiceNo:     invoiceNo,
-        invoiceDate:   fmtDate(invoiceDate),
-        customerName:  customerName,
-        frameNo:       frameNo,
-        modelName:     modelName,
-        engineNo:      engineNo,
-        hpCompany:     hpCompany,
-        invoiceAmount: invoiceAmt,
-        accessories:   accessories,
-        brokerName:    brokerName
+        invoiceNo:      invoiceNo,
+        invoiceDate:    fmtDate(invoiceDate),
+        customerName:   customerName,
+        frameNo:        frameNo,
+        modelName:      modelName,
+        engineNo:       engineNo,
+        hpCompany:      hpCompany,
+        invoiceAmount:  invoiceAmt,
+        accessories:    accessories,
+        brokerName:     brokerName,
+        refCustomer:    refCustomer,
+        registrationNo: registrationNo
       });
     }
 

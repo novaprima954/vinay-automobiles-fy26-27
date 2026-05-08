@@ -299,9 +299,23 @@ function renderSalesDashboard(data) {
         </div>
       `).join('')}
     </div>
+
+    <!-- My Delivered Sales (Account Check: Yes) -->
+    <div class="section">
+      <div class="section-header">📋 My Delivered Sales (Account Check: Yes)</div>
+      <div id="myExecDetailContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
+    <!-- My Full Accessories -->
+    <div class="section">
+      <div class="section-header">🎯 My Full Accessories</div>
+      <div id="myFullAccContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
   `;
-  
+
   content.style.display = 'block';
+  loadMyExecDetail();
+  loadFullAccessoriesAnalysis('myFullAccContent');
 }
 
 /**
@@ -338,15 +352,21 @@ function renderAccountsDashboard(data) {
     <div class="section">
       <div class="section-header">👥 Executive-wise Sales (Account Check: Yes)</div>
       ${data.executiveSales && data.executiveSales.length > 0 ? data.executiveSales.map((exec, index) => `
-        <div class="list-item" onclick="showExecutiveModels('${exec.executive}', 'models')" style="cursor:pointer;">
-          <div class="list-item-main">
-            <div class="list-item-title">
-              ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
-              ${exec.executive}
+        <div style="border-bottom:1px solid #f0f0f0;">
+          <div class="list-item" onclick="toggleExecutiveDetail('${exec.executive}', 'acctExecDetail_${index}', this)" style="cursor:pointer;border-bottom:none;">
+            <div class="list-item-main">
+              <div class="list-item-title">
+                ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
+                ${exec.executive}
+              </div>
+              <div class="list-item-subtitle">🎯 Full Acc: ${exec.fullAccessories || 0} | Tap for detail</div>
             </div>
-            <div class="list-item-subtitle">🎯 Full Acc: ${exec.fullAccessories || 0} | Tap for model breakdown</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;font-weight:700;color:#667eea;">${exec.completedSales}</span>
+              <span class="execChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+            </div>
           </div>
-          <div class="list-item-value">${exec.completedSales}</div>
+          <div id="acctExecDetail_${index}" style="display:none;"></div>
         </div>
       `).join('') : '<div class="empty-state">No completed sales</div>'}
     </div>
@@ -715,15 +735,21 @@ function renderAdminDashboard(data) {
     <div class="section">
       <div class="section-header">👥 By Executive (Account Check: Yes)</div>
       ${data.executiveList.map((exec, index) => `
-        <div class="list-item" onclick="showExecutiveModels('${exec.executive}', 'models')" style="cursor:pointer;">
-          <div class="list-item-main">
-            <div class="list-item-title">
-              ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
-              ${exec.executive}
+        <div style="border-bottom:1px solid #f0f0f0;">
+          <div class="list-item" onclick="toggleExecutiveDetail('${exec.executive}', 'adminExecDetail_${index}', this)" style="cursor:pointer;border-bottom:none;">
+            <div class="list-item-main">
+              <div class="list-item-title">
+                ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
+                ${exec.executive}
+              </div>
+              <div class="list-item-subtitle">Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0}</div>
             </div>
-            <div class="list-item-subtitle">Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0} | Tap for models</div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;font-weight:700;color:#667eea;">${exec.completedSales}</span>
+              <span class="execChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+            </div>
           </div>
-          <div class="list-item-value">${exec.completedSales}</div>
+          <div id="adminExecDetail_${index}" style="display:none;"></div>
         </div>
       `).join('')}
     </div>
@@ -1498,36 +1524,93 @@ async function showPendingDetails(type, name) {
 }
 
 /**
- * Show executive models or accessories breakdown (for accounts dashboard)
+ * Toggle inline executive sales detail below the clicked row
  */
-async function showExecutiveModels(executive, type) {
+async function toggleExecutiveDetail(executive, detailId, rowEl) {
+  const detail = document.getElementById(detailId);
+  if (!detail) return;
+
+  const chevron = rowEl.querySelector('.execChevron');
+
+  // Toggle if already loaded
+  if (detail.dataset.loaded === 'true') {
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    return;
+  }
+
+  // Show loading
+  detail.style.display = 'block';
+  detail.innerHTML = '<div style="padding:10px 16px;text-align:center;color:#999;font-size:12px;">⏳ Loading...</div>';
+  if (chevron) chevron.style.transform = 'rotate(180deg)';
+
   try {
-    const response = await API.getExecutiveBreakdown(executive, type, currentFilter);
-    
-    if (response.success && response.breakdown && response.breakdown.length > 0) {
-      if (type === 'models') {
-        document.getElementById('modalTitle').textContent = executive + ' - Models Sold';
-      } else {
-        document.getElementById('modalTitle').textContent = executive + ' - Accessories';
-      }
-      
-      const modalContent = document.getElementById('modalContent');
-      modalContent.innerHTML = response.breakdown.map(item => `
-        <div class="list-item">
-          <div class="list-item-main">
-            <div class="list-item-title">${type === 'models' ? item.model : item.accessory}</div>
-          </div>
-          <div class="list-item-value">${item.count}</div>
-        </div>
-      `).join('');
-      
-      document.getElementById('accessoryModal').classList.add('active');
+    const response = await API.call('getExecutiveSalesDetail', {
+      sessionId: currentSessionId,
+      executiveName: executive,
+      dateFilter: currentFilter
+    });
+    if (response.success && response.data && response.data.customers && response.data.customers.length > 0) {
+      const customers = response.data.customers;
+      var tableHtml = '<div style="background:#f9fafe;padding:8px 16px 14px;">';
+      tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      tableHtml += '<thead><tr style="background:#eef1fb;">';
+      tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Del. Date</th>';
+      tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Customer</th>';
+      tableHtml += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Model</th>';
+      tableHtml += '</tr></thead><tbody>';
+      customers.forEach(function(c) {
+        tableHtml += '<tr><td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">' + (c.date || '—') + '</td>';
+        tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;">' + (c.customerName || '') + '</td>';
+        tableHtml += '<td style="padding:5px 8px;border:1px solid #ddd;">' + (c.model || '') + '</td></tr>';
+      });
+      tableHtml += '</tbody></table></div>';
+      detail.innerHTML = tableHtml;
     } else {
-      showMessage('No data available', 'error');
+      detail.innerHTML = '<div style="padding:10px 16px;text-align:center;color:#999;font-size:12px;">No records found</div>';
     }
-  } catch (error) {
-    console.error('Executive breakdown error:', error);
-    showMessage('Error loading breakdown', 'error');
+    detail.dataset.loaded = 'true';
+  } catch(e) {
+    detail.innerHTML = '<div style="padding:10px 16px;color:#dc3545;font-size:12px;">Error loading</div>';
+    detail.dataset.loaded = 'true';
+  }
+}
+
+/**
+ * Load executive's own delivered sales detail (for executive role dashboard)
+ */
+async function loadMyExecDetail() {
+  const container = document.getElementById('myExecDetailContent');
+  if (!container) return;
+  try {
+    const response = await API.call('getExecutiveSalesDetail', {
+      sessionId: currentSessionId,
+      executiveName: currentUser.name,
+      dateFilter: currentFilter
+    });
+    if (response.success && response.data && response.data.customers && response.data.customers.length > 0) {
+      const customers = response.data.customers;
+      var tableHtml = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">';
+      tableHtml += '<thead><tr style="background:#eef1fb;">';
+      tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Del. Date</th>';
+      tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Customer</th>';
+      tableHtml += '<th style="padding:7px 10px;text-align:left;border:1px solid #ddd;">Model</th>';
+      tableHtml += '</tr></thead><tbody>';
+      customers.forEach(function(c) {
+        tableHtml += '<tr><td style="padding:6px 10px;border:1px solid #ddd;white-space:nowrap;">' + (c.date || '—') + '</td>';
+        tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;font-weight:600;">' + (c.customerName || '') + '</td>';
+        tableHtml += '<td style="padding:6px 10px;border:1px solid #ddd;">' + (c.model || '') + '</td></tr>';
+      });
+      tableHtml += '</tbody></table></div>';
+      container.innerHTML = tableHtml;
+    } else if (response.success) {
+      container.innerHTML = '<div class="empty-state">No delivered sales (Account Check: Yes) in this period</div>';
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed to load') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading data</div>';
   }
 }
 

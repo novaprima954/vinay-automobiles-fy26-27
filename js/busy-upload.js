@@ -192,7 +192,7 @@ async function generateVSeriesExport() {
 }
 
 function buildVSeriesExcel(records) {
-  // Header row (A–R = 18 cols)
+  // Header row (A–T = 20 cols)
   const header = [
     'Series',           // A
     'Voucher Inv Date', // B
@@ -211,7 +211,9 @@ function buildVSeriesExcel(records) {
     'Unit',             // O
     'Sale/Purc Type',   // P
     'MC Name',          // Q
-    'Qty'               // R
+    'Qty',              // R
+    'Ref Customer',     // S
+    'Reg Number'        // T
   ];
 
   const rows = [header];
@@ -235,7 +237,9 @@ function buildVSeriesExcel(records) {
       'Nos',                                       // O: Unit
       'GST SALES',                                 // P: Sale/Purc Type
       'Main Store',                                // Q: MC Name
-      1                                            // R: Qty
+      1,                                           // R: Qty
+      r.refCustomer    || '',                      // S: Ref Customer
+      r.registrationNo || ''                       // T: Reg Number
     ]);
   });
 
@@ -258,7 +262,9 @@ function buildVSeriesExcel(records) {
     { wch: 8  }, // O
     { wch: 14 }, // P
     { wch: 14 }, // Q
-    { wch: 8  }  // R
+    { wch: 8  }, // R
+    { wch: 24 }, // S
+    { wch: 18 }  // T
   ];
 
   const wb = XLSX.utils.book_new();
