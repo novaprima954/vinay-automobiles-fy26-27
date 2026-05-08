@@ -159,6 +159,9 @@ function handleRequest(e) {
       case 'getDiscountAnalysis':
         result = getDiscountAnalysis(params.sessionId, params.dateFilter);
         break;
+      case 'getFullAccessoriesDetail':
+        result = getFullAccessoriesDetail(params.sessionId, params.dateFilter);
+        break;
       case 'getInventoryAnalysis':
         result = getInventoryAnalysis(params.sessionId, params.dateFilter);
         break;
@@ -3332,6 +3335,10 @@ function getDiscountAnalysis(sessionId, dateFilter) {
 
     for (let i = 1; i < filteredData.length; i++) {
       const row = filteredData[i];
+
+      // Only include records where Account Check = Yes
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;
+
       const executive  = (row[1] || '').toString().trim();
       const custName   = (row[3] || '').toString().trim();
       const model      = (row[5] || '').toString().trim();
@@ -3443,6 +3450,54 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     };
   } catch(e) {
     Logger.log('getDiscountAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Full Accessories Detail: customers with Guard+Grip+SeatCover+Matin=Yes and accountCheck=Yes
+ * Grouped by executive, sorted by count desc.
+ */
+function getFullAccessoriesDetail(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+
+    const sheet      = getSheet(CONFIG.SHEETS.DATA);
+    const rawData    = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    const byExec = {};
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;            // accountCheck
+      if (row[12] !== 'Yes' || row[13] !== 'Yes' ||
+          row[14] !== 'Yes' || row[15] !== 'Yes') continue;                 // all 4 core accessories
+
+      const executive = (row[1] || '').toString().trim();
+      const custName  = (row[3] || '').toString().trim();
+      const model     = (row[5] || '').toString().trim();
+      const variant   = (row[6] || '').toString().trim();
+      let dateStr = '';
+      if (row[2]) {
+        try { dateStr = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
+      }
+
+      if (!byExec[executive]) byExec[executive] = { count: 0, customers: [] };
+      byExec[executive].count++;
+      byExec[executive].customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+    }
+
+    const result = Object.keys(byExec).map(function(exec) {
+      return { executive: exec, count: byExec[exec].count, customers: byExec[exec].customers };
+    }).sort(function(a, b) { return b.count - a.count; });
+
+    return { success: true, data: result };
+  } catch(e) {
+    Logger.log('getFullAccessoriesDetail error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }

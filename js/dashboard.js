@@ -404,6 +404,12 @@ function renderAccountsDashboard(data) {
       <div id="acctDiscountContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
     </div>
 
+    <!-- Full Accessories by Executive (async load) -->
+    <div class="section" id="acctFullAccSection">
+      <div class="section-header">🎯 Full Accessories by Executive</div>
+      <div id="acctFullAccContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
     <!-- AD Sales from Inventory (async load) -->
     <div class="section" id="acctAdSaleSection">
       <div class="section-header">🤝 AD Sales</div>
@@ -415,6 +421,7 @@ function renderAccountsDashboard(data) {
 
   // Load async sections
   loadAccountsDiscountByExec();
+  loadFullAccessoriesAnalysis('acctFullAccContent');
   loadAccountsAdSales();
 }
 
@@ -484,6 +491,77 @@ async function loadAccountsDiscountByExec() {
   } catch(e) {
     container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading discount data</div>';
   }
+}
+
+/**
+ * Load Full Accessories Detail (shared by admin + accounts dashboards)
+ * containerId: 'adminFullAccContent' or 'acctFullAccContent'
+ */
+async function loadFullAccessoriesAnalysis(containerId) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  try {
+    const response = await API.call('getFullAccessoriesDetail', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success) {
+      renderFullAccessoriesAnalysis(container, response.data);
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading data</div>';
+  }
+}
+
+function renderFullAccessoriesAnalysis(container, data) {
+  if (!data || data.length === 0) {
+    container.innerHTML = '<div style="color:#999;text-align:center;padding:20px;font-size:13px;">No full accessories sales in this period</div>';
+    return;
+  }
+
+  var html = '';
+  data.forEach(function(exec, idx) {
+    var detailId = 'fullAccDetail_' + idx;
+    html += '<div style="border-bottom:1px solid #f0f0f0;">';
+    html += '<div onclick="toggleFullAccDetail(\'' + detailId + '\', this)" style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;cursor:pointer;">';
+    html += '<div>';
+    html += '<div style="font-weight:700;font-size:14px;color:#333;">' + exec.executive + '</div>';
+    html += '<div style="font-size:12px;color:#666;margin-top:2px;">🎯 Full Accessories: ' + exec.count + ' customers</div>';
+    html += '</div>';
+    html += '<div style="display:flex;align-items:center;gap:8px;">';
+    html += '<span style="background:#28a745;color:white;font-size:13px;font-weight:700;padding:4px 10px;border-radius:12px;">' + exec.count + '</span>';
+    html += '<span class="fullAccChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>';
+    html += '</div></div>';
+
+    // Collapsible customer list
+    html += '<div id="' + detailId + '" style="display:none;background:#f9fafe;padding:0 16px 14px;">';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+    html += '<thead><tr style="background:#eef1fb;">';
+    html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Date</th>';
+    html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Customer</th>';
+    html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Model</th>';
+    html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ddd;">Variant</th>';
+    html += '</tr></thead><tbody>';
+    exec.customers.forEach(function(c) {
+      html += '<tr style="border-bottom:1px solid #f0f0f0;">';
+      html += '<td style="padding:5px 8px;border:1px solid #ddd;white-space:nowrap;">' + (c.date || '') + '</td>';
+      html += '<td style="padding:5px 8px;border:1px solid #ddd;font-weight:600;">' + (c.customerName || '') + '</td>';
+      html += '<td style="padding:5px 8px;border:1px solid #ddd;">' + (c.model || '') + '</td>';
+      html += '<td style="padding:5px 8px;border:1px solid #ddd;">' + (c.variant || '') + '</td>';
+      html += '</tr>';
+    });
+    html += '</tbody></table></div></div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function toggleFullAccDetail(id, rowEl) {
+  var detail = document.getElementById(id);
+  var chevron = rowEl.querySelector('.fullAccChevron');
+  if (!detail) return;
+  var open = detail.style.display !== 'none';
+  detail.style.display = open ? 'none' : 'block';
+  if (chevron) chevron.style.transform = open ? '' : 'rotate(180deg)';
 }
 
 /**
@@ -832,6 +910,12 @@ function renderAdminDashboard(data) {
       <div id="stockInContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
     </div>
 
+    <!-- Full Accessories by Executive -->
+    <div class="section" id="adminFullAccSection">
+      <div class="section-header">🎯 Full Accessories by Executive</div>
+      <div id="adminFullAccContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
     <!-- Discount Analysis (Admin Only – Password Protected) -->
     <div class="section" id="discountSection">
       <div class="section-header">💸 Discount Analysis
@@ -880,6 +964,7 @@ function renderAdminDashboard(data) {
 
   // Load Stock In analysis immediately (no password needed)
   loadStockInAnalysis();
+  loadFullAccessoriesAnalysis('adminFullAccContent');
 
   // Auto-unlock if already authenticated in this session
   if (discountUnlocked) {
