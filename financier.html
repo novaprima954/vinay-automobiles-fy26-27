@@ -116,6 +116,29 @@
       cursor: pointer;
     }
 
+    /* ---- CUSTOM MULTISELECT ---- */
+    .custom-ms { position: relative; }
+    .custom-ms-head {
+      border: 1px solid #ddd; border-radius: 6px; padding: 10px 12px;
+      cursor: pointer; background: white; display: flex;
+      justify-content: space-between; align-items: center;
+      font-size: 14px; user-select: none; transition: border-color 0.2s;
+    }
+    .custom-ms-head:hover { border-color: #667eea; }
+    .custom-ms-body {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: white; border: 1px solid #ddd; border-radius: 6px;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.12); max-height: 220px;
+      overflow-y: auto; z-index: 200; display: none;
+    }
+    .custom-ms-body.open { display: block; }
+    .custom-ms-item {
+      padding: 8px 12px; cursor: pointer; font-size: 13px;
+      display: flex; align-items: center; gap: 8px; transition: background 0.1s;
+    }
+    .custom-ms-item:hover { background: #f0f4ff; }
+    .custom-ms-item input[type="checkbox"] { width: 15px; height: 15px; cursor: pointer; flex-shrink: 0; }
+
     .btn-group-filter {
       display: flex;
       gap: 10px;
@@ -477,19 +500,27 @@
         <div class="filter-row">
           <div class="form-group">
             <label for="filterCustomer">Customer Name</label>
-            <input type="text" id="filterCustomer" placeholder="Search by customer name...">
+            <input type="text" id="filterCustomer" placeholder="Search by customer name..." oninput="applyFilters()">
           </div>
           <div class="form-group">
-            <label for="filterRefCustomer">Ref Customer</label>
-            <select id="filterRefCustomer">
-              <option value="">-- All --</option>
-            </select>
+            <label>Ref Customer</label>
+            <div class="custom-ms" id="msRefCustomer">
+              <div class="custom-ms-head" onclick="toggleMS('msRefCustomer')">
+                <span id="msRefCustomer_label">-- All --</span>
+                <span style="color:#999;font-size:11px;">▼</span>
+              </div>
+              <div class="custom-ms-body" id="msRefCustomer_body"></div>
+            </div>
           </div>
           <div class="form-group">
-            <label for="filterFinancier">Financier / HP Company</label>
-            <select id="filterFinancier">
-              <option value="">-- All --</option>
-            </select>
+            <label>Financier / HP Company</label>
+            <div class="custom-ms" id="msFinancier">
+              <div class="custom-ms-head" onclick="toggleMS('msFinancier')">
+                <span id="msFinancier_label">-- All --</span>
+                <span style="color:#999;font-size:11px;">▼</span>
+              </div>
+              <div class="custom-ms-body" id="msFinancier_body"></div>
+            </div>
           </div>
           <div class="btn-group-filter">
             <button class="btn btn-primary" onclick="applyFilters()">&#128269; Apply Filters</button>

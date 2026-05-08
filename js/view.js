@@ -318,6 +318,14 @@ function displayRecordDetails(record) {
   updateStatusIndicator('statusDMS', record.dmsStatus);
   updateStatusIndicator('statusInsurance', record.insuranceStatus);
   updateStatusIndicator('statusRTO', record.vahanStatus || record.rtoStatus);
+
+  // Show completion dates under DMS / Insurance / RTO
+  const dmsDateEl = document.getElementById('statusDMSDate');
+  if (dmsDateEl) dmsDateEl.textContent = (record.dmsStatus === 'Yes' && record.dmsDate) ? record.dmsDate : '';
+  const insDteEl = document.getElementById('statusInsuranceDate');
+  if (insDteEl) insDteEl.textContent = (record.insuranceStatus === 'Yes' && record.insuranceDate) ? record.insuranceDate : '';
+  const rtoDteEl = document.getElementById('statusRTODate');
+  if (rtoDteEl) rtoDteEl.textContent = ((record.vahanStatus === 'Yes' || record.rtoStatus === 'Yes') && record.vahanDate) ? record.vahanDate : '';
   updateStatusIndicator('statusAccessories', record.accessoryFitted);
   
   // Update Vehicle Details

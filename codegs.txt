@@ -249,6 +249,9 @@ function handleRequest(e) {
       case 'exportHSRPToPdf':
         result = exportHSRPToPdf(params.sessionId, params.fromDate, params.toDate);
         break;
+      case 'getHSRPRefCustomers':
+        result = getHSRPRefCustomers(params.sessionId);
+        break;
       case 'getBusyUploadData':
         result = getBusyUploadData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
         break;
@@ -8355,6 +8358,9 @@ function getDisbursementComparison(sessionId, password) {
       const frame        = String(row[60] || '').trim();  // col BI: Frame Number
       if (!frame) continue;
 
+      const hpCompany     = String(row[10] || '').trim(); // col K: Financier/HP Company
+      if (!hpCompany) continue;                           // Only show HP company records
+
       const customerName  = String(row[3]  || '').trim(); // col D
       const variant       = String(row[6]  || '').trim(); // col G
       const dataDisbursed = parseFloat(row[32]);           // col AG: Disbursed Amount
@@ -8377,6 +8383,27 @@ function getDisbursementComparison(sessionId, password) {
 
     return { success: true, rows };
   } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * Get unique Ref Customer values from HSRP sheet for dropdown
+ */
+function getHSRPRefCustomers(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+    const refSet = new Set();
+    for (let i = 1; i < data.length; i++) {
+      const ref = (data[i][8] || '').toString().trim(); // col I = index 8
+      if (ref) refSet.add(ref);
+    }
+    return { success: true, refCustomers: Array.from(refSet).sort() };
+  } catch(e) {
+    Logger.log('getHSRPRefCustomers error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
 }
 
 /**

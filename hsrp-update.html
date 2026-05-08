@@ -26,7 +26,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
     }
 
@@ -438,7 +438,7 @@
     }
 
     .table-container {
-      max-height: 400px;
+      max-height: 560px;
       overflow-y: auto;
       border-radius: 8px;
       border: 1px solid #ddd;
@@ -508,7 +508,7 @@
     }
     .hsrp-dash-cards {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
       gap: 14px;
     }
     .hsrp-dash-card {
@@ -668,6 +668,13 @@
         <div class="form-group" id="searchValueGroup" style="display: none;">
           <label for="searchValue">Search Value</label>
           <input type="text" id="searchValue" placeholder="Enter search value">
+        </div>
+
+        <div class="form-group" id="refCustomerDropdownGroup" style="display: none;">
+          <label for="searchRefCustomerSel">Ref Customer</label>
+          <select id="searchRefCustomerSel" style="width:100%;padding:10px;border:1px solid #ddd;border-radius:6px;font-size:14px;">
+            <option value="">-- Loading... --</option>
+          </select>
         </div>
         
         <div class="form-group" id="dateFilterGroup" style="display: none;">

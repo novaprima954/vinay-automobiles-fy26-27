@@ -204,22 +204,52 @@ function showDashboardFilterData(cardKey) {
 // SEARCH FUNCTIONALITY
 // ==========================================
 
+let refCustomerOptions = null;
+
 function handleSearchByChange() {
   const searchBy = document.getElementById('searchBy').value;
   const searchValueGroup = document.getElementById('searchValueGroup');
   const dateFilterGroup = document.getElementById('dateFilterGroup');
   const customDateGroup = document.getElementById('customDateGroup');
-  
-  // Reset
+  const refCustomerDropdownGroup = document.getElementById('refCustomerDropdownGroup');
+
+  // Reset all
   searchValueGroup.style.display = 'none';
   dateFilterGroup.style.display = 'none';
   customDateGroup.style.display = 'none';
-  
-  // NEW: Added 'refCustomer' and 'orderDate' options
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'refCustomer') {
+  refCustomerDropdownGroup.style.display = 'none';
+
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
     searchValueGroup.style.display = 'block';
+  } else if (searchBy === 'refCustomer') {
+    refCustomerDropdownGroup.style.display = 'block';
+    loadRefCustomerOptions();
   } else if (searchBy === 'invoiceDate' || searchBy === 'orderDate') {
     dateFilterGroup.style.display = 'block';
+  }
+}
+
+async function loadRefCustomerOptions() {
+  if (refCustomerOptions !== null) return; // already loaded
+  const sel = document.getElementById('searchRefCustomerSel');
+  sel.innerHTML = '<option value="">-- Loading... --</option>';
+  try {
+    const session = SessionManager.getSession();
+    const response = await API.call('getHSRPRefCustomers', { sessionId: session.sessionId });
+    if (response.success && response.refCustomers) {
+      refCustomerOptions = response.refCustomers;
+      sel.innerHTML = '<option value="">-- All Ref Customers --</option>';
+      response.refCustomers.forEach(function(rc) {
+        const opt = document.createElement('option');
+        opt.value = rc; opt.textContent = rc;
+        sel.appendChild(opt);
+      });
+    } else {
+      sel.innerHTML = '<option value="">-- Failed to load --</option>';
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="">-- Error --</option>';
+    console.error('loadRefCustomerOptions error:', e);
   }
 }
 
@@ -246,11 +276,16 @@ async function searchData() {
   let dateFilter = '';
   let customDate = '';
   
-  // NEW: Updated condition to include refCustomer
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'refCustomer') {
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
     searchValue = document.getElementById('searchValue').value.trim();
     if (!searchValue) {
       alert('Please enter a search value');
+      return;
+    }
+  } else if (searchBy === 'refCustomer') {
+    searchValue = document.getElementById('searchRefCustomerSel').value;
+    if (!searchValue) {
+      alert('Please select a Ref Customer');
       return;
     }
   // NEW: Updated condition to include orderDate
@@ -301,6 +336,8 @@ function clearSearch() {
   document.getElementById('searchValueGroup').style.display = 'none';
   document.getElementById('dateFilterGroup').style.display = 'none';
   document.getElementById('customDateGroup').style.display = 'none';
+  document.getElementById('refCustomerDropdownGroup').style.display = 'none';
+  document.getElementById('searchRefCustomerSel').value = '';
 
   document.getElementById('dataTableContainer').style.display = 'none';
 

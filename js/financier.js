@@ -83,6 +83,66 @@ function populatePayoutHpDropdown(data) {
   });
 }
 
+// ==========================================
+// CUSTOM MULTISELECT HELPERS
+// ==========================================
+
+function toggleMS(id) {
+  const body = document.getElementById(id + '_body');
+  const isOpen = body.classList.contains('open');
+  // Close all
+  document.querySelectorAll('.custom-ms-body').forEach(function(el) { el.classList.remove('open'); });
+  if (!isOpen) body.classList.add('open');
+}
+
+function getSelectedMS(id) {
+  const body = document.getElementById(id + '_body');
+  if (!body) return [];
+  return Array.from(body.querySelectorAll('input[type="checkbox"]:checked')).map(function(cb) { return cb.value; });
+}
+
+function clearMS(id) {
+  const body = document.getElementById(id + '_body');
+  if (!body) return;
+  body.querySelectorAll('input[type="checkbox"]').forEach(function(cb) { cb.checked = false; });
+  updateMSLabel(id);
+}
+
+function updateMSLabel(id) {
+  const selected = getSelectedMS(id);
+  const label = document.getElementById(id + '_label');
+  if (!label) return;
+  if (selected.length === 0) label.textContent = '-- All --';
+  else if (selected.length === 1) label.textContent = selected[0];
+  else label.textContent = selected.length + ' selected';
+}
+
+function populateMS(id, values) {
+  const body = document.getElementById(id + '_body');
+  if (!body) return;
+  const selected = getSelectedMS(id);
+  body.innerHTML = '';
+  values.forEach(function(v) {
+    const label = document.createElement('label');
+    label.className = 'custom-ms-item';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = v;
+    cb.checked = selected.includes(v);
+    cb.addEventListener('change', function() { updateMSLabel(id); applyFilters(); });
+    label.appendChild(cb);
+    label.appendChild(document.createTextNode(v));
+    body.appendChild(label);
+  });
+}
+
+// Close dropdowns when clicking outside
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.custom-ms')) {
+    document.querySelectorAll('.custom-ms-body').forEach(function(el) { el.classList.remove('open'); });
+  }
+});
+
 function populateDropdowns(data) {
   const refSet = new Set();
   const finSet = new Set();
@@ -90,21 +150,8 @@ function populateDropdowns(data) {
     if (r.refCustomer) refSet.add(r.refCustomer);
     if (r.financier)   finSet.add(r.financier);
   });
-
-  function rebuild(id, values) {
-    const sel = document.getElementById(id);
-    const prev = sel.value;
-    sel.innerHTML = '<option value="">-- All --</option>';
-    Array.from(values).sort().forEach(function(v) {
-      const opt = document.createElement('option');
-      opt.value = v; opt.textContent = v;
-      if (v === prev) opt.selected = true;
-      sel.appendChild(opt);
-    });
-  }
-
-  rebuild('filterRefCustomer', refSet);
-  rebuild('filterFinancier', finSet);
+  populateMS('msRefCustomer', Array.from(refSet).sort());
+  populateMS('msFinancier',   Array.from(finSet).sort());
 }
 
 // ==========================================
@@ -121,15 +168,15 @@ function getDiffValue(record) {
 }
 
 function applyFiltersAndSort() {
-  const customerName = document.getElementById('filterCustomer').value.trim().toLowerCase();
-  const refCustomer  = document.getElementById('filterRefCustomer').value;
-  const financier    = document.getElementById('filterFinancier').value;
-  currentSort        = document.getElementById('sortDiff').value;
+  const customerName  = document.getElementById('filterCustomer').value.trim().toLowerCase();
+  const refCustomers  = getSelectedMS('msRefCustomer');
+  const financiers    = getSelectedMS('msFinancier');
+  currentSort         = document.getElementById('sortDiff').value;
 
   let filtered = records.filter(function(r) {
     if (customerName && r.customerName.toLowerCase().indexOf(customerName) === -1) return false;
-    if (refCustomer && r.refCustomer !== refCustomer) return false;
-    if (financier   && r.financier   !== financier)   return false;
+    if (refCustomers.length > 0 && !refCustomers.includes(r.refCustomer)) return false;
+    if (financiers.length > 0   && !financiers.includes(r.financier))     return false;
     return true;
   });
 
@@ -151,10 +198,10 @@ function applyFiltersAndSort() {
 function applyFilters() { applyFiltersAndSort(); }
 
 function clearFilters() {
-  document.getElementById('filterCustomer').value    = '';
-  document.getElementById('filterRefCustomer').value = '';
-  document.getElementById('filterFinancier').value   = '';
-  document.getElementById('sortDiff').value          = 'all';
+  document.getElementById('filterCustomer').value = '';
+  clearMS('msRefCustomer');
+  clearMS('msFinancier');
+  document.getElementById('sortDiff').value = 'all';
   currentSort = 'all';
   displayedData = records;
   renderTable(records);
