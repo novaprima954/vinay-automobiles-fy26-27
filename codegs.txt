@@ -70,9 +70,6 @@ function handleRequest(e) {
       case 'getSalesData':
         result = getSalesData(params.sessionId);
         break;
-      case 'getAccountsDashboard':
-        result = getAccountsDashboard(params.sessionId, params.month);
-        break;
       case 'getAccountsByStatus':
         result = getAccountsByStatus(params.sessionId, params.month, params.status);
         break;
@@ -159,6 +156,21 @@ function handleRequest(e) {
       case 'getAdminDashboard':
         result = getAdminDashboard(params.sessionId, params.dateFilter);
         break;
+      case 'getDiscountAnalysis':
+        result = getDiscountAnalysis(params.sessionId, params.dateFilter);
+        break;
+      case 'getFullAccessoriesDetail':
+        result = getFullAccessoriesDetail(params.sessionId, params.dateFilter);
+        break;
+      case 'getExecutiveSalesDetail':
+        result = getExecutiveSalesDetail(params.sessionId, params.executiveName, params.dateFilter);
+        break;
+      case 'getInventoryAnalysis':
+        result = getInventoryAnalysis(params.sessionId, params.dateFilter);
+        break;
+      case 'getStockInAnalysis':
+        result = getStockInAnalysis(params.sessionId, params.dateFilter);
+        break;
       case 'getAccessoryBreakdown':
         result = getAccessoryBreakdown(params.sessionId, params.accessoryType, params.dateFilter);
         break;
@@ -237,6 +249,18 @@ function handleRequest(e) {
       case 'exportHSRPToPdf':
         result = exportHSRPToPdf(params.sessionId, params.fromDate, params.toDate);
         break;
+      case 'getBusyUploadData':
+        result = getBusyUploadData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
+      case 'getVSeriesExportData':
+        result = getVSeriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
+      case 'getStdAccessoriesExportData':
+        result = getStdAccessoriesExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
+      case 'getVahanExportData':
+        result = getVahanExportData(params.sessionId, params.filterType, params.fromDate, params.toDate, params.fromInvoice, params.toInvoice);
+        break;
 case 'getFinancierData':       result = getFinancierData(params, params.sessionId);       break;
 case 'saveFinancierData':      result = saveFinancierData(params, params.sessionId);      break;
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
@@ -280,6 +304,7 @@ case 'invTransfer':        result = invTransfer(params, params.sessionId); break
 case 'getBookingForIssue': result = getBookingForIssue(params, params.sessionId); break;
 case 'invIssueToBooking':  result = invIssueToBooking(params, params.sessionId); break;
 case 'invOtcSale':         result = invOtcSale(params, params.sessionId); break;
+case 'invAdSale':          result = invAdSale(params, params.sessionId); break;
 case 'getIssuedItems':     result = getIssuedItems(params, params.sessionId); break;
 case 'invReturn':          result = invReturn(params, params.sessionId); break;
 case 'getInvTransactions': result = getInvTransactions(params, params.sessionId); break;
@@ -1483,7 +1508,19 @@ function updateAccountsRecord(sessionId, updateData) {
       sheet.getRange(targetRow, 58).setValue(updateData.priceMatched);
       Logger.log('  ✅ Saved Price Matched to BF (58): ' + updateData.priceMatched);
     }
-    
+
+    // Engine/Chassis Number → Column BH (60) — accounts can approve/correct
+    if (updateData.engineNumber !== undefined) {
+      sheet.getRange(targetRow, 60).setValue(updateData.engineNumber || '');
+      Logger.log('  ✅ Saved Engine/Chassis Number to BH (60): "' + updateData.engineNumber + '"');
+    }
+
+    // Frame Number → Column BI (61) — accounts can approve/correct
+    if (updateData.frameNumber !== undefined) {
+      sheet.getRange(targetRow, 61).setValue(updateData.frameNumber || '');
+      Logger.log('  ✅ Saved Frame Number to BI (61): "' + updateData.frameNumber + '"');
+    }
+
     SpreadsheetApp.flush();
     
     Logger.log('=== updateAccountsRecord SUCCESS ===');
@@ -2512,17 +2549,39 @@ function getSalesDashboard(sessionId, dateFilter) {
     const now = new Date();
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const currentMonth = monthNames[now.getMonth()] + '-' + now.getFullYear();
-    
+
+    // Normalize a Targets sheet month cell → "Jan-2026" string
+    // Handles: Date objects, "Jan-2026", "Jan 2026", "January-2026", "01-2026" etc.
+    function normalizeTargetMonth(val) {
+      if (!val) return '';
+      if (val instanceof Date) {
+        return monthNames[val.getMonth()] + '-' + val.getFullYear();
+      }
+      var s = val.toString().trim();
+      // Already in correct format
+      if (/^[A-Za-z]{3}-\d{4}$/.test(s)) return s;
+      // "Jan 2026" → "Jan-2026"
+      var m = s.match(/^([A-Za-z]+)[^A-Za-z0-9]+(\d{4})$/);
+      if (m) {
+        var abbr = m[1].substring(0, 3);
+        abbr = abbr.charAt(0).toUpperCase() + abbr.slice(1).toLowerCase();
+        return abbr + '-' + m[2];
+      }
+      return s;
+    }
+
     Logger.log('Current month for target lookup: ' + currentMonth);
-    
+
     // Find user's target
     let target = 0;
     for (let i = 1; i < targetsData.length; i++) {
-      const targetMonth = targetsData[i][0]; // Column A: Month
-      const targetExec = targetsData[i][1];  // Column B: Executive
+      const targetMonth = normalizeTargetMonth(targetsData[i][0]); // Column A: Month
+      const targetExec  = (targetsData[i][1] || '').toString().trim(); // Column B: Executive
       const targetValue = targetsData[i][2]; // Column C: Target
-      
-      if (targetMonth === currentMonth && targetExec === user.name) {
+
+      Logger.log('Targets row ' + i + ': month=' + targetMonth + ', exec=' + targetExec);
+
+      if (targetMonth === currentMonth && targetExec === user.name.trim()) {
         target = parseInt(targetValue) || 0;
         Logger.log('Found target: ' + target);
         break;
@@ -2571,11 +2630,11 @@ function getSalesDashboard(sessionId, dateFilter) {
       // Only count user's own sales
       if (executive === user.name) {
         mySales++;
-        
-        // Count completed sales (Account Check = Yes)
+
+        // Count completed retail sales (Account Check = Yes)
         if (accountCheck === 'Yes') {
           myCompletedSales++;
-          
+
           // Model breakdown (only completed sales)
           if (model) {
             if (!modelBreakdownMap[model]) {
@@ -2583,7 +2642,7 @@ function getSalesDashboard(sessionId, dateFilter) {
             }
             modelBreakdownMap[model]++;
           }
-          
+
           // Count accessories (only when Account Check = Yes AND accessory = Yes)
           if (row[12] === 'Yes') myAccessories.guard++;
           if (row[13] === 'Yes') myAccessories.grip++;
@@ -2596,13 +2655,13 @@ function getSalesDashboard(sessionId, dateFilter) {
           if (row[62] === 'Yes') myAccessories.buzzer++;
           if (row[63] === 'Yes') myAccessories.backRest++;
 
+          // Pending tasks: only for retail sales (accountCheck=Yes)
+          // Status stored as 'Yes' when done
+          if (dmsStatus !== 'Yes') dmsPending++;
+          if (insuranceStatus !== 'Yes') insurancePending++;
+          if (rtoStatus !== 'Yes') rtoPending++;
+          if (accessoryFitted !== 'Yes') accessoriesPending++;
         }
-        
-        // Count pending tasks (for all sales, not just completed)
-        if (dmsStatus !== 'Done') dmsPending++;
-        if (insuranceStatus !== 'Done') insurancePending++;
-        if (rtoStatus !== 'Done') rtoPending++;
-        if (accessoryFitted !== 'Yes') accessoriesPending++;
       }
     }
     
@@ -2660,18 +2719,83 @@ function getSalesDashboard(sessionId, dateFilter) {
       }
     }
     
-    // Calculate target progress
-    const targetProgress = target > 0 ? Math.round((myCompletedSales / target) * 100) : 0;
-    
+    // Target progress — always use CURRENT MONTH (calendar month) regardless of filter
+    let myCompletedSalesThisMonth = 0;
+    let myTotalSalesThisMonth = 0;
+    const daysInCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dailyBookingMap = {};
+    const dailySalesMap   = {};
+    for (let d = 1; d <= daysInCurrentMonth; d++) { dailyBookingMap[d] = 0; dailySalesMap[d] = 0; }
+
+    // Determine which month to show on daily trend chart
+    // If filter is 'month:YYYY-MM', show that month's daily data; otherwise current month
+    let trendYear  = now.getFullYear();
+    let trendMonth = now.getMonth();
+    if (dateFilter && dateFilter.indexOf('month:') === 0) {
+      const parts = dateFilter.substring(6).split('-');
+      trendYear  = parseInt(parts[0]);
+      trendMonth = parseInt(parts[1]) - 1;
+    }
+    const daysInTrendMonth = new Date(trendYear, trendMonth + 1, 0).getDate();
+    const trendBookingMap  = {};
+    const trendSalesMap    = {};
+    for (let d = 1; d <= daysInTrendMonth; d++) { trendBookingMap[d] = 0; trendSalesMap[d] = 0; }
+    const isSameMonth = (trendYear === now.getFullYear() && trendMonth === now.getMonth());
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if ((row[1] || '').toString().trim() !== user.name.trim()) continue;
+      if (!row[2]) continue;
+      try {
+        const dt = new Date(row[2]);
+        const dtMonth = dt.getMonth();
+        const dtYear  = dt.getFullYear();
+
+        // Current month → target progress
+        if (dtMonth === now.getMonth() && dtYear === now.getFullYear()) {
+          myTotalSalesThisMonth++;
+          if (row[21] === 'Yes') myCompletedSalesThisMonth++;
+          const day = dt.getDate();
+          if (day >= 1 && day <= daysInCurrentMonth) {
+            dailyBookingMap[day]++;
+            if (row[21] === 'Yes') dailySalesMap[day]++;
+          }
+        }
+
+        // Trend month (may differ if user picked a past month)
+        if (!isSameMonth && dtMonth === trendMonth && dtYear === trendYear) {
+          const day = dt.getDate();
+          if (day >= 1 && day <= daysInTrendMonth) {
+            trendBookingMap[day]++;
+            if (row[21] === 'Yes') trendSalesMap[day]++;
+          }
+        }
+      } catch(e) {}
+    }
+
+    // If trend month IS current month, reuse same maps
+    const finalBookingMap = isSameMonth ? dailyBookingMap : trendBookingMap;
+    const finalSalesMap   = isSameMonth ? dailySalesMap   : trendSalesMap;
+
+    const targetProgress = target > 0 ? Math.round((myCompletedSalesThisMonth / target) * 100) : 0;
+
+    const dailyTrend = [];
+    for (let d = 1; d <= daysInTrendMonth; d++) {
+      dailyTrend.push({ day: d, bookings: finalBookingMap[d] || 0, sales: finalSalesMap[d] || 0 });
+    }
+
     return {
       success: true,
       dashboard: {
         mySales: mySales,
         myCompletedSales: myCompletedSales,
+        myCompletedSalesThisMonth: myCompletedSalesThisMonth,
+        myTotalSalesThisMonth: myTotalSalesThisMonth,
         target: target,
         targetProgress: targetProgress,
         modelBreakdown: modelBreakdown,
         monthlyTrend: monthlyTrend,
+        dailyTrend: dailyTrend,
         dmsPending: dmsPending,
         insurancePending: insurancePending,
         rtoPending: rtoPending,
@@ -2749,9 +2873,13 @@ function getAccountsDashboardView(sessionId, dateFilter) {
         
         // Executive sales count
         if (!executiveStats[executive]) {
-          executiveStats[executive] = 0;
+          executiveStats[executive] = { completedSales: 0, fullAccessories: 0 };
         }
-        executiveStats[executive]++;
+        executiveStats[executive].completedSales++;
+        // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
+        if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
+          executiveStats[executive].fullAccessories++;
+        }
         
         // Executive accessories count
         if (!executiveAccessoryStats[executive]) {
@@ -2797,7 +2925,8 @@ function getAccountsDashboardView(sessionId, dateFilter) {
     const executiveSales = Object.keys(executiveStats).map(function(exec) {
       return {
         executive: exec,
-        completedSales: executiveStats[exec]
+        completedSales: executiveStats[exec].completedSales,
+        fullAccessories: executiveStats[exec].fullAccessories
       };
     }).sort(function(a, b) {
       return b.completedSales - a.completedSales;
@@ -3023,6 +3152,7 @@ function getAdminDashboard(sessionId, dateFilter) {
 
     // Model breakdown (Account Check = Yes only)
     const modelCounts = {};
+    const modelVariantCounts = {}; // "Model|||Variant" → count
 
     // Process data (skip header)
     for (let i = 1; i < filteredData.length; i++) {
@@ -3055,12 +3185,17 @@ function getAdminDashboard(sessionId, dateFilter) {
       if (!executiveStats[executive]) {
         executiveStats[executive] = {
           totalSales: 0,
-          completedSales: 0
+          completedSales: 0,
+          fullAccessories: 0
         };
       }
       executiveStats[executive].totalSales++;
       if (accountCheck === 'Yes') {
         executiveStats[executive].completedSales++;
+        // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
+        if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
+          executiveStats[executive].fullAccessories++;
+        }
       }
 
       // Count accessories, model, operator only when Account Check = Yes
@@ -3076,9 +3211,13 @@ function getAdminDashboard(sessionId, dateFilter) {
         if (row[62] === 'Yes') accessories.buzzer++;
         if (row[63] === 'Yes') accessories.backRest++;
 
-        // Model breakdown
+        // Model breakdown + variant tracking
         if (model) {
           modelCounts[model] = (modelCounts[model] || 0) + 1;
+          const variant = (row[6] || 'Unknown').toString().trim() || 'Unknown';
+          const mvKey = model + '|||' + variant;
+          if (!modelVariantCounts[mvKey]) modelVariantCounts[mvKey] = 0;
+          modelVariantCounts[mvKey]++;
         }
 
         // Operator pending for account-checked rows
@@ -3092,14 +3231,34 @@ function getAdminDashboard(sessionId, dateFilter) {
     const executiveList = Object.keys(executiveStats).map(exec => ({
       executive: exec,
       totalSales: executiveStats[exec].totalSales,
-      completedSales: executiveStats[exec].completedSales
+      completedSales: executiveStats[exec].completedSales,
+      fullAccessories: executiveStats[exec].fullAccessories
     })).sort((a, b) => b.completedSales - a.completedSales);
 
     // Convert model counts to sorted array
     const modelBreakdown = Object.keys(modelCounts).map(function(m) {
       return { model: m, count: modelCounts[m] };
     }).sort(function(a, b) { return b.count - a.count; });
-    
+
+    // Build model+variant nested breakdown
+    const mvMap = {};
+    Object.keys(modelVariantCounts).forEach(function(key) {
+      var parts = key.split('|||');
+      var m = parts[0], v = parts[1] || 'Unknown';
+      if (!mvMap[m]) mvMap[m] = {};
+      mvMap[m][v] = modelVariantCounts[key];
+    });
+    const modelVariantBreakdown = modelBreakdown.map(function(mb) {
+      var variants = mvMap[mb.model] || {};
+      return {
+        model: mb.model,
+        total: mb.count,
+        variants: Object.keys(variants).map(function(v) {
+          return { variant: v, count: variants[v] };
+        }).sort(function(a, b) { return b.count - a.count; })
+      };
+    });
+
     // Get CRM stats
     const crmSheet = getSheet('CRM_Leads');
     const crmData = crmSheet.getDataRange().getValues();
@@ -3137,6 +3296,7 @@ function getAdminDashboard(sessionId, dateFilter) {
         executiveList: executiveList,
         accessories: accessories,
         modelBreakdown: modelBreakdown,
+        modelVariantBreakdown: modelVariantBreakdown,
         crmNewLeads: newLeads,
         crmHotLeads: hotLeads,
         crmConversionRate: conversionRate
@@ -3149,6 +3309,393 @@ function getAdminDashboard(sessionId, dateFilter) {
       success: false,
       message: 'Error loading dashboard: ' + error.toString()
     };
+  }
+}
+
+/**
+ * Discount Analysis (Admin only, password-protected on frontend)
+ */
+function getDiscountAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    let totalDiscount = 0;
+    let dealsWithDiscount = 0;
+    let maxDiscount = 0;
+    const byModel = {};
+    const byExec  = {};
+    const byExecNoApache = {};
+    const buckets = { zero: 0, small: 0, medium: 0, large: 0 };
+    const allDeals = [];
+    const monthlyMap = {};
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+
+      // Only include records where Account Check = Yes
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;
+
+      const executive  = (row[1] || '').toString().trim();
+      const custName   = (row[3] || '').toString().trim();
+      const model      = (row[5] || '').toString().trim();
+      const disc       = parseFloat(row[8]) || 0;
+      const finalPrice = parseFloat(row[9]) || 0;
+      const grossPrice = finalPrice + disc;
+      let rowDateFmt = '', rowMonth = '';
+      if (row[2]) {
+        try {
+          rowDateFmt = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy');
+          rowMonth   = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'MMM yy');
+        } catch(e) {}
+      }
+
+      totalDiscount += disc;
+      if (disc > 0) dealsWithDiscount++;
+      if (disc > maxDiscount) maxDiscount = disc;
+
+      if (model) {
+        if (!byModel[model]) byModel[model] = { count: 0, totalDiscount: 0, totalGross: 0, maxDiscount: 0 };
+        byModel[model].count++;
+        byModel[model].totalDiscount += disc;
+        byModel[model].totalGross += grossPrice;
+        if (disc > byModel[model].maxDiscount) byModel[model].maxDiscount = disc;
+      }
+      if (executive) {
+        if (!byExec[executive]) byExec[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+        byExec[executive].count++;
+        byExec[executive].totalDiscount += disc;
+        if (disc > byExec[executive].maxDiscount) byExec[executive].maxDiscount = disc;
+
+        // byExecNoApache: same but exclude rows where model contains 'Apache'
+        if (model.toLowerCase().indexOf('apache') === -1) {
+          if (!byExecNoApache[executive]) byExecNoApache[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+          byExecNoApache[executive].count++;
+          byExecNoApache[executive].totalDiscount += disc;
+          if (disc > byExecNoApache[executive].maxDiscount) byExecNoApache[executive].maxDiscount = disc;
+        }
+      }
+
+      if (disc === 0)          buckets.zero++;
+      else if (disc <= 1000)   buckets.small++;
+      else if (disc <= 1500)   buckets.medium++;
+      else                     buckets.large++;
+
+      allDeals.push({ date: rowDateFmt, customer: custName, model: model, executive: executive, discount: disc, finalPrice: finalPrice, grossPrice: grossPrice });
+      if (rowMonth) {
+        if (!monthlyMap[rowMonth]) monthlyMap[rowMonth] = { totalDiscount: 0, count: 0 };
+        monthlyMap[rowMonth].totalDiscount += disc;
+        monthlyMap[rowMonth].count++;
+      }
+    }
+
+    const totalRows  = filteredData.length - 1;
+    const totalGross = allDeals.reduce(function(s, d) { return s + d.grossPrice; }, 0);
+    const totalNet   = allDeals.reduce(function(s, d) { return s + d.finalPrice; }, 0);
+
+    const byModelArr = Object.keys(byModel).map(function(m) {
+      var d = byModel[m];
+      return { model: m, count: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount,
+        discountPct:   d.totalGross > 0 ? Math.round((d.totalDiscount / d.totalGross) * 1000) / 10 : 0 };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const byExecArr = Object.keys(byExec).map(function(e) {
+      var d = byExec[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const byExecNoApacheArr = Object.keys(byExecNoApache).map(function(e) {
+      var d = byExecNoApache[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const top10 = allDeals.filter(function(d) { return d.discount > 0; })
+      .sort(function(a, b) { return b.discount - a.discount; }).slice(0, 10);
+
+    const monthly = Object.keys(monthlyMap).map(function(m) {
+      return { month: m, totalDiscount: Math.round(monthlyMap[m].totalDiscount), count: monthlyMap[m].count };
+    });
+
+    return {
+      success: true,
+      data: {
+        totalDiscount:               Math.round(totalDiscount),
+        totalDeals:                  totalRows,
+        dealsWithDiscount:           dealsWithDiscount,
+        avgDiscountPerDeal:          totalRows > 0 ? Math.round(totalDiscount / totalRows) : 0,
+        avgDiscountPerDiscountedDeal: dealsWithDiscount > 0 ? Math.round(totalDiscount / dealsWithDiscount) : 0,
+        maxDiscount:                 maxDiscount,
+        totalGrossRevenue:           Math.round(totalGross),
+        totalNetRevenue:             Math.round(totalNet),
+        discountPct:                 totalGross > 0 ? Math.round((totalDiscount / totalGross) * 1000) / 10 : 0,
+        byModel:                     byModelArr,
+        byExecutive:                 byExecArr,
+        byExecutiveNoApache:         byExecNoApacheArr,
+        buckets:                     buckets,
+        top10:                       top10,
+        monthly:                     monthly
+      }
+    };
+  } catch(e) {
+    Logger.log('getDiscountAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Full Accessories Detail: customers with Guard+Grip+SeatCover+Matin=Yes and accountCheck=Yes
+ * Grouped by executive, sorted by count desc.
+ */
+function getFullAccessoriesDetail(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    let filterExecutive = null;
+    if (user.role === 'executive') {
+      filterExecutive = user.name;
+    } else if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const sheet      = getSheet(CONFIG.SHEETS.DATA);
+    const rawData    = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    const byExec = {};
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;            // accountCheck
+      if (row[12] !== 'Yes' || row[13] !== 'Yes' ||
+          row[14] !== 'Yes' || row[15] !== 'Yes') continue;                 // all 4 core accessories
+
+      const executive = (row[1] || '').toString().trim();
+      if (filterExecutive && executive !== filterExecutive) continue;       // executive self-view
+      const custName  = (row[3] || '').toString().trim();
+      const model     = (row[5] || '').toString().trim();
+      const variant   = (row[6] || '').toString().trim();
+      let dateStr = '';
+      if (row[2]) {
+        try { dateStr = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
+      }
+
+      if (!byExec[executive]) byExec[executive] = { count: 0, customers: [] };
+      byExec[executive].count++;
+      byExec[executive].customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+    }
+
+    const result = Object.keys(byExec).map(function(exec) {
+      return { executive: exec, count: byExec[exec].count, customers: byExec[exec].customers };
+    }).sort(function(a, b) { return b.count - a.count; });
+
+    return { success: true, data: result };
+  } catch(e) {
+    Logger.log('getFullAccessoriesDetail error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Executive Sales Detail: individual records for one executive where accountCheck=Yes.
+ * Executive role can see only their own data; admin/accounts can request any executive.
+ * Returns: { executive, customers: [{date, customerName, model, variant}] }
+ */
+function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+
+    // Executive role: force to own name only
+    if (user.role === 'executive') {
+      executiveName = user.name;
+    } else if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    const customers = [];
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      if ((row[21] || '').toString().trim() !== 'Yes') continue;
+      if ((row[1] || '').toString().trim() !== executiveName) continue;
+
+      const custName = (row[3] || '').toString().trim();
+      const model    = (row[5] || '').toString().trim();
+      const variant  = (row[6] || '').toString().trim();
+      let dateStr = '';
+      if (row[11]) {
+        try { dateStr = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
+      }
+      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+    }
+
+    return { success: true, data: { executive: executiveName, customers: customers } };
+  } catch(e) {
+    Logger.log('getExecutiveSalesDetail error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Inventory Analysis: ISSUE units per SKU, OTC_SALE units per SKU, AD_SALE by AD name
+ * InvTransactions columns: 0:txnId 1:date 2:type 3:skuId 4:skuName 5:from 6:to 7:qty
+ *   8:receiptNo 9:customerName(AD name for AD_SALE) 10:executiveName ... 18:invoiceNo
+ */
+function getInventoryAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const invRole = validation.user.role;
+    if (invRole !== 'admin' && invRole !== 'accounts') return { success: false, message: 'Access denied' };
+
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.INV_TXN_SHEET);
+    if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
+
+    const allRows = sheet.getDataRange().getValues();
+    // Filter by dateFilter on col index 1 (date column)
+    const rows = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header
+
+    // --- Accumulators ---
+    const issueTotals = {};   // skuName -> qty
+    const otcTotals   = {};   // skuName -> qty
+    const adTotals    = {};   // adName -> { skuName -> qty }
+    const otcByExec   = {};   // executiveName -> { skuName -> qty }
+
+    rows.forEach(function(row) {
+      const type    = String(row[2] || '').trim().toUpperCase();
+      const skuName = String(row[4] || '').trim();
+      const qty     = Number(row[7]) || 0;
+
+      if (!skuName || qty <= 0) return;
+
+      if (type === 'ISSUE') {
+        issueTotals[skuName] = (issueTotals[skuName] || 0) + qty;
+
+      } else if (type === 'OTC_SALE') {
+        otcTotals[skuName] = (otcTotals[skuName] || 0) + qty;
+        // Track by executive (col 10)
+        var execName = String(row[10] || '').trim() || 'Unknown';
+        if (!otcByExec[execName]) otcByExec[execName] = {};
+        otcByExec[execName][skuName] = (otcByExec[execName][skuName] || 0) + qty;
+
+      } else if (type === 'AD_SALE') {
+        const adName = String(row[9] || '').trim() || 'Unknown';
+        if (!adTotals[adName]) adTotals[adName] = {};
+        adTotals[adName][skuName] = (adTotals[adName][skuName] || 0) + qty;
+      }
+    });
+
+    // Convert to sorted arrays
+    const issue = Object.keys(issueTotals)
+      .map(function(k) { return { skuName: k, qty: issueTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    const otc = Object.keys(otcTotals)
+      .map(function(k) { return { skuName: k, qty: otcTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    const adSale = Object.keys(adTotals)
+      .map(function(adName) {
+        const items = Object.keys(adTotals[adName])
+          .map(function(sku) { return { skuName: sku, qty: adTotals[adName][sku] }; })
+          .sort(function(a, b) { return b.qty - a.qty; });
+        return { adName: adName, items: items };
+      })
+      .sort(function(a, b) {
+        // sort ADs by total qty desc
+        const ta = a.items.reduce(function(s, x) { return s + x.qty; }, 0);
+        const tb = b.items.reduce(function(s, x) { return s + x.qty; }, 0);
+        return tb - ta;
+      });
+
+    // Build otcByExecutive sorted array
+    const otcByExecutive = Object.keys(otcByExec)
+      .map(function(exec) {
+        var items = Object.keys(otcByExec[exec])
+          .map(function(sku) { return { skuName: sku, qty: otcByExec[exec][sku] }; })
+          .sort(function(a, b) { return b.qty - a.qty; });
+        var total = items.reduce(function(s, x) { return s + x.qty; }, 0);
+        return { executive: exec, items: items, total: total };
+      })
+      .sort(function(a, b) { return b.total - a.total; });
+
+    return {
+      success: true,
+      data: { issue: issue, otc: otc, adSale: adSale, otcByExecutive: otcByExecutive }
+    };
+  } catch(e) {
+    Logger.log('getInventoryAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Stock In (Purchase) Analysis — STOCK_IN transactions grouped by SKU
+ * InvTransactions col 2=type, 4=skuName, 7=qty, 6=toLocation, 15=enteredBy, 18=invoiceNo
+ */
+function getStockInAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName(CONFIG.SHEETS.INV_TXN_SHEET);
+    if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
+
+    const allRows = sheet.getDataRange().getValues();
+    const rows    = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header, date=col1
+
+    const skuTotals   = {}; // skuName -> total qty
+    let   totalUnits  = 0;
+    let   totalTxns   = 0;
+
+    rows.forEach(function(row) {
+      const type    = String(row[2] || '').trim().toUpperCase();
+      if (type !== 'STOCK_IN') return;
+
+      const skuName = String(row[4] || '').trim() || 'Unknown';
+      const qty     = Number(row[7]) || 0;
+      if (qty <= 0) return;
+
+      skuTotals[skuName] = (skuTotals[skuName] || 0) + qty;
+      totalUnits += qty;
+      totalTxns++;
+    });
+
+    const items = Object.keys(skuTotals)
+      .map(function(k) { return { skuName: k, qty: skuTotals[k] }; })
+      .sort(function(a, b) { return b.qty - a.qty; });
+
+    return {
+      success: true,
+      data: { items: items, totalUnits: totalUnits, totalTxns: totalTxns }
+    };
+  } catch(e) {
+    Logger.log('getStockInAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
   }
 }
 
@@ -3276,9 +3823,20 @@ function filterByDateRange(data, dateFilter, dateColumnIndex) {
       weekAgo.setDate(weekAgo.getDate() - 7);
       include = rowDate >= weekAgo && rowDate <= today;
     } else if (dateFilter === 'month') {
-      const monthAgo = new Date(today);
-      monthAgo.setMonth(monthAgo.getMonth() - 1);
-      include = rowDate >= monthAgo && rowDate <= today;
+      // Current calendar month (1st to last day of current month)
+      const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+      const lastDay  = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+      include = rowDate >= firstDay && rowDate <= lastDay;
+    } else if (dateFilter.indexOf('month:') === 0) {
+      // Specific month e.g. 'month:2026-03'
+      const parts    = dateFilter.substring(6).split('-');
+      const yr       = parseInt(parts[0]);
+      const mo       = parseInt(parts[1]) - 1; // 0-indexed
+      const firstDay = new Date(yr, mo, 1);
+      const lastDay  = new Date(yr, mo + 1, 0);
+      lastDay.setHours(23, 59, 59, 999);
+      include = rowDate >= firstDay && rowDate <= lastDay;
     } else {
       include = true;
     }
@@ -6152,10 +6710,13 @@ function uploadV301File(sessionId, base64Data, fileName) {
       const invoiceNo = values[2] || '';      // Column C
       const modelName = values[3] || '';      // Column D
       const frameNo = values[4] || '';        // Column E
+      const engineNo = values[5] || '';       // Column F - Engine Number
       const customerName = values[6] || '';   // Column G
       const mobileNo = values[8] || '';       // Column I
       const hpCompany = values[9] || '';      // Column J - HP Company
+      const invoiceAmount = values[11] || ''; // Column L - Invoice Amount
       const refCustomer = values[12] || '';   // Column M
+      const customerAddress = values[13] || ''; // Column N - Customer Address
       
       // Skip if invoice number already exists
       if (existingInvoices[invoiceNo.toString()]) {
@@ -6171,20 +6732,29 @@ function uploadV301File(sessionId, base64Data, fileName) {
       
       // Build row for HSRP sheet
       // Columns: Sr No, Invoice No, Invoice Date, Status, Mobile No, Customer Name, Frame No, Registration No, Ref Customer, Model Name, Order Date, Fitment Date, HP Company
+      // Cols N-R (indices 13-17) left blank; S-U (indices 18-20) = Engine No, Invoice Amount, Customer Address
       const newRow = [
-          maxSrNo,                  // A: Sr No
-          invoiceNo,                // B: Invoice No
-          invoiceDate,              // C: Invoice Date
-          '',                       // D: Status (blank initially)
-          mobileNo,                 // E: Mobile No
-          customerName,             // F: Customer Name
-          frameNo,                  // G: Frame No
-          '',                       // H: Registration No (blank)
-          (customerName.toUpperCase().includes('SEVA MOTORS') ? 'SEVA MOTORS' : (refCustomer || 'Vinay Automobiles')),  // I: Ref Customer
-          modelName,                // J: Model Name
-          '',                       // K: Order Date (blank initially, set during Step 2)
-          '',                       // L: Fitment Date (blank)
-          hpCompany                 // M: HP Company (stored, not displayed)
+          maxSrNo,                  // A (0): Sr No
+          invoiceNo,                // B (1): Invoice No
+          invoiceDate,              // C (2): Invoice Date
+          '',                       // D (3): Status (blank initially)
+          mobileNo,                 // E (4): Mobile No
+          customerName,             // F (5): Customer Name
+          frameNo,                  // G (6): Frame No
+          '',                       // H (7): Registration No (blank)
+          (customerName.toUpperCase().includes('SEVA MOTORS') ? 'SEVA MOTORS' : (refCustomer || 'Vinay Automobiles')),  // I (8): Ref Customer
+          modelName,                // J (9): Model Name
+          '',                       // K (10): Order Date (blank initially, set during Step 2)
+          '',                       // L (11): Fitment Date (blank)
+          hpCompany,                // M (12): HP Company (stored, not displayed)
+          '',                       // N (13): blank
+          '',                       // O (14): blank
+          '',                       // P (15): blank
+          '',                       // Q (16): blank
+          '',                       // R (17): blank
+          engineNo,                 // S (18): Engine Number
+          invoiceAmount,            // T (19): Invoice Amount
+          customerAddress           // U (20): Customer Address
       ];
       
       rowsToAdd.push(newRow);
@@ -6199,7 +6769,7 @@ function uploadV301File(sessionId, base64Data, fileName) {
     // Append rows to sheet
     if (rowsToAdd.length > 0) {
       const startRow = hsrpSheet.getLastRow() + 1;
-      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 13).setValues(rowsToAdd);
+      hsrpSheet.getRange(startRow, 1, rowsToAdd.length, 21).setValues(rowsToAdd);
       SpreadsheetApp.flush();
     }
     
@@ -6887,6 +7457,538 @@ function exportHSRPToPdf(sessionId, fromDate, toDate) {
   }
 }
 
+/**
+ * Busy Upload - Get HSRP data for Vehicle Invoice Master Excel export
+ * Filter by date range OR invoice number range
+ * Returns: customerName, refCustomer, customerAddress, mobileNo, invoiceNo, invoiceDate
+ */
+function getBusyUploadData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    const sheet = getSheet('HSRP');
+    const data  = sheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try {
+        const d = new Date(val);
+        return Utilities.formatDate(d, 'Asia/Kolkata', 'dd-MMM-yyyy');
+      } catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue; // skip empty rows
+
+      const invoiceNo      = (row[1]  || '').toString().trim();
+      const invoiceDateRaw = row[2];
+      const customerName   = (row[5]  || '').toString().trim();
+      const refCustomer    = (row[8]  || '').toString().trim();
+      const customerAddr   = (row[20] || '').toString().trim();
+      const mobileNo       = (row[4]  || '').toString().trim();
+
+      // --- Filter by invoice date ---
+      if (filterType === 'date') {
+        if (!invoiceDateRaw) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDateRaw); } catch(e) { continue; }
+        rowDate.setHours(0, 0, 0, 0);
+        if (fromDate) {
+          var fd = new Date(fromDate); fd.setHours(0,0,0,0);
+          if (rowDate < fd) continue;
+        }
+        if (toDate) {
+          var td = new Date(toDate); td.setHours(23,59,59,999);
+          if (rowDate > td) continue;
+        }
+
+      // --- Filter by invoice number range ---
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      records.push({
+        invoiceNo:       invoiceNo,
+        invoiceDate:     fmtDate(invoiceDateRaw),
+        customerName:    customerName,
+        refCustomer:     refCustomer,
+        customerAddress: customerAddr,
+        mobileNo:        mobileNo
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getBusyUploadData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * V Series Export — HSRP data joined with main Data sheet for accessories + executive name
+ * Main Data sheet: row[1]=executive, row[60]=frameNumber, row[12]=Guard, row[13]=Grip, row[14]=SeatCover, row[15]=Matin
+ * HSRP sheet: col6=frameNo, col8=refCustomer, col9=modelName, col12=hpCompany, col18=engineNo, col19=invoiceAmount
+ */
+function getVSeriesExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    // --- Build frame number index from main Data sheet ---
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const dataRows  = dataSheet.getDataRange().getValues();
+    const frameIndex = {}; // frameNumber (lowercase) -> { executive, guard, grip, seatCover, matin }
+    for (var di = 1; di < dataRows.length; di++) {
+      var dr = dataRows[di];
+      var fn = (dr[60] || '').toString().trim();
+      if (fn) {
+        frameIndex[fn.toLowerCase()] = {
+          executive: (dr[1]  || '').toString().trim(),
+          guard:     (dr[12] || '').toString().trim(),
+          grip:      (dr[13] || '').toString().trim(),
+          seatCover: (dr[14] || '').toString().trim(),
+          matin:     (dr[15] || '').toString().trim()
+        };
+      }
+    }
+
+    // --- Read & filter HSRP sheet ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MMM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1]  || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5]  || '').toString().trim();
+      var frameNo      = (row[6]  || '').toString().trim();
+      var refCustomer  = (row[8]  || '').toString().trim();
+      var modelName    = (row[9]  || '').toString().trim();
+      var hpCompany    = (row[12] || '').toString().trim();
+      var engineNo     = (row[18] || '').toString().trim();
+      var invoiceAmt   = row[19] || '';
+
+      // --- Apply filter ---
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0); if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      // --- Look up Data sheet by frame number ---
+      var dataLookup = frameIndex[frameNo.toLowerCase()] || null;
+
+      // --- Accessories (K): VA → check Guard+Grip+SeatCover+Matin; others → 'N' ---
+      var accessories = 'N';
+      var isVinay = refCustomer.toLowerCase().indexOf('vinay automobiles') !== -1;
+      if (isVinay && dataLookup) {
+        if (dataLookup.guard === 'Yes' && dataLookup.grip === 'Yes' &&
+            dataLookup.seatCover === 'Yes' && dataLookup.matin === 'Yes') {
+          accessories = 'Y';
+        }
+      }
+
+      // --- Broker name (M): VA → executive name; others → refCustomer ---
+      var brokerName = '';
+      if (isVinay) {
+        brokerName = dataLookup ? dataLookup.executive : '';
+      } else {
+        brokerName = refCustomer;
+      }
+
+      records.push({
+        invoiceNo:     invoiceNo,
+        invoiceDate:   fmtDate(invoiceDate),
+        customerName:  customerName,
+        frameNo:       frameNo,
+        modelName:     modelName,
+        engineNo:      engineNo,
+        hpCompany:     hpCompany,
+        invoiceAmount: invoiceAmt,
+        accessories:   accessories,
+        brokerName:    brokerName
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getVSeriesExportData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ==========================================
+// STANDARD ACCESSORIES EXPORT
+// ==========================================
+
+/**
+ * For each filtered HSRP invoice, join to Data sheet by frame number,
+ * look up each accessory taken (Yes/qty) against PriceMaster, and
+ * return one row per accessory item + service charge if applicable.
+ *
+ * PriceMaster columns (0-indexed):
+ *   0=Model, 1=Variant, 2=ExShowroom, 3=RTO, 4=Insurance,
+ *   5=ServiceCharge, 6=MandAccessories, 7=Guard, 8=GripCover,
+ *   9=SeatCover, 10=Matin, 11=TankCover, 12=HandleHook, 13=Helmet,
+ *   14=Total, 15=RainCoverPrice, 16=BuzzerPrice, 17=BackRestPrice
+ *
+ * Data sheet accessory columns (0-indexed):
+ *   12=Guard, 13=GripCover, 14=SeatCover, 15=Matin, 16=TankCover,
+ *   17=HandleHook, 18=Helmet(1/2/No), 61=RainCover, 62=Buzzer, 63=BackRest
+ */
+function getStdAccessoriesExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    // --- Build PriceMaster lookup map ---
+    // Key: lowercased "model variant" (or just "model" as fallback)
+    const pmSheet = getSheet('PriceMaster');
+    const pmData  = pmSheet.getDataRange().getValues();
+    const priceMap        = {}; // "model variant" lowercase → entry
+    const priceMapVariant = {}; // variant-only lowercase → entry (fallback)
+    const priceMapModel   = {}; // model-only lowercase → entry (fallback)
+
+    for (var pi = 1; pi < pmData.length; pi++) {
+      var pr = pmData[pi];
+      var pmModel   = (pr[0]  || '').toString().trim();
+      var pmVariant = (pr[1]  || '').toString().trim();
+      if (!pmModel) continue;
+
+      var entry = {
+        pmDisplayName:   pmModel,
+        mandAccessories: parseFloat(pr[6])  || 0,
+        guard:           parseFloat(pr[7])  || 0,
+        grip:            parseFloat(pr[8])  || 0,
+        seatCover:       parseFloat(pr[9])  || 0,
+        matin:           parseFloat(pr[10]) || 0,
+        tankCover:       parseFloat(pr[11]) || 0,
+        handleHook:      parseFloat(pr[12]) || 0,
+        helmet:          parseFloat(pr[13]) || 0,
+        rainCover:       parseFloat(pr[15]) || 0,
+        buzzer:          parseFloat(pr[16]) || 0,
+        backRest:        parseFloat(pr[17]) || 0
+      };
+
+      var fullKey    = (pmModel + (pmVariant ? ' ' + pmVariant : '')).toLowerCase();
+      var variantKey = pmVariant.toLowerCase();
+      var modelKey   = pmModel.toLowerCase();
+      priceMap[fullKey] = entry;
+      if (pmVariant && !priceMapVariant[variantKey]) priceMapVariant[variantKey] = entry;
+      if (!priceMapModel[modelKey]) priceMapModel[modelKey] = entry;
+    }
+
+    // Look up PriceMaster using Data sheet col G model name
+    function lookupPrice(modelName) {
+      if (!modelName) return null;
+      var mn = modelName.toLowerCase();
+      if (priceMap[mn])        return priceMap[mn];        // exact full match
+      if (priceMapVariant[mn]) return priceMapVariant[mn]; // variant-only match
+      if (priceMapModel[mn])   return priceMapModel[mn];   // model-only match
+      // partial contains match
+      var keys = Object.keys(priceMap);
+      for (var k = 0; k < keys.length; k++) {
+        if (mn.indexOf(keys[k]) !== -1 || keys[k].indexOf(mn) !== -1) return priceMap[keys[k]];
+      }
+      // partial variant match
+      var vkeys = Object.keys(priceMapVariant);
+      for (var v = 0; v < vkeys.length; v++) {
+        if (mn.indexOf(vkeys[v]) !== -1 || vkeys[v].indexOf(mn) !== -1) return priceMapVariant[vkeys[v]];
+      }
+      return null;
+    }
+
+    // --- Build Data sheet frame index (col BI=60 for frame, col G=6 for model) ---
+    const dataSheet = getSheet(CONFIG.SHEETS.DATA);
+    const dataRows  = dataSheet.getDataRange().getValues();
+    const frameIndex = {};
+    for (var di = 1; di < dataRows.length; di++) {
+      var dr = dataRows[di];
+      var fn = (dr[60] || '').toString().trim();
+      if (!fn) continue;
+      frameIndex[fn.toLowerCase()] = {
+        modelName:  (dr[6]  || '').toString().trim(), // col G = variant/model for PriceMaster
+        guard:      (dr[12] || '').toString().trim(),
+        grip:       (dr[13] || '').toString().trim(),
+        seatCover:  (dr[14] || '').toString().trim(),
+        matin:      (dr[15] || '').toString().trim(),
+        tankCover:  (dr[16] || '').toString().trim(),
+        handleHook: (dr[17] || '').toString().trim(),
+        helmet:     (dr[18] || '').toString().trim(),
+        rainCover:  (dr[61] || '').toString().trim(),
+        buzzer:     (dr[62] || '').toString().trim(),
+        backRest:   (dr[63] || '').toString().trim()
+      };
+    }
+
+    // --- Read & filter HSRP ---
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MMM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    function round2(n) { return Math.round(n * 100) / 100; }
+
+    const records      = []; // VA customer rows (individual accessories)
+    const nonVaInvoices = []; // non-VA invoices needing manual amount entry
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1]  || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5]  || '').toString().trim();
+      var frameNo      = (row[6]  || '').toString().trim();
+      var refCustomer  = (row[8]  || '').toString().trim();
+
+      if (!invoiceNo) continue;
+
+      // Apply date / invoice filter
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0);      if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      var fmtInvDate = fmtDate(invoiceDate);
+
+      // --- Non-VA customer: no Data sheet entry expected; ask user for manual amounts ---
+      var isVinay = refCustomer.toLowerCase().indexOf('vinay automobiles') !== -1;
+      if (!isVinay || !frameNo) {
+        nonVaInvoices.push({
+          invoiceNo:    invoiceNo,
+          invoiceDate:  fmtInvDate,
+          customerName: customerName,
+          modelName:    (row[9] || '').toString().trim(),
+          refCustomer:  refCustomer
+        });
+        continue;
+      }
+
+      // --- VA customer: look up Data sheet by frame number ---
+      var dl = frameIndex[frameNo.toLowerCase()];
+      if (!dl) {
+        // Frame not found in Data sheet — treat as non-VA for manual entry
+        nonVaInvoices.push({
+          invoiceNo:    invoiceNo,
+          invoiceDate:  fmtInvDate,
+          customerName: customerName,
+          modelName:    (row[9] || '').toString().trim(),
+          refCustomer:  refCustomer
+        });
+        continue;
+      }
+
+      // --- Look up PriceMaster using Data sheet col G model name ---
+      var pm = lookupPrice(dl.modelName);
+      if (!pm) continue; // no pricing found, skip silently
+
+      // --- Emit one row per accessory taken ---
+      var dn = pm.pmDisplayName; // e.g. "Jupiter 110" or "Ronin"
+      var accList = [
+        { val: dl.guard,      label: dn + ' Guard',     price: pm.guard      },
+        { val: dl.grip,       label: 'Grip Cover',      price: pm.grip       },
+        { val: dl.seatCover,  label: dn + ' SeatCover', price: pm.seatCover  },
+        { val: dl.matin,      label: dn + ' Matin',     price: pm.matin      },
+        { val: dl.tankCover,  label: 'Tank Cover',      price: pm.tankCover  },
+        { val: dl.handleHook, label: 'Handle Hook',     price: pm.handleHook },
+        { val: dl.helmet,     label: 'Helmet',          price: pm.helmet,    isHelmet: true },
+        { val: dl.rainCover,  label: 'Rain Cover',      price: pm.rainCover  },
+        { val: dl.buzzer,     label: 'Buzzer',          price: pm.buzzer     },
+        { val: dl.backRest,   label: 'Back Rest',       price: pm.backRest   }
+      ];
+
+      for (var a = 0; a < accList.length; a++) {
+        var acc = accList[a];
+        var qty = 0;
+        var dv  = acc.val.toLowerCase();
+        if (acc.isHelmet) {
+          if (dv === '2') qty = 2;
+          else if (dv === '1' || dv === 'yes') qty = 1;
+        } else {
+          if (dv === 'yes') qty = 1;
+        }
+        if (qty === 0) continue;
+        var amount = round2(acc.price * qty);
+        if (amount === 0) continue;
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     acc.label,
+          quantity:     qty,
+          unitPrice:    round2(acc.price / 1.18),
+          amount:       amount
+        });
+      }
+
+      // Standard Accessories row (from PriceMaster MandAccessories col 6)
+      if (pm.mandAccessories > 0) {
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     'Standard Accessories',
+          quantity:     1,
+          unitPrice:    round2(pm.mandAccessories / 1.18),
+          amount:       pm.mandAccessories
+        });
+      }
+
+      // Service charge — taken directly from PriceMaster
+      if (pm.serviceCharge > 0) {
+        records.push({
+          invoiceDate:  fmtInvDate,
+          invoiceNo:    invoiceNo,
+          customerName: customerName,
+          itemName:     'Service Charge',
+          quantity:     1,
+          unitPrice:    round2(pm.serviceCharge / 1.18),
+          amount:       pm.serviceCharge
+        });
+      }
+    }
+
+    return { success: true, vaData: records, nonVaInvoices: nonVaInvoices };
+
+  } catch(e) {
+    Logger.log('getStdAccessoriesExportData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+// ==========================================
+// VAHAN EXPORT
+// ==========================================
+
+/**
+ * Get HSRP records for Vahan Export (RTO/INSU voucher format)
+ * Returns: invoiceNo, invoiceDate (dd-MM-yyyy), customerName, modelName, hpCompany
+ */
+function getVahanExportData(sessionId, filterType, fromDate, toDate, fromInvoice, toInvoice) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    // --- Build PriceMaster ExShowroom → RTO map (first match per rounded exShowroom) ---
+    const pmSheet   = getSheet('PriceMaster');
+    const pmData    = pmSheet.getDataRange().getValues();
+    const exShowroomMap = {}; // key: rounded exShowroom → rto amount
+    for (var pi = 1; pi < pmData.length; pi++) {
+      var pr = pmData[pi];
+      if (!pr[0]) continue;
+      var exShowroom = Math.round(parseFloat(pr[2]) || 0);
+      var rto        = parseFloat(pr[3]) || 0;
+      if (exShowroom > 0 && !exShowroomMap[exShowroom]) {
+        exShowroomMap[exShowroom] = rto; // first match wins
+      }
+    }
+
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    function fmtDate(val) {
+      if (!val) return '';
+      try { return Utilities.formatDate(new Date(val), 'Asia/Kolkata', 'dd-MM-yyyy'); }
+      catch(e) { return val.toString(); }
+    }
+
+    const records = [];
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      if (!row[0]) continue;
+
+      var invoiceNo    = (row[1]  || '').toString().trim();
+      var invoiceDate  = row[2];
+      var customerName = (row[5]  || '').toString().trim();
+      var modelName    = (row[9]  || '').toString().trim();
+      var hpCompany    = (row[12] || '').toString().trim();
+      var refCustomer  = (row[8]  || '').toString().trim();
+      var invoiceAmt   = Math.round(parseFloat(row[19]) || 0); // col T, rounded
+      var rtoAmount    = exShowroomMap[invoiceAmt] || 0;        // 0 if no match
+      if (hpCompany)   rtoAmount += 500;                        // HP surcharge
+
+      // --- Apply filter ---
+      if (filterType === 'date') {
+        if (!invoiceDate) continue;
+        var rowDate;
+        try { rowDate = new Date(invoiceDate); rowDate.setHours(0,0,0,0); } catch(e) { continue; }
+        if (fromDate) { var fd = new Date(fromDate); fd.setHours(0,0,0,0); if (rowDate < fd) continue; }
+        if (toDate)   { var td = new Date(toDate);   td.setHours(23,59,59,999); if (rowDate > td) continue; }
+      } else if (filterType === 'invoice') {
+        if (fromInvoice && invoiceNo < fromInvoice.toString().trim()) continue;
+        if (toInvoice   && invoiceNo > toInvoice.toString().trim())   continue;
+      }
+
+      records.push({
+        invoiceNo:     invoiceNo,
+        invoiceDate:   fmtDate(invoiceDate),
+        customerName:  customerName,
+        modelName:     modelName,
+        hpCompany:     hpCompany,
+        invoiceAmount: invoiceAmt,
+        rtoAmount:     rtoAmount,
+        refCustomer:   refCustomer
+      });
+    }
+
+    return { success: true, data: records, count: records.length };
+
+  } catch(e) {
+    Logger.log('getVahanExportData error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
 // ==========================================
 // FINANCIER DETAILS
 // ==========================================
@@ -6954,7 +8056,8 @@ function getFinancierData(params, sessionId) {
         amountReceived:  row[14] !== '' && row[14] !== null && row[14] !== undefined ? row[14] : '',
         receivedDate:    fmtDateInput(row[15]),
         doDate:          fmtDateInput(row[16]),
-        doNumber:        row[17] || ''
+        doNumber:        row[17] || '',
+        proposalNo:      row[21] || ''
       });
     }
 
@@ -6974,7 +8077,7 @@ function saveFinancierData(params, sessionId) {
       return { success: false, message: 'Access denied' };
     }
 
-    const { invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber } = params;
+    const { invoiceNo, disbursalAmount, amountReceived, receivedDate, doDate, doNumber, proposalNo } = params;
     if (!invoiceNo) return { success: false, message: 'Invoice No is required' };
 
     const sheet = getSheet('HSRP');
@@ -6996,6 +8099,7 @@ function saveFinancierData(params, sessionId) {
     sheet.getRange(targetRow, 16).setValue(receivedDate || '');
     sheet.getRange(targetRow, 17).setValue(doDate       || '');
     sheet.getRange(targetRow, 18).setValue(doNumber     || '');
+    sheet.getRange(targetRow, 22).setValue(proposalNo   || '');
     SpreadsheetApp.flush();
 
     return { success: true, message: 'Saved successfully' };
@@ -7014,8 +8118,11 @@ function batchSaveFinancierData(params, sessionId) {
       return { success: false, message: 'Access denied' };
     }
 
-    const recs = params.records || [];
-    if (recs.length === 0) return { success: false, message: 'No records to save' };
+    let recs = params.records || [];
+    if (typeof recs === 'string') {
+      try { recs = JSON.parse(recs); } catch(e) { recs = []; }
+    }
+    if (!Array.isArray(recs) || recs.length === 0) return { success: false, message: 'No records to save' };
 
     const sheet = getSheet('HSRP');
     const data = sheet.getDataRange().getValues();
@@ -7039,6 +8146,7 @@ function batchSaveFinancierData(params, sessionId) {
       sheet.getRange(targetRow, 16).setValue(rec.receivedDate || '');
       sheet.getRange(targetRow, 17).setValue(rec.doDate       || '');
       sheet.getRange(targetRow, 18).setValue(rec.doNumber     || '');
+      sheet.getRange(targetRow, 22).setValue(rec.proposalNo   || '');
       saved++;
     }
 
@@ -8458,6 +9566,38 @@ const user = validation.user;
       updateInvStock(item.skuId, locationId, -item.qty);
       logInvTransaction('OTC_SALE', item.skuId, skuName, locName, '', item.qty,
         '', customerName, '', otcReceiptNo, saleAmount, '', remarks || '', user.name);
+    }
+    return { success: true };
+  } catch(e) { return { success: false, message: e.message }; }
+}
+
+function invAdSale(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+    const user = validation.user;
+    const { adName, busyInvoiceNo, saleAmount, date, locationId, items, remarks } = params;
+    const itemList = JSON.parse(items || '[]');
+    if (!itemList.length) return { success: false, message: 'No items' };
+    if (!adName) return { success: false, message: 'AD Name is required' };
+
+    const locName = getLocationName(locationId);
+
+    // Check stock for all items first
+    for (const item of itemList) {
+      const avail = getStockQty(item.skuId, locationId);
+      if (avail < item.qty) {
+        return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+      }
+    }
+
+    // Deduct stock and log each item
+    for (const item of itemList) {
+      const skuName = getSkuName(item.skuId);
+      updateInvStock(item.skuId, locationId, -item.qty);
+      logInvTransaction('AD_SALE', item.skuId, skuName, locName, '', item.qty,
+        '', adName, '', '', saleAmount, '', remarks || '', user.name,
+        '', '', busyInvoiceNo || '');
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.message }; }
