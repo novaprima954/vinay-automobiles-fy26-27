@@ -162,6 +162,9 @@ function handleRequest(e) {
       case 'getFullAccessoriesDetail':
         result = getFullAccessoriesDetail(params.sessionId, params.dateFilter);
         break;
+      case 'getFinancierCommissionAnalysis':
+        result = getFinancierCommissionAnalysis(params.sessionId, params.dateFilter);
+        break;
       case 'getExecutiveSalesDetail':
         result = getExecutiveSalesDetail(params.sessionId, params.executiveName, params.dateFilter);
         break;
@@ -3510,6 +3513,64 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
     return { success: true, data: result };
   } catch(e) {
     Logger.log('getFullAccessoriesDetail error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Financier Commission Analysis — admin only
+ * Groups by financier (col K = index 10)
+ * Sums finance commission (col BD = index 55) and grand total (col AI = index 34)
+ * Commission % = (totalCommission / totalGrandTotal) × 100
+ */
+function getFinancierCommissionAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+
+    const byFinancier = {}; // { name: { count, totalCommission, totalGrandTotal } }
+
+    for (let i = 1; i < filteredData.length; i++) {
+      const row = filteredData[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+
+      const financier = (row[10] || '').toString().trim();
+      if (!financier) continue;
+
+      const commission = parseFloat(row[55]);
+      const grandTotal = parseFloat(row[34]);
+      if (isNaN(commission) || commission <= 0) continue; // skip rows with no commission
+
+      if (!byFinancier[financier]) {
+        byFinancier[financier] = { count: 0, totalCommission: 0, totalGrandTotal: 0 };
+      }
+      byFinancier[financier].count++;
+      byFinancier[financier].totalCommission  += commission;
+      byFinancier[financier].totalGrandTotal  += isNaN(grandTotal) ? 0 : grandTotal;
+    }
+
+    const result = Object.keys(byFinancier).map(function(name) {
+      const d = byFinancier[name];
+      const pct = d.totalGrandTotal > 0 ? (d.totalCommission / d.totalGrandTotal) * 100 : 0;
+      return {
+        financier:       name,
+        count:           d.count,
+        totalCommission: Math.round(d.totalCommission),
+        totalGrandTotal: Math.round(d.totalGrandTotal),
+        commissionPct:   Math.round(pct * 100) / 100   // 2 decimal places
+      };
+    }).sort(function(a, b) { return b.totalCommission - a.totalCommission; });
+
+    return { success: true, data: result };
+  } catch(e) {
+    Logger.log('getFinancierCommissionAnalysis error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }

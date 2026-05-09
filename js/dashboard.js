@@ -517,6 +517,47 @@ async function loadAccountsDiscountByExec() {
  * Load Full Accessories Detail (shared by admin + accounts dashboards)
  * containerId: 'adminFullAccContent' or 'acctFullAccContent'
  */
+/**
+ * Financier Commission Analysis — admin dashboard
+ */
+async function loadFinancierCommissionAnalysis() {
+  const container = document.getElementById('adminFinCommContent');
+  if (!container) return;
+  try {
+    const response = await API.call('getFinancierCommissionAnalysis', { sessionId: currentSessionId, dateFilter: currentFilter });
+    if (response.success && response.data && response.data.length > 0) {
+      const fmt = function(n) { return '₹' + Math.round(n).toLocaleString('en-IN'); };
+      var html = '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:13px;">';
+      html += '<thead><tr style="background:#f8f9fa;">';
+      html += '<th style="padding:9px 12px;text-align:left;border-bottom:2px solid #dee2e6;">Financier</th>';
+      html += '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #dee2e6;">Count</th>';
+      html += '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #dee2e6;">Total Commission</th>';
+      html += '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #dee2e6;">Total Grand Total</th>';
+      html += '<th style="padding:9px 12px;text-align:right;border-bottom:2px solid #dee2e6;">Comm %</th>';
+      html += '</tr></thead><tbody>';
+      response.data.forEach(function(r) {
+        var pct = r.commissionPct;
+        var pctColor = pct >= 2 ? '#28a745' : pct >= 1 ? '#fd7e14' : '#dc3545';
+        html += '<tr style="border-bottom:1px solid #f0f0f0;">';
+        html += '<td style="padding:9px 12px;font-weight:600;">' + r.financier + '</td>';
+        html += '<td style="padding:9px 12px;text-align:right;color:#666;">' + r.count + '</td>';
+        html += '<td style="padding:9px 12px;text-align:right;font-weight:600;color:#667eea;">' + fmt(r.totalCommission) + '</td>';
+        html += '<td style="padding:9px 12px;text-align:right;">' + fmt(r.totalGrandTotal) + '</td>';
+        html += '<td style="padding:9px 12px;text-align:right;font-weight:700;color:' + pctColor + ';">' + pct.toFixed(2) + '%</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+      container.innerHTML = html;
+    } else if (response.success) {
+      container.innerHTML = '<div style="color:#999;text-align:center;padding:20px;">No financier commission data in this period</div>';
+    } else {
+      container.innerHTML = '<div style="color:#dc3545;padding:15px;text-align:center;">⚠️ ' + (response.message || 'Failed') + '</div>';
+    }
+  } catch(e) {
+    container.innerHTML = '<div style="color:#dc3545;padding:15px;">Error loading data</div>';
+  }
+}
+
 async function loadFullAccessoriesAnalysis(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
@@ -964,6 +1005,12 @@ function renderAdminDashboard(data) {
       <div id="discountAnalysisContent" style="display:none;"></div>
     </div>
 
+    <!-- Financier Commission Analysis (Admin Only) -->
+    <div class="section" id="adminFinCommSection">
+      <div class="section-header">💰 Financier Commission Analysis</div>
+      <div id="adminFinCommContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+    </div>
+
     <!-- Inventory Analysis (Admin Only – same password unlock, no title) -->
     <div class="section" id="inventorySection">
       <div class="section-header">📦 Inventory Analysis
@@ -991,6 +1038,7 @@ function renderAdminDashboard(data) {
   // Load Stock In analysis immediately (no password needed)
   loadStockInAnalysis();
   loadFullAccessoriesAnalysis('adminFullAccContent');
+  loadFinancierCommissionAnalysis();
 
   // Auto-unlock if already authenticated in this session
   if (discountUnlocked) {
