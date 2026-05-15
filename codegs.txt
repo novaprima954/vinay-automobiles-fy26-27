@@ -8524,9 +8524,10 @@ function getVehicleMileageDashboard(sessionId) {
     const mileageSheet = getSheet('VehicleMileage');
     const mileageData = mileageSheet.getDataRange().getValues();
     
-    // Calculate stats for each vehicle
+    // Calculate stats for each vehicle (Generator excluded from stats cards but included in totals)
     const vehicles = ['BMW X1', 'Kia Sonet', 'TATA 407'];
     const vehicleStats = {};
+    const lastKmByVehicle = { 'BMW X1': 0, 'Kia Sonet': 0, 'TATA 407': 0, 'Generator': 0 };
     
     const now = new Date();
     const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -8546,17 +8547,18 @@ function getVehicleMileageDashboard(sessionId) {
         const row = mileageData[i];
         const vehicle = row[2]; // Column C
         const date = new Date(row[1]); // Column B
-        
+
         if (vehicle === vehicleName) {
           totalEntries++;
-          
+
           // Get last entry
           if (lastKm === 0) {
             lastKm = row[4]; // Column E: New KM
             lastMileage = row[7]; // Column H: Mileage
             lastDate = formatDate(row[1]);
+            lastKmByVehicle[vehicleName] = parseFloat(row[4]) || 0;
           }
-          
+
           // Calculate monthly stats
           if (date >= thisMonthStart) {
             monthlyFuel += parseFloat(row[6]) || 0; // Column G: Liters
@@ -8598,6 +8600,7 @@ function getVehicleMileageDashboard(sessionId) {
         walletBalance: currentBalance,
         lowBalanceAlert: currentBalance < 3000,
         vehicleStats: vehicleStats,
+        lastKmByVehicle: lastKmByVehicle,
         monthlyTotals: {
           fuel: totalMonthlyFuel.toFixed(2),
           cost: totalMonthlyCost.toFixed(2)
@@ -8637,6 +8640,10 @@ function getLastKmReading(sessionId, vehicleName) {
     const sheet = getSheet('VehicleMileage');
     const data = sheet.getDataRange().getValues();
     
+    if (vehicleName === 'Generator') {
+      return { success: true, lastKm: 0, lastDate: 'N/A' };
+    }
+
     // Find last entry for this vehicle
     for (let i = data.length - 1; i >= 1; i--) {
       const row = data[i];
@@ -8693,39 +8700,38 @@ function addFuelEntry(sessionId, data) {
     Logger.log('Liters: ' + data.liters);
     Logger.log('Cost: ' + data.cost);
     
+    const isGenerator = data.vehicleName === 'Generator';
+
     // Validate inputs
-    if (!data.vehicleName || !data.newKm || !data.liters || !data.cost) {
+    if (!data.vehicleName || (!isGenerator && !data.newKm) || !data.liters || !data.cost) {
       return {
         success: false,
         message: 'All fields are required'
       };
     }
-    
-    const newKm = parseFloat(data.newKm);
-    const liters = parseFloat(data.liters);
-    const cost = parseFloat(data.cost);
-    
-    // Get last KM for this vehicle
-    const lastKmResult = getLastKmReading(sessionId, data.vehicleName);
-    if (!lastKmResult.success) {
-      return lastKmResult;
+
+    const newKm     = isGenerator ? 0 : parseFloat(data.newKm);
+    const liters    = parseFloat(data.liters);
+    const cost      = parseFloat(data.cost);
+    let   previousKm = 0;
+    let   distance   = 0;
+    let   mileage    = 0;
+
+    if (!isGenerator) {
+      // Get last KM for this vehicle
+      const lastKmResult = getLastKmReading(sessionId, data.vehicleName);
+      if (!lastKmResult.success) return lastKmResult;
+      previousKm = parseFloat(lastKmResult.lastKm) || 0;
+      distance   = newKm - previousKm;
+      if (distance <= 0 && previousKm > 0) {
+        return {
+          success: false,
+          message: 'New KM (' + newKm + ') must be greater than Previous KM (' + previousKm + ')'
+        };
+      }
+      mileage = distance > 0 ? (distance / liters).toFixed(2) : 0;
     }
-    
-    const previousKm = parseFloat(lastKmResult.lastKm) || 0;
-    
-    // Calculate distance
-    const distance = newKm - previousKm;
-    
-    if (distance <= 0 && previousKm > 0) {
-      return {
-        success: false,
-        message: 'New KM (' + newKm + ') must be greater than Previous KM (' + previousKm + ')'
-      };
-    }
-    
-    // Calculate mileage
-    const mileage = distance > 0 ? (distance / liters).toFixed(2) : 0;
-    
+
     // Calculate rate per liter
     const ratePerLiter = (cost / liters).toFixed(2);
     

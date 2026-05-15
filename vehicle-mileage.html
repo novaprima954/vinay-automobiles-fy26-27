@@ -496,11 +496,12 @@
                                 <option value="BMW X1">BMW X1</option>
                                 <option value="Kia Sonet">Kia Sonet</option>
                                 <option value="TATA 407">TATA 407</option>
+                                <option value="Generator">Generator</option>
                             </select>
                         </div>
                     </div>
 
-                    <div class="form-row">
+                    <div class="form-row" id="kmRow">
                         <div class="form-group">
                             <label>Previous KM Reading</label>
                             <input type="number" id="previousKm" readonly>
@@ -508,7 +509,7 @@
 
                         <div class="form-group">
                             <label>New KM Reading *</label>
-                            <input type="number" id="newKm" step="0.01" required oninput="calculateMileage()">
+                            <input type="number" id="newKm" step="0.01" oninput="calculateMileage()">
                         </div>
 
                         <div class="form-group">
@@ -533,7 +534,7 @@
                             <input type="number" id="ratePerLiter" step="0.01" readonly>
                         </div>
 
-                        <div class="form-group">
+                        <div class="form-group" id="mileageFormGroup">
                             <label>Calculated Mileage (km/l)</label>
                             <input type="number" id="calculatedMileage" readonly>
                         </div>
@@ -589,6 +590,7 @@
                             <option value="BMW X1">BMW X1</option>
                             <option value="Kia Sonet">Kia Sonet</option>
                             <option value="TATA 407">TATA 407</option>
+                            <option value="Generator">Generator</option>
                         </select>
                     </div>
 
@@ -731,88 +733,80 @@
     <script src="js/auth.js"></script>
     <script src="js/api.js"></script>
     <script>
+        let lastKmCache = {};
+
         // Initialize
         document.addEventListener('DOMContentLoaded', async function() {
-            // Check session
             const session = SessionManager.getSession();
             if (!session) {
                 window.location.href = 'index.html';
                 return;
             }
 
-            // Verify session with server
-            try {
-                const result = await API.validateSession();
-                if (!result.success) {
-                    SessionManager.clearSession();
-                    window.location.href = 'index.html';
-                    return;
-                }
-
-                // Check role access
-                const allowedRoles = ['operator', 'accounts', 'admin'];
-                if (!allowedRoles.includes(result.user.role)) {
-                    alert('Access Denied. Only Operator, Accounts, and Admin can access this page.');
-                    window.location.href = 'dashboard.html';
-                    return;
-                }
-
-                // Set user info
-                document.getElementById('userName').textContent = result.user.name;
-                document.getElementById('userRole').textContent = result.user.role.toUpperCase();
-
-                // Show topup section only for admin/accounts
-                if (result.user.role === 'admin' || result.user.role === 'accounts') {
-                    document.getElementById('topupSection').style.display = 'block';
-                }
-
-                // Set today's date as default
-                document.getElementById('entryDate').valueAsDate = new Date();
-
-                // Load dashboard
-                await loadDashboard();
-
-            } catch (error) {
-                console.error('Session validation error:', error);
-                alert('Session error. Please login again.');
-                window.location.href = 'index.html';
+            const user = session.user || session;
+            const allowedRoles = ['operator', 'accounts', 'admin'];
+            if (!allowedRoles.includes(user.role)) {
+                alert('Access Denied. Only Operator, Accounts, and Admin can access this page.');
+                window.location.href = 'dashboard.html';
+                return;
             }
+
+            document.getElementById('userName').textContent = user.name;
+            document.getElementById('userRole').textContent = user.role.toUpperCase();
+
+            if (user.role === 'admin' || user.role === 'accounts') {
+                document.getElementById('topupSection').style.display = 'block';
+            }
+
+            document.getElementById('entryDate').valueAsDate = new Date();
+
+            await loadDashboard();
         });
 
         // Load Dashboard
         async function loadDashboard() {
             try {
                 const result = await API.getVehicleMileageDashboard();
-                
-                if (result.success) {
-                    const dash = result.dashboard;
-                    
-                    // Wallet balance
-                    document.getElementById('walletBalance').textContent = '₹ ' + parseFloat(dash.walletBalance).toFixed(2);
-                    
-                    if (dash.lowBalanceAlert) {
-                        document.getElementById('lowBalanceAlert').style.display = 'block';
+
+                if (!result.success) {
+                    if (result.message === 'Invalid session' || result.message === 'Session expired') {
+                        SessionManager.clearSession();
+                        window.location.href = 'index.html';
                     }
-
-                    // BMW X1 stats
-                    const bmw = dash.vehicleStats['BMW X1'];
-                    document.getElementById('bmwMileage').textContent = bmw.lastMileage + ' km/l';
-                    document.getElementById('bmwLastKm').textContent = 'Last: ' + bmw.lastKm + ' km on ' + bmw.lastDate;
-
-                    // Kia Sonet stats
-                    const kia = dash.vehicleStats['Kia Sonet'];
-                    document.getElementById('kiaMileage').textContent = kia.lastMileage + ' km/l';
-                    document.getElementById('kiaLastKm').textContent = 'Last: ' + kia.lastKm + ' km on ' + kia.lastDate;
-
-                    // TATA 407 stats
-                    const tata = dash.vehicleStats['TATA 407'];
-                    document.getElementById('tataMileage').textContent = tata.lastMileage + ' km/l';
-                    document.getElementById('tataLastKm').textContent = 'Last: ' + tata.lastKm + ' km on ' + tata.lastDate;
-
-                    // Monthly totals
-                    document.getElementById('monthlyFuel').textContent = dash.monthlyTotals.fuel + ' L';
-                    document.getElementById('monthlyCost').textContent = 'Cost: ₹ ' + dash.monthlyTotals.cost;
+                    return;
                 }
+
+                const dash = result.dashboard;
+
+                // Cache last KM readings for instant access in form
+                if (dash.lastKmByVehicle) {
+                    lastKmCache = dash.lastKmByVehicle;
+                }
+
+                // Wallet balance
+                document.getElementById('walletBalance').textContent = '₹ ' + parseFloat(dash.walletBalance).toFixed(2);
+                if (dash.lowBalanceAlert) {
+                    document.getElementById('lowBalanceAlert').style.display = 'block';
+                }
+
+                // BMW X1 stats
+                const bmw = dash.vehicleStats['BMW X1'];
+                document.getElementById('bmwMileage').textContent = bmw.lastMileage + ' km/l';
+                document.getElementById('bmwLastKm').textContent = 'Last: ' + bmw.lastKm + ' km on ' + bmw.lastDate;
+
+                // Kia Sonet stats
+                const kia = dash.vehicleStats['Kia Sonet'];
+                document.getElementById('kiaMileage').textContent = kia.lastMileage + ' km/l';
+                document.getElementById('kiaLastKm').textContent = 'Last: ' + kia.lastKm + ' km on ' + kia.lastDate;
+
+                // TATA 407 stats
+                const tata = dash.vehicleStats['TATA 407'];
+                document.getElementById('tataMileage').textContent = tata.lastMileage + ' km/l';
+                document.getElementById('tataLastKm').textContent = 'Last: ' + tata.lastKm + ' km on ' + tata.lastDate;
+
+                // Monthly totals
+                document.getElementById('monthlyFuel').textContent = dash.monthlyTotals.fuel + ' L';
+                document.getElementById('monthlyCost').textContent = 'Cost: ₹ ' + dash.monthlyTotals.cost;
 
             } catch (error) {
                 console.error('Dashboard load error:', error);
@@ -840,12 +834,18 @@
         }
 
         // Fetch last KM when vehicle is selected
-        async function fetchLastKm() {
+        function fetchLastKm() {
             const vehicleName = document.getElementById('vehicleName').value;
-            
+            const kmRow = document.getElementById('kmRow');
+            const mileageGroup = document.getElementById('mileageFormGroup');
+            const newKmInput = document.getElementById('newKm');
+
             if (!vehicleName) {
                 document.getElementById('previousKm').value = '';
                 document.getElementById('loadFields').classList.remove('active');
+                kmRow.style.display = '';
+                mileageGroup.style.display = '';
+                newKmInput.required = true;
                 return;
             }
 
@@ -858,17 +858,26 @@
                 document.getElementById('loadType').required = false;
             }
 
-            try {
-                const result = await API.getLastKmReading(vehicleName);
-                
-                if (result.success) {
-                    document.getElementById('previousKm').value = result.lastKm;
-                    calculateMileage();
-                }
-
-            } catch (error) {
-                console.error('Fetch last KM error:', error);
+            // Generator: hide KM and mileage fields
+            if (vehicleName === 'Generator') {
+                kmRow.style.display = 'none';
+                mileageGroup.style.display = 'none';
+                newKmInput.required = false;
+                newKmInput.value = '';
+                document.getElementById('previousKm').value = '';
+                document.getElementById('distance').value = '';
+                document.getElementById('calculatedMileage').value = '';
+                return;
             }
+
+            kmRow.style.display = '';
+            mileageGroup.style.display = '';
+            newKmInput.required = true;
+
+            // Use cached last KM — no extra API call needed
+            const lastKm = lastKmCache[vehicleName] || 0;
+            document.getElementById('previousKm').value = lastKm;
+            calculateMileage();
         }
 
         // Toggle load other field
@@ -954,7 +963,11 @@
                 const result = await API.addFuelEntry(data);
 
                 if (result.success) {
-                    showMessage('entryMessage', '✅ ' + result.message + ' | Mileage: ' + result.data.mileage + ' km/l | New Balance: ₹' + result.data.newBalance.toFixed(2), 'success');
+                    const isGen = vehicleName === 'Generator';
+                    const detail = isGen
+                        ? 'Cost: ₹' + result.data.cost + ' | New Balance: ₹' + result.data.newBalance.toFixed(2)
+                        : 'Mileage: ' + result.data.mileage + ' km/l | New Balance: ₹' + result.data.newBalance.toFixed(2);
+                    showMessage('entryMessage', '✅ ' + result.message + ' | ' + detail, 'success');
                     
                     // Show low balance alert if needed
                     if (result.data.lowBalanceAlert) {
@@ -1003,15 +1016,16 @@
                         tbody.innerHTML = '<tr><td colspan="11" style="text-align: center; color: #999;">No records found</td></tr>';
                     } else {
                         result.records.forEach(record => {
+                            const isGen = record.vehicleName === 'Generator';
                             const row = `
                                 <tr>
                                     <td>${record.date}</td>
                                     <td><span class="badge badge-success">${record.vehicleName}</span></td>
-                                    <td>${record.previousKm}</td>
-                                    <td>${record.newKm}</td>
-                                    <td>${record.distance} km</td>
+                                    <td>${isGen ? '-' : record.previousKm}</td>
+                                    <td>${isGen ? '-' : record.newKm}</td>
+                                    <td>${isGen ? '-' : record.distance + ' km'}</td>
                                     <td>${record.liters} L</td>
-                                    <td><strong>${record.mileage} km/l</strong></td>
+                                    <td><strong>${isGen ? '-' : record.mileage + ' km/l'}</strong></td>
                                     <td>₹ ${record.cost}</td>
                                     <td>₹ ${record.ratePerLiter}/L</td>
                                     <td>${record.loadType || '-'}</td>
