@@ -587,19 +587,19 @@ async function renderAccessoriesFromPriceMaster(model, variant, record) {
       ];
       
       accessories.forEach(function(acc) {
-        if (details[acc.key]) {
+        if (details[acc.key] || acc.id === 'backrest') {
           const formGroup = document.createElement('div');
           formGroup.className = 'form-group';
-          
+
           const label = document.createElement('label');
           label.textContent = acc.name;
-          
+
           const select = document.createElement('select');
           select.id = acc.id;
           select.className = 'editable-highlight';
           select.innerHTML = '<option value="">-- Select --</option><option>Yes</option><option>No</option>';
-          select.value = record[acc.id] || '';
-          
+          select.value = record[acc.id] || 'No';
+
           formGroup.appendChild(label);
           formGroup.appendChild(select);
           gridWrapper.appendChild(formGroup);
@@ -618,7 +618,7 @@ async function renderAccessoriesFromPriceMaster(model, variant, record) {
         select.id = 'helmet';
         select.className = 'editable-highlight';
         select.innerHTML = '<option value="">-- Select --</option><option>1</option><option>2</option><option>No</option>';
-        select.value = record.helmet || '';
+        select.value = record.helmet || 'No';
         
         formGroup.appendChild(label);
         formGroup.appendChild(select);
@@ -819,9 +819,14 @@ async function handleUpdate(e) {
   // These are set by the "Calculate from PriceMaster" button
   if (window.lastPriceVerification) {
     data.priceMaster = window.lastPriceVerification.calculatedTotal || '';  // Column BE
-    const _pvMatched = window.lastPriceVerification.matched;
-    const _pvNote = window.lastPriceVerification.note || '';
-    data.priceMatched = _pvMatched ? 'Yes' : (_pvNote ? 'No \u2014 ' + _pvNote : 'No');  // Column BF
+    const pv = window.lastPriceVerification;
+    if (pv.matched) {
+      data.priceMatched = 'Yes';
+    } else {
+      const absDiff = Math.abs(Math.round(pv.diff || 0));
+      const dir = (pv.diff || 0) > 0 ? 'S' : 'E';
+      data.priceMatched = 'No ' + absDiff + ' ' + dir + (pv.note ? ' ' + pv.note : '');
+    }
   }
   
   // Attach engine/frame from the editable inputs
@@ -1227,8 +1232,9 @@ function displayPriceBreakdown(calculation) {
     html += '</div>';
   }
 
-  // Save button - save afterDiscount value
-  html += '<button type="button" onclick="savePriceVerification(' + afterDiscount + ', ' + matched + ')" class="btn-primary" style="width: 100%; margin-top: 15px; padding: 12px; font-size: 15px;">';
+  // Save button - save afterDiscount value + diff (positive=SHORT, negative=EXCESS)
+  const _diffVal = afterDiscount - amountCollected;
+  html += '<button type="button" onclick="savePriceVerification(' + afterDiscount + ', ' + matched + ', ' + _diffVal + ')" class="btn-primary" style="width: 100%; margin-top: 15px; padding: 12px; font-size: 15px;">';
   html += '💾 Save Verification';
   html += '</button>';
   
@@ -1240,7 +1246,7 @@ function displayPriceBreakdown(calculation) {
 /**
  * Save price verification
  */
-async function savePriceVerification(calculatedTotal, matched) {
+async function savePriceVerification(calculatedTotal, matched, diff) {
   if (!currentReceiptNo) {
     alert('Receipt number not found');
     return;
@@ -1260,7 +1266,8 @@ async function savePriceVerification(calculatedTotal, matched) {
   window.lastPriceVerification = {
     calculatedTotal: calculatedTotal,
     matched: matched,
-    note: note
+    note: note,
+    diff: diff || 0
   };
 
   console.log('💾 Stored price verification:', window.lastPriceVerification);
