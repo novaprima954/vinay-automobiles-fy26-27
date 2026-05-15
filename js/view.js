@@ -327,7 +327,37 @@ function displayRecordDetails(record) {
   const rtoDteEl = document.getElementById('statusRTODate');
   if (rtoDteEl) rtoDteEl.textContent = ((record.vahanStatus === 'Yes' || record.rtoStatus === 'Yes') && record.vahanDate) ? record.vahanDate : '';
   updateStatusIndicator('statusAccessories', record.accessoryFitted);
-  
+
+  // HSRP Status
+  const hsrpIcon  = document.getElementById('statusHSRPIcon');
+  const hsrpValue = document.getElementById('statusHSRPValue');
+  const hsrpDetail = document.getElementById('statusHSRPDetail');
+  if (hsrpIcon) {
+    const hs = record.hsrpStatus || '';
+    if (hs === 'Fitted') {
+      hsrpIcon.textContent = '✓'; hsrpIcon.className = 'status-icon complete';
+      hsrpValue.textContent = 'Fitted'; hsrpValue.style.color = '#28a745';
+      if (hsrpDetail) hsrpDetail.textContent = record.hsrpFitmentDate ? 'Fitted: ' + record.hsrpFitmentDate : '';
+    } else if (hs === 'Received') {
+      hsrpIcon.textContent = '◐'; hsrpIcon.className = 'status-icon partial';
+      hsrpValue.textContent = 'Received'; hsrpValue.style.color = '#ff9800';
+      if (hsrpDetail) hsrpDetail.textContent = record.hsrpOrderDate ? 'Ordered: ' + record.hsrpOrderDate : '';
+    } else if (hs === 'Ordered') {
+      hsrpIcon.textContent = '◐'; hsrpIcon.className = 'status-icon partial';
+      hsrpValue.textContent = 'Ordered'; hsrpValue.style.color = '#ff9800';
+      if (hsrpDetail) hsrpDetail.textContent = record.hsrpOrderDate || '';
+    } else if (!record.engineNumber) {
+      hsrpIcon.textContent = '-'; hsrpIcon.className = 'status-icon';
+      hsrpIcon.style.background = '#e0e0e0'; hsrpIcon.style.color = '#999';
+      hsrpValue.textContent = 'N/A'; hsrpValue.style.color = '#999';
+      if (hsrpDetail) hsrpDetail.textContent = 'No engine no.';
+    } else {
+      hsrpIcon.textContent = '✗'; hsrpIcon.className = 'status-icon pending';
+      hsrpValue.textContent = 'Not Ordered'; hsrpValue.style.color = '#dc3545';
+      if (hsrpDetail) hsrpDetail.textContent = '';
+    }
+  }
+
   // Update Vehicle Details
   document.getElementById('vehicleEngineNumber').textContent = record.engineNumber || '-';
   document.getElementById('vehicleFrameNumber').textContent = record.frameNumber || '-';
@@ -353,25 +383,25 @@ function displayRecordDetails(record) {
   accessoriesGrid.innerHTML = '';
   
   const accessories = [
-    { label: 'Guard', value: record.guard },
-    { label: 'Grip Cover', value: record.gripCover },
-    { label: 'Seat Cover', value: record.seatCover },
-    { label: 'Matin', value: record.matin },
-    { label: 'Tank Cover', value: record.tankCover },
+    { label: 'Guard',       value: record.guard },
+    { label: 'Grip Cover',  value: record.gripCover },
+    { label: 'Seat Cover',  value: record.seatCover },
+    { label: 'Matin',       value: record.matin },
+    { label: 'Tank Cover',  value: record.tankCover },
     { label: 'Handle Hook', value: record.handleHook },
-    { label: 'Helmet', value: record.helmet },
-    { label: 'Rain Cover', value: record.rainCover },
-    { label: 'Buzzer', value: record.buzzer },
-    { label: 'Back Rest', value: record.backRest }
+    { label: 'Helmet',      value: record.helmet },
+    { label: 'Rain Cover',  value: record.rainCover,  alwaysShow: true },
+    { label: 'Buzzer',      value: record.buzzer,     alwaysShow: true },
+    { label: 'Back Rest',   value: record.backRest,   alwaysShow: true }
   ];
-  
+
   accessories.forEach(acc => {
-    if (acc.value) {
+    if (acc.value || acc.alwaysShow) {
       const div = document.createElement('div');
       div.className = 'detail-item';
       div.innerHTML = `
         <span class="detail-label">${acc.label}:</span>
-        <span class="detail-value">${acc.value}</span>
+        <span class="detail-value">${acc.value || 'No'}</span>
       `;
       accessoriesGrid.appendChild(div);
     }

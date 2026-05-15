@@ -227,29 +227,33 @@ function setupVehicleNumbers(engineNumber, frameNumber, locked) {
 }
 
 function setupStatusSection(type, status, date, operator, forceLocked) {
-  const section = document.getElementById(type + 'Section');
-  const badge = document.getElementById(type + 'Badge');
-  const info = document.getElementById(type + 'Info');
-  const yesRadio = document.getElementById(type + 'Yes');
-  const noRadio = document.getElementById(type + 'No');
-  
+  const section   = document.getElementById(type + 'Section');
+  const badge     = document.getElementById(type + 'Badge');
+  const info      = document.getElementById(type + 'Info');
+  const yesRadio  = document.getElementById(type + 'Yes');
+  const noRadio   = document.getElementById(type + 'No');
+  const dateRow   = document.getElementById(type + 'DateRow');  // may be null for numberPlate
+  const dateInput = document.getElementById(type + 'Date');
+
   const isLocked = (status === 'Yes') || forceLocked;
-  
+
   if (isLocked) {
     section.classList.add('locked');
     badge.textContent = 'COMPLETED ✅';
     badge.className = 'status-badge badge-locked';
-    
+
     if (date && operator) {
       info.textContent = `Completed on ${date} by ${operator}`;
     } else if (forceLocked) {
       info.textContent = 'All steps completed - Status locked';
     }
-    
+
     yesRadio.checked = (status === 'Yes');
     yesRadio.disabled = true;
     noRadio.disabled = true;
-    
+
+    if (dateRow) dateRow.style.display = 'none';
+
     if (type === 'numberPlate') {
       document.getElementById('numberPlateDetails').disabled = true;
     }
@@ -258,19 +262,40 @@ function setupStatusSection(type, status, date, operator, forceLocked) {
     badge.textContent = 'PENDING';
     badge.className = 'status-badge badge-pending';
     info.textContent = '';
-    
+
     yesRadio.disabled = false;
     noRadio.disabled = false;
-    
+
     if (status === 'Yes') {
       yesRadio.checked = true;
+      if (dateRow) { dateRow.style.display = 'block'; }
     } else if (status === 'No') {
       noRadio.checked = true;
+      if (dateRow) dateRow.style.display = 'none';
     } else {
       yesRadio.checked = false;
       noRadio.checked = false;
+      if (dateRow) dateRow.style.display = 'none';
     }
-    
+
+    // Set default date to today on the date input
+    if (dateInput && !dateInput.value) {
+      dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Wire up show/hide on radio change
+    if (dateRow) {
+      yesRadio.onchange = function() {
+        if (this.checked) {
+          dateRow.style.display = 'block';
+          if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
+        }
+      };
+      noRadio.onchange = function() {
+        if (this.checked) dateRow.style.display = 'none';
+      };
+    }
+
     if (type === 'numberPlate') {
       document.getElementById('numberPlateDetails').disabled = false;
     }
@@ -295,10 +320,17 @@ function formatNumberPlate(e) {
 async function handleUpdate(e) {
   e.preventDefault();
   
+  const dmsStatus       = document.querySelector('input[name="dmsStatus"]:checked')?.value || '';
+  const insuranceStatus = document.querySelector('input[name="insuranceStatus"]:checked')?.value || '';
+  const vahanStatus     = document.querySelector('input[name="vahanStatus"]:checked')?.value || '';
+
   const data = {
-    dmsStatus: document.querySelector('input[name="dmsStatus"]:checked')?.value || '',
-    insuranceStatus: document.querySelector('input[name="insuranceStatus"]:checked')?.value || '',
-    vahanStatus: document.querySelector('input[name="vahanStatus"]:checked')?.value || '',
+    dmsStatus,
+    insuranceStatus,
+    vahanStatus,
+    dmsDate:       (dmsStatus === 'Yes')       ? (document.getElementById('dmsDate')?.value || '')       : '',
+    insuranceDate: (insuranceStatus === 'Yes') ? (document.getElementById('insuranceDate')?.value || '') : '',
+    vahanDate:     (vahanStatus === 'Yes')     ? (document.getElementById('vahanDate')?.value || '')     : '',
     numberPlateDetails: document.getElementById('numberPlateDetails').value.trim(),
     numberPlateFitted: document.querySelector('input[name="numberPlateFitted"]:checked')?.value || '',
     engineNumber: document.getElementById('engineNumber').value.trim(),
