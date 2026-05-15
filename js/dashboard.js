@@ -209,39 +209,63 @@ function renderSalesDashboard(data) {
       <div class="section-header">⚠️ Pending Tasks</div>
       ${(data.dmsPending > 0 || data.insurancePending > 0 || data.rtoPending > 0 || data.accessoriesPending > 0) ? `
         ${data.dmsPending > 0 ? `
-          <div class="list-item" onclick="showPendingDetails('dms', 'DMS')">
-            <div class="list-item-main">
-              <div class="list-item-title">DMS Pending</div>
-              <div class="list-item-subtitle">${data.dmsPending} sales need DMS completion</div>
+          <div style="border-bottom:1px solid #f0f0f0;">
+            <div class="list-item" onclick="togglePendingDetail('dms', 'pendingDmsDetail', this)" style="cursor:pointer;border-bottom:none;">
+              <div class="list-item-main">
+                <div class="list-item-title">DMS Pending</div>
+                <div class="list-item-subtitle">${data.dmsPending} sales need DMS completion</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="badge">${data.dmsPending}</span>
+                <span class="pendingChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+              </div>
             </div>
-            <span class="badge">${data.dmsPending}</span>
+            <div id="pendingDmsDetail" style="display:none;"></div>
           </div>
         ` : ''}
         ${data.insurancePending > 0 ? `
-          <div class="list-item" onclick="showPendingDetails('insurance', 'Insurance')">
-            <div class="list-item-main">
-              <div class="list-item-title">Insurance Pending</div>
-              <div class="list-item-subtitle">${data.insurancePending} sales need insurance processing</div>
+          <div style="border-bottom:1px solid #f0f0f0;">
+            <div class="list-item" onclick="togglePendingDetail('insurance', 'pendingInsuranceDetail', this)" style="cursor:pointer;border-bottom:none;">
+              <div class="list-item-main">
+                <div class="list-item-title">Insurance Pending</div>
+                <div class="list-item-subtitle">${data.insurancePending} sales need insurance processing</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="badge">${data.insurancePending}</span>
+                <span class="pendingChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+              </div>
             </div>
-            <span class="badge">${data.insurancePending}</span>
+            <div id="pendingInsuranceDetail" style="display:none;"></div>
           </div>
         ` : ''}
         ${data.rtoPending > 0 ? `
-          <div class="list-item" onclick="showPendingDetails('rto', 'RTO')">
-            <div class="list-item-main">
-              <div class="list-item-title">RTO Pending</div>
-              <div class="list-item-subtitle">${data.rtoPending} sales need RTO registration</div>
+          <div style="border-bottom:1px solid #f0f0f0;">
+            <div class="list-item" onclick="togglePendingDetail('rto', 'pendingRtoDetail', this)" style="cursor:pointer;border-bottom:none;">
+              <div class="list-item-main">
+                <div class="list-item-title">RTO Pending</div>
+                <div class="list-item-subtitle">${data.rtoPending} sales need RTO registration</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="badge">${data.rtoPending}</span>
+                <span class="pendingChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+              </div>
             </div>
-            <span class="badge">${data.rtoPending}</span>
+            <div id="pendingRtoDetail" style="display:none;"></div>
           </div>
         ` : ''}
         ${data.accessoriesPending > 0 ? `
-          <div class="list-item" onclick="showPendingDetails('accessories', 'Accessories')">
-            <div class="list-item-main">
-              <div class="list-item-title">Accessories Pending Fitting</div>
-              <div class="list-item-subtitle">${data.accessoriesPending} sales need accessories</div>
+          <div style="border-bottom:1px solid #f0f0f0;">
+            <div class="list-item" onclick="togglePendingDetail('accessories', 'pendingAccDetail', this)" style="cursor:pointer;border-bottom:none;">
+              <div class="list-item-main">
+                <div class="list-item-title">Accessories Pending Fitting</div>
+                <div class="list-item-subtitle">${data.accessoriesPending} sales need accessories</div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;">
+                <span class="badge">${data.accessoriesPending}</span>
+                <span class="pendingChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+              </div>
             </div>
-            <span class="badge">${data.accessoriesPending}</span>
+            <div id="pendingAccDetail" style="display:none;"></div>
           </div>
         ` : ''}
       ` : '<div class="empty-state">No pending tasks ✅</div>'}
@@ -1005,10 +1029,26 @@ function renderAdminDashboard(data) {
       <div id="discountAnalysisContent" style="display:none;"></div>
     </div>
 
-    <!-- Financier Commission Analysis (Admin Only) -->
+    <!-- Financier Commission Analysis (Admin Only – Password Protected) -->
     <div class="section" id="adminFinCommSection">
-      <div class="section-header">💰 Financier Commission Analysis</div>
-      <div id="adminFinCommContent"><div style="text-align:center;padding:20px;color:#999;">⏳ Loading...</div></div>
+      <div class="section-header">💰 Financier Commission Analysis
+        <span style="font-size:11px;background:#6c757d;color:white;padding:2px 7px;border-radius:10px;margin-left:8px;">Admin Only</span>
+      </div>
+      <div id="finCommLockView">
+        <div style="text-align:center;padding:25px 15px;">
+          <div style="font-size:44px;margin-bottom:10px;">🔒</div>
+          <div style="color:#666;margin-bottom:18px;font-size:14px;">This section is password protected</div>
+          <input type="password" id="finCommPwd" placeholder="Enter password"
+            style="border:2px solid #ddd;border-radius:8px;padding:10px 15px;font-size:14px;width:200px;text-align:center;display:block;margin:0 auto 12px;outline:none;"
+            onkeydown="if(event.key==='Enter') unlockFinComm()">
+          <button onclick="unlockFinComm()"
+            style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;padding:10px 28px;font-size:14px;font-weight:600;cursor:pointer;">
+            🔓 Unlock
+          </button>
+          <div id="finCommPwdError" style="color:#dc3545;font-size:13px;margin-top:10px;display:none;">❌ Incorrect password</div>
+        </div>
+      </div>
+      <div id="adminFinCommContent" style="display:none;"></div>
     </div>
 
     <!-- Inventory Analysis (Admin Only – same password unlock, no title) -->
@@ -1038,9 +1078,8 @@ function renderAdminDashboard(data) {
   // Load Stock In analysis immediately (no password needed)
   loadStockInAnalysis();
   loadFullAccessoriesAnalysis('adminFullAccContent');
-  loadFinancierCommissionAnalysis();
 
-  // Auto-unlock if already authenticated in this session
+  // Auto-unlock all locked sections if already authenticated in this session
   if (discountUnlocked) {
     document.getElementById('discountLockView').style.display = 'none';
     document.getElementById('discountAnalysisContent').style.display = 'block';
@@ -1049,6 +1088,10 @@ function renderAdminDashboard(data) {
     document.getElementById('inventoryLockView').style.display = 'none';
     document.getElementById('inventoryAnalysisContent').style.display = 'block';
     loadInventoryAnalysis();
+
+    document.getElementById('finCommLockView').style.display = 'none';
+    document.getElementById('adminFinCommContent').style.display = 'block';
+    loadFinancierCommissionAnalysis();
   }
 }
 
@@ -1062,10 +1105,16 @@ function unlockDiscount() {
     document.getElementById('discountLockView').style.display = 'none';
     document.getElementById('discountAnalysisContent').style.display = 'block';
     loadDiscountAnalysis();
-    // Also unlock inventory section (same password, same session flag)
+    // Also unlock inventory and fin comm (same password)
     document.getElementById('inventoryLockView').style.display = 'none';
     document.getElementById('inventoryAnalysisContent').style.display = 'block';
     loadInventoryAnalysis();
+    var fcLock = document.getElementById('finCommLockView');
+    if (fcLock && fcLock.style.display !== 'none') {
+      fcLock.style.display = 'none';
+      document.getElementById('adminFinCommContent').style.display = 'block';
+      loadFinancierCommissionAnalysis();
+    }
   } else {
     const errEl = document.getElementById('discountPwdError');
     errEl.style.display = 'block';
@@ -1084,17 +1133,55 @@ function unlockInventory() {
     document.getElementById('inventoryLockView').style.display = 'none';
     document.getElementById('inventoryAnalysisContent').style.display = 'block';
     loadInventoryAnalysis();
-    // Also unlock discount section if still locked
+    // Also unlock discount if still locked
     var discLock = document.getElementById('discountLockView');
     if (discLock && discLock.style.display !== 'none') {
       discLock.style.display = 'none';
       document.getElementById('discountAnalysisContent').style.display = 'block';
       loadDiscountAnalysis();
     }
+    // Also unlock fin comm if still locked
+    var fcLock2 = document.getElementById('finCommLockView');
+    if (fcLock2 && fcLock2.style.display !== 'none') {
+      fcLock2.style.display = 'none';
+      document.getElementById('adminFinCommContent').style.display = 'block';
+      loadFinancierCommissionAnalysis();
+    }
   } else {
     const errEl = document.getElementById('inventoryPwdError');
     errEl.style.display = 'block';
     document.getElementById('inventoryPwd').value = '';
+    setTimeout(function() { errEl.style.display = 'none'; }, 2500);
+  }
+}
+
+/**
+ * Unlock Financier Commission (same password as discount)
+ */
+function unlockFinComm() {
+  const pwd = document.getElementById('finCommPwd').value;
+  if (pwd === 'advait55&') {
+    discountUnlocked = true;
+    document.getElementById('finCommLockView').style.display = 'none';
+    document.getElementById('adminFinCommContent').style.display = 'block';
+    loadFinancierCommissionAnalysis();
+    // Also unlock discount/inventory if still locked
+    var discLock = document.getElementById('discountLockView');
+    if (discLock && discLock.style.display !== 'none') {
+      discLock.style.display = 'none';
+      document.getElementById('discountAnalysisContent').style.display = 'block';
+      loadDiscountAnalysis();
+    }
+    var invLock = document.getElementById('inventoryLockView');
+    if (invLock && invLock.style.display !== 'none') {
+      invLock.style.display = 'none';
+      document.getElementById('inventoryAnalysisContent').style.display = 'block';
+      loadInventoryAnalysis();
+    }
+  } else {
+    const errEl = document.getElementById('finCommPwdError');
+    errEl.style.display = 'block';
+    document.getElementById('finCommPwd').value = '';
     setTimeout(function() { errEl.style.display = 'none'; }, 2500);
   }
 }
@@ -1544,6 +1631,57 @@ async function showAccessoryBreakdown(type, name) {
 /**
  * Show pending details (DMS, Insurance, RTO, Accessories)
  */
+/**
+ * Inline accordion expand for pending task customer list
+ */
+async function togglePendingDetail(type, detailId, rowEl) {
+  const detail = document.getElementById(detailId);
+  if (!detail) return;
+
+  const chevron = rowEl.querySelector('.pendingChevron');
+
+  if (detail.dataset.loaded === 'true') {
+    const isOpen = detail.style.display !== 'none';
+    detail.style.display = isOpen ? 'none' : 'block';
+    if (chevron) chevron.style.transform = isOpen ? '' : 'rotate(180deg)';
+    return;
+  }
+
+  detail.style.display = 'block';
+  detail.innerHTML = '<div style="padding:10px 16px;text-align:center;color:#999;font-size:12px;">⏳ Loading...</div>';
+  if (chevron) chevron.style.transform = 'rotate(180deg)';
+
+  try {
+    const response = await API.call('getMyPendingDetails', {
+      sessionId: currentSessionId,
+      pendingType: type,
+      dateFilter: currentFilter
+    });
+    if (response.success && response.pending && response.pending.length > 0) {
+      var html = '<div style="background:#fffbf0;padding:8px 16px 14px;">';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
+      html += '<thead><tr style="background:#fff3cd;">';
+      html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ffe;font-size:11px;">Customer</th>';
+      html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ffe;font-size:11px;">Model</th>';
+      html += '<th style="padding:6px 8px;text-align:left;border:1px solid #ffe;font-size:11px;">Receipt No</th>';
+      html += '</tr></thead><tbody>';
+      response.pending.forEach(function(item) {
+        html += '<tr><td style="padding:5px 8px;border:1px solid #ffe;font-weight:600;">' + (item.customerName || '') + '</td>';
+        html += '<td style="padding:5px 8px;border:1px solid #ffe;">' + (item.model || '') + '</td>';
+        html += '<td style="padding:5px 8px;border:1px solid #ffe;color:#666;">' + (item.receiptNo || '') + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+      detail.innerHTML = html;
+    } else {
+      detail.innerHTML = '<div style="padding:10px 16px;text-align:center;color:#999;font-size:12px;">No pending items found</div>';
+    }
+    detail.dataset.loaded = 'true';
+  } catch(e) {
+    detail.innerHTML = '<div style="padding:10px 16px;color:#dc3545;font-size:12px;">Error loading</div>';
+    if (chevron) chevron.style.transform = '';
+  }
+}
+
 async function showPendingDetails(type, name) {
   try {
     const response = await API.getMyPendingDetails(type, currentFilter);

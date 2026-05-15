@@ -2594,8 +2594,8 @@ function getSalesDashboard(sessionId, dateFilter) {
       }
     }
     
-    // Filter by date range
-    const filteredData = filterByDateRange(data, dateFilter, 2); // Column C is Booking Date
+    // Filter by date range (Delivery Date = col L = index 11)
+    const filteredData = filterByDateRange(data, dateFilter, 11);
     
     Logger.log('Filtered rows: ' + (filteredData.length - 1));
     
@@ -3122,9 +3122,9 @@ function getAdminDashboard(sessionId, dateFilter) {
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data = sheet.getDataRange().getValues();
     
-    // Filter by date range
-    const filteredData = filterByDateRange(data, dateFilter, 2);
-    
+    // Filter by date range (Delivery Date = col L = index 11)
+    const filteredData = filterByDateRange(data, dateFilter, 11);
+
     let totalBookings = filteredData.length - 1; // All rows (excluding header)
     let totalSales = 0;       // Only where Account Check = Yes
     let accountsYes = 0;
@@ -3473,7 +3473,7 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
     if (!validation.success) return validation;
     const user = validation.user;
     let filterExecutive = null;
-    if (user.role === 'executive') {
+    if (user.role === 'sales') {
       filterExecutive = user.name;
     } else if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
@@ -3481,7 +3481,7 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
 
     const sheet      = getSheet(CONFIG.SHEETS.DATA);
     const rawData    = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+    const filteredData = filterByDateRange(rawData, dateFilter, 11);
 
     const byExec = {};
 
@@ -3532,7 +3532,7 @@ function getFinancierCommissionAnalysis(sessionId, dateFilter) {
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const rawData = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+    const filteredData = filterByDateRange(rawData, dateFilter, 11);
 
     const byFinancier = {}; // { name: { count, totalCommission, totalGrandTotal } }
 
@@ -3587,7 +3587,7 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
     const user = validation.user;
 
     // Executive role: force to own name only
-    if (user.role === 'executive') {
+    if (user.role === 'sales') {
       executiveName = user.name;
     } else if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
@@ -3595,7 +3595,7 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const rawData = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+    const filteredData = filterByDateRange(rawData, dateFilter, 11);
 
     const customers = [];
 
@@ -3731,7 +3731,9 @@ function getStockInAnalysis(sessionId, dateFilter) {
     if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
 
     const allRows = sheet.getDataRange().getValues();
-    const rows    = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header, date=col1
+    // Pass full array (with header) to filterByDateRange, then strip header afterward
+    const filteredWithHeader = filterByDateRange(allRows, dateFilter, 1);
+    const rows = filteredWithHeader.slice(1); // remove header row
 
     const skuTotals   = {}; // skuName -> total qty
     let   totalUnits  = 0;
@@ -5835,25 +5837,26 @@ function getMyPendingDetails(sessionId, pendingType, dateFilter) {
     
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(data, dateFilter, 2);
-    
+    const filteredData = filterByDateRange(data, dateFilter, 11); // Delivery Date col L
+
     const pending = [];
-    
-    // Get pending records
+
+    // Get pending records (Account Check = Yes only)
     for (let i = 1; i < filteredData.length; i++) {
       const row = filteredData[i];
       const executive = row[1];
-      
+      if ((row[21] || '').toString().trim() !== 'Yes') continue; // only completed sales
+
       // Only user's sales
       if (executive === user.name) {
         let isPending = false;
-        
+
         if (pendingType === 'dms') {
-          isPending = row[42] !== 'Done'; // Column AQ
+          isPending = row[42] !== 'Yes'; // Column AQ
         } else if (pendingType === 'insurance') {
-          isPending = row[45] !== 'Done'; // Column AT
+          isPending = row[45] !== 'Yes'; // Column AT
         } else if (pendingType === 'rto') {
-          isPending = row[48] !== 'Done'; // Column AW
+          isPending = row[48] !== 'Yes'; // Column AW
         } else if (pendingType === 'accessories') {
           isPending = row[36] !== 'Yes'; // Column AK
         }
