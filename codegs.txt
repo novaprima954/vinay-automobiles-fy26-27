@@ -4914,13 +4914,13 @@ function getViewRecordByRow(sessionId, row) {
 
     // Look up HSRP status by engine number
     var hsrpStatus = '', hsrpOrderDate = '', hsrpFitmentDate = '', hsrpRegNo = '';
-    const engineNoForHsrp = (rowData[59] || '').toString().trim();
+    const engineNoForHsrp = (rowData[59] || '').toString().trim().toUpperCase();
     if (engineNoForHsrp) {
       try {
         const hsrpSheet = getSheet('HSRP');
         const hsrpRows = hsrpSheet.getDataRange().getValues();
         for (var h = 1; h < hsrpRows.length; h++) {
-          if ((hsrpRows[h][18] || '').toString().trim() === engineNoForHsrp) {
+          if ((hsrpRows[h][18] || '').toString().trim().toUpperCase() === engineNoForHsrp) {
             hsrpStatus      = (hsrpRows[h][3]  || '').toString().trim();   // Col D: Status
             hsrpOrderDate   = hsrpRows[h][10] ? formatDate(hsrpRows[h][10]) : ''; // Col K: Order Date
             hsrpFitmentDate = hsrpRows[h][11] ? formatDate(hsrpRows[h][11]) : ''; // Col L: Fitment Date
