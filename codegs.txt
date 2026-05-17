@@ -109,6 +109,9 @@ function handleRequest(e) {
       case 'getViewRecordByRow':
         result = getViewRecordByRow(params.sessionId, params.row);
         break;
+      case 'getHSRPStatusForRecord':
+        result = getHSRPStatusForRecord(params.sessionId, params.engineNo, params.frameNo);
+        break;
       case 'exportViewRecordsToCSV':
         result = exportViewRecordsToCSV(params.sessionId, params.searchBy, params.searchValue, params.dateFilter, params.month, params.fromDate, params.toDate);
         break;
@@ -4912,30 +4915,6 @@ function getViewRecordByRow(sessionId, row) {
     
     const rowData = data[rowIndex];
 
-    // Look up HSRP status — try engine number first, then frame number as fallback
-    var hsrpStatus = '', hsrpOrderDate = '', hsrpFitmentDate = '', hsrpRegNo = '';
-    const engineNoForHsrp = (rowData[59] || '').toString().trim().toUpperCase();
-    const frameNoForHsrp  = (rowData[60] || '').toString().trim().toUpperCase();
-    if (engineNoForHsrp || frameNoForHsrp) {
-      try {
-        const hsrpSheet = getSheet('HSRP');
-        const hsrpRows = hsrpSheet.getDataRange().getValues();
-        for (var h = 1; h < hsrpRows.length; h++) {
-          const rowEngineNo = (hsrpRows[h][18] || '').toString().trim().toUpperCase(); // Col S
-          const rowFrameNo  = (hsrpRows[h][6]  || '').toString().trim().toUpperCase(); // Col G
-          const matched = (engineNoForHsrp && rowEngineNo === engineNoForHsrp) ||
-                          (frameNoForHsrp  && rowFrameNo  === frameNoForHsrp);
-          if (matched) {
-            hsrpStatus      = (hsrpRows[h][3]  || '').toString().trim();   // Col D: Status
-            hsrpOrderDate   = hsrpRows[h][10] ? formatDate(hsrpRows[h][10]) : ''; // Col K
-            hsrpFitmentDate = hsrpRows[h][11] ? formatDate(hsrpRows[h][11]) : ''; // Col L
-            hsrpRegNo       = (hsrpRows[h][7]  || '').toString().trim();   // Col H: Reg No
-            break;
-          }
-        }
-      } catch(e) { Logger.log('HSRP lookup error: ' + e.toString()); }
-    }
-
     return {
       success: true,
       record: {
@@ -5019,13 +4998,7 @@ function getViewRecordByRow(sessionId, row) {
         priceMatched: rowData[57] || '',     // BF - Price Matched
         customerRefused: rowData[58] || '',  // BG - Customer Refused
         engineNumber: rowData[59] || '',     // BH - Engine Number
-        frameNumber: rowData[60] || '',      // BI - Frame Number
-
-        // HSRP info (looked up from HSRP sheet by engine number)
-        hsrpStatus:      hsrpStatus,
-        hsrpOrderDate:   hsrpOrderDate,
-        hsrpFitmentDate: hsrpFitmentDate,
-        hsrpRegNo:       hsrpRegNo
+        frameNumber: rowData[60] || ''       // BI - Frame Number
       }
     };
 
@@ -5037,6 +5010,58 @@ function getViewRecordByRow(sessionId, row) {
     };
   }
 }
+
+/**
+ * Dedicated HSRP status lookup by engine number (col BH of Data sheet → col S of HSRP sheet)
+ * Status is in col D of HSRP sheet; blank = Not Ordered
+ */
+function getHSRPStatusForRecord(sessionId, engineNo, frameNo) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const eng = (engineNo || '').toString().trim().toUpperCase();
+    const frm = (frameNo  || '').toString().trim().toUpperCase();
+
+    Logger.log('=== getHSRPStatusForRecord === eng:' + eng + ' frm:' + frm);
+
+    if (!eng && !frm) {
+      return { success: true, found: false, status: '', message: 'No engine/frame number provided' };
+    }
+
+    const hsrpSheet = getSheet('HSRP');
+    const hsrpData  = hsrpSheet.getDataRange().getValues();
+
+    Logger.log('HSRP rows: ' + hsrpData.length);
+    if (hsrpData.length > 1) {
+      Logger.log('HSRP row1 sample - colD:' + hsrpData[1][3] + ' colG:' + hsrpData[1][6] + ' colS:' + hsrpData[1][18]);
+    }
+
+    for (var i = 1; i < hsrpData.length; i++) {
+      var row = hsrpData[i];
+      var rowEng = (row[18] || '').toString().trim().toUpperCase(); // Col S: Engine No
+      var rowFrm = (row[6]  || '').toString().trim().toUpperCase(); // Col G: Frame No
+
+      var matched = (eng && rowEng === eng) || (frm && rowFrm === frm);
+      if (matched) {
+        var status      = (row[3]  || '').toString().trim(); // Col D: Status
+        var orderDate   = row[10] ? formatDate(row[10]) : ''; // Col K: Order Date
+        var fitmentDate = row[11] ? formatDate(row[11]) : ''; // Col L: Fitment Date
+        var regNo       = (row[7]  || '').toString().trim(); // Col H: Reg No
+        Logger.log('HSRP found at row ' + (i+1) + ' status:' + status);
+        return { success: true, found: true, status: status, orderDate: orderDate, fitmentDate: fitmentDate, regNo: regNo };
+      }
+    }
+
+    Logger.log('HSRP not found for eng:' + eng + ' frm:' + frm);
+    return { success: true, found: false, status: '' };
+
+  } catch (e) {
+    Logger.log('getHSRPStatusForRecord error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
 /**
  * Export view records to CSV
  */

@@ -251,24 +251,64 @@ function hideResults() {
  */
 async function viewRecordDetails(row) {
   console.log('Loading details for row:', row);
-  
+
   showMessage('📄 Loading record details...', 'success');
-  
+
   try {
     const response = await API.getViewRecordByRow(row);
-    
+
     if (response.success) {
       displayRecordDetails(response.record);
       document.getElementById('detailsSection').style.display = 'block';
-      
-      // Scroll to details
       document.getElementById('detailsSection').scrollIntoView({ behavior: 'smooth' });
+
+      // Load HSRP status separately (dedicated lookup by engine/frame number)
+      loadHSRPStatus(response.record.engineNumber, response.record.frameNumber);
     } else {
       showMessage(response.message, 'error');
     }
   } catch (error) {
     console.error('Error loading details:', error);
     showMessage('❌ Error loading record details', 'error');
+  }
+}
+
+async function loadHSRPStatus(engineNumber, frameNumber) {
+  const hsrpIcon   = document.getElementById('statusHSRPIcon');
+  const hsrpValue  = document.getElementById('statusHSRPValue');
+  const hsrpDetail = document.getElementById('statusHSRPDetail');
+  if (!hsrpIcon) return;
+
+  hsrpIcon.textContent = '…';
+  hsrpValue.textContent = 'Loading';
+  hsrpValue.style.color = '#999';
+  if (hsrpDetail) hsrpDetail.textContent = '';
+
+  try {
+    const res = await API.call('getHSRPStatusForRecord', { engineNo: engineNumber || '', frameNo: frameNumber || '' });
+    const hs = (res && res.status) ? res.status.trim() : '';
+
+    if (hs === 'Fitted') {
+      hsrpIcon.textContent = '✓'; hsrpIcon.className = 'status-icon complete';
+      hsrpValue.textContent = 'Fitted'; hsrpValue.style.color = '#28a745';
+      if (hsrpDetail) hsrpDetail.textContent = res.fitmentDate ? 'Fitted: ' + res.fitmentDate : '';
+    } else if (hs === 'Received') {
+      hsrpIcon.textContent = '◐'; hsrpIcon.className = 'status-icon partial';
+      hsrpValue.textContent = 'Received'; hsrpValue.style.color = '#ff9800';
+      if (hsrpDetail) hsrpDetail.textContent = res.orderDate ? 'Ordered: ' + res.orderDate : '';
+    } else if (hs === 'Ordered') {
+      hsrpIcon.textContent = '◐'; hsrpIcon.className = 'status-icon partial';
+      hsrpValue.textContent = 'Ordered'; hsrpValue.style.color = '#ff9800';
+      if (hsrpDetail) hsrpDetail.textContent = res.orderDate || '';
+    } else {
+      // blank status or not found → Not Ordered
+      hsrpIcon.textContent = '✗'; hsrpIcon.className = 'status-icon pending';
+      hsrpValue.textContent = 'Not Ordered'; hsrpValue.style.color = '#dc3545';
+      if (hsrpDetail) hsrpDetail.textContent = '';
+    }
+  } catch (e) {
+    console.error('HSRP lookup error:', e);
+    hsrpIcon.textContent = '?'; hsrpValue.textContent = 'Error'; hsrpValue.style.color = '#999';
   }
 }
 
