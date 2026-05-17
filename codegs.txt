@@ -4912,23 +4912,28 @@ function getViewRecordByRow(sessionId, row) {
     
     const rowData = data[rowIndex];
 
-    // Look up HSRP status by engine number
+    // Look up HSRP status — try engine number first, then frame number as fallback
     var hsrpStatus = '', hsrpOrderDate = '', hsrpFitmentDate = '', hsrpRegNo = '';
     const engineNoForHsrp = (rowData[59] || '').toString().trim().toUpperCase();
-    if (engineNoForHsrp) {
+    const frameNoForHsrp  = (rowData[60] || '').toString().trim().toUpperCase();
+    if (engineNoForHsrp || frameNoForHsrp) {
       try {
         const hsrpSheet = getSheet('HSRP');
         const hsrpRows = hsrpSheet.getDataRange().getValues();
         for (var h = 1; h < hsrpRows.length; h++) {
-          if ((hsrpRows[h][18] || '').toString().trim().toUpperCase() === engineNoForHsrp) {
+          const rowEngineNo = (hsrpRows[h][18] || '').toString().trim().toUpperCase(); // Col S
+          const rowFrameNo  = (hsrpRows[h][6]  || '').toString().trim().toUpperCase(); // Col G
+          const matched = (engineNoForHsrp && rowEngineNo === engineNoForHsrp) ||
+                          (frameNoForHsrp  && rowFrameNo  === frameNoForHsrp);
+          if (matched) {
             hsrpStatus      = (hsrpRows[h][3]  || '').toString().trim();   // Col D: Status
-            hsrpOrderDate   = hsrpRows[h][10] ? formatDate(hsrpRows[h][10]) : ''; // Col K: Order Date
-            hsrpFitmentDate = hsrpRows[h][11] ? formatDate(hsrpRows[h][11]) : ''; // Col L: Fitment Date
-            hsrpRegNo       = (hsrpRows[h][7]  || '').toString().trim();   // Col H: Registration No
+            hsrpOrderDate   = hsrpRows[h][10] ? formatDate(hsrpRows[h][10]) : ''; // Col K
+            hsrpFitmentDate = hsrpRows[h][11] ? formatDate(hsrpRows[h][11]) : ''; // Col L
+            hsrpRegNo       = (hsrpRows[h][7]  || '').toString().trim();   // Col H: Reg No
             break;
           }
         }
-      } catch(e) {}
+      } catch(e) { Logger.log('HSRP lookup error: ' + e.toString()); }
     }
 
     return {

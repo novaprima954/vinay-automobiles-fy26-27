@@ -346,12 +346,8 @@ function displayRecordDetails(record) {
       hsrpIcon.textContent = '◐'; hsrpIcon.className = 'status-icon partial';
       hsrpValue.textContent = 'Ordered'; hsrpValue.style.color = '#ff9800';
       if (hsrpDetail) hsrpDetail.textContent = record.hsrpOrderDate || '';
-    } else if (!record.engineNumber) {
-      hsrpIcon.textContent = '-'; hsrpIcon.className = 'status-icon';
-      hsrpIcon.style.background = '#e0e0e0'; hsrpIcon.style.color = '#999';
-      hsrpValue.textContent = 'N/A'; hsrpValue.style.color = '#999';
-      if (hsrpDetail) hsrpDetail.textContent = 'No engine no.';
     } else {
+      // blank status (col D empty) or no HSRP record found → Not Ordered
       hsrpIcon.textContent = '✗'; hsrpIcon.className = 'status-icon pending';
       hsrpValue.textContent = 'Not Ordered'; hsrpValue.style.color = '#dc3545';
       if (hsrpDetail) hsrpDetail.textContent = '';
