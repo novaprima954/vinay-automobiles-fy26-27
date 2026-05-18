@@ -527,8 +527,18 @@ function formatDateDDMMYYYY(val) {
     } catch(e) {}
   }
 
-  // String — handle M/D/YYYY or MM/DD/YYYY
+  // String — handle various formats
   var str = val.toString().trim();
+
+  // DD-Mon-YYYY (e.g., "01-Apr-2026") — BPCL format
+  var dmy3 = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (dmy3) {
+    var monMap = {Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12};
+    var m3 = monMap[dmy3[2].charAt(0).toUpperCase() + dmy3[2].slice(1).toLowerCase()];
+    if (m3) return String(dmy3[1]).padStart(2,'0') + '/' + String(m3).padStart(2,'0') + '/' + dmy3[3];
+  }
+
+  // M/D/YYYY or MM/DD/YYYY
   var mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (mdy) {
     // Assume M/D/YYYY (US format from RazorPay)
@@ -601,6 +611,116 @@ function buildHaritaExcel(records, startVoucher) {
   var outWb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(outWb, ws, 'Harita Insurance');
   XLSX.writeFile(outWb, 'Harita_Insurance_Export_' + todayDateSuffix() + '.xlsx');
+}
+
+// ==========================================
+// BPCL EXPORT (frontend-only)
+// Input: BPCL Sale Transaction history xlsx
+// Col C(2)=Date, Col V(21)=Qty Litres (narration), Col Z(25)=Total Amount
+// Header row at index 11, data starts at index 12
+// ==========================================
+
+async function generateBPCLExport() {
+  const fileInput  = document.getElementById('bpcl_file');
+  const startInput = document.getElementById('bpcl_startVoucher');
+
+  if (!fileInput.files || !fileInput.files[0]) {
+    showStatus('bpcl', 'Please select a file.', 'error'); return;
+  }
+  const startVoucher = parseInt(startInput.value, 10);
+  if (isNaN(startVoucher) || startVoucher < 1) {
+    showStatus('bpcl', 'Please enter a valid starting voucher number.', 'error'); return;
+  }
+
+  showStatus('bpcl', '⏳ Processing file...', 'info');
+  document.getElementById('bpcl_generateBtn').disabled = true;
+
+  try {
+    const ab = await fileInput.files[0].arrayBuffer();
+    const wb = XLSX.read(ab, { type: 'array', cellDates: true });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rawData = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+
+    // Header row is at index 11 (Row 12); data rows start at index 12 (Row 13)
+    const records = [];
+    for (var i = 12; i < rawData.length; i++) {
+      var row = rawData[i];
+      var dateVal = row[2];   // Col C: Transaction Date
+      var amount  = row[25];  // Col Z: Total Transaction Amount
+      if (!dateVal && !amount) continue;
+
+      records.push({
+        date:      formatDateDDMMYYYY(dateVal),
+        amount:    amount || '',
+        narration: (row[21] || '').toString().trim()  // Col V: Quantity (Litres)
+      });
+    }
+
+    document.getElementById('bpcl_generateBtn').disabled = false;
+
+    if (records.length === 0) {
+      showStatus('bpcl', 'No data rows found in file.', 'error'); return;
+    }
+
+    buildBPCLExcel(records, startVoucher);
+    showStatus('bpcl', '✅ Downloaded — ' + records.length + ' transactions (' + (records.length * 2) + ' rows)', 'success');
+
+  } catch(e) {
+    document.getElementById('bpcl_generateBtn').disabled = false;
+    showStatus('bpcl', 'Error: ' + e.message, 'error');
+    console.error(e);
+  }
+}
+
+function buildBPCLExcel(records, startVoucher) {
+  var outputRows = [[
+    'Voucher Series', 'Voucher Date', 'Voucher Number', 'GST Nature',
+    'Account Name', 'Amount DR', 'Amount CR', 'Short Narration'
+  ]];
+
+  records.forEach(function(r, i) {
+    var voucherNo = 'BPCL/' + (startVoucher + i);
+
+    // Row 1: BPCL ( PETROL ) — DR
+    outputRows.push([
+      'BPCL',               // A: Voucher Series
+      r.date,               // B: Voucher Date
+      voucherNo,            // C: Voucher Number
+      'Not Applicable',     // D: GST Nature
+      'BPCL ( PETROL )',    // E: Account Name
+      r.amount,             // F: Amount DR
+      '',                   // G: Amount CR
+      r.narration           // H: Short Narration
+    ]);
+
+    // Row 2: P.D.I. VEHICLE EXPENCES — CR
+    outputRows.push([
+      '',                         // A
+      '',                         // B
+      '',                         // C
+      '',                         // D
+      'P.D.I. VEHICLE EXPENCES',  // E: Account Name
+      '',                         // F: Amount DR
+      r.amount,                   // G: Amount CR
+      r.narration                 // H: Short Narration
+    ]);
+  });
+
+  var ws = XLSX.utils.aoa_to_sheet(outputRows);
+  ws['!cols'] = [
+    { wch: 14 }, // A Voucher Series
+    { wch: 13 }, // B Voucher Date
+    { wch: 14 }, // C Voucher Number
+    { wch: 16 }, // D GST Nature
+    { wch: 26 }, // E Account Name
+    { wch: 12 }, // F Amount DR
+    { wch: 12 }, // G Amount CR
+    { wch: 16 }  // H Short Narration
+  ];
+
+  var outWb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(outWb, ws, 'BPCL Export');
+  XLSX.writeFile(outWb, 'BPCL_Export_' + todayDateSuffix() + '.xlsx');
 }
 
 // ==========================================

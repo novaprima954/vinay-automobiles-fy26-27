@@ -288,6 +288,29 @@
       </div>
     </div>
 
+    <!-- BPCL Export -->
+    <div class="card">
+      <div class="card-header">⛽ BPCL Export</div>
+      <div class="card-body">
+
+        <div class="form-group">
+          <label>Upload BPCL Transaction File (.xlsx / .xls)</label>
+          <input type="file" id="bpcl_file" accept=".xlsx,.xls"
+            style="width:100%;padding:10px 12px;border:2px dashed #ccc;border-radius:8px;font-size:14px;box-sizing:border-box;background:#fafafa;cursor:pointer;">
+        </div>
+
+        <div class="form-group">
+          <label>Starting Voucher Number</label>
+          <input type="number" id="bpcl_startVoucher" placeholder="e.g. 1" min="1"
+            style="width:100%;padding:10px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:14px;box-sizing:border-box;outline:none;transition:border-color 0.2s;"
+            onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+        </div>
+
+        <button class="btn-generate" id="bpcl_generateBtn" onclick="generateBPCLExport()">⬇️ Process &amp; Download Excel</button>
+        <div id="bpcl_statusMsg" class="status-msg"></div>
+      </div>
+    </div>
+
     </div><!-- /cards-grid -->
   </div>
 
@@ -295,6 +318,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/busy-upload.js?v=7"></script>
+  <script src="js/busy-upload.js?v=8"></script>
 </body>
 </html>
