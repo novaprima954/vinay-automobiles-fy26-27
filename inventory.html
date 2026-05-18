@@ -201,12 +201,15 @@
       padding: 8px 10px; border: 2px solid #ddd; border-radius: 7px; font-size: 13px;
     }
 
+    /* Wide container for reports tab */
+    .container.inv-wide { max-width: 100%; }
+
     /* Report table */
     .report-grid { overflow-x: auto; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
     .report-table { width: 100%; border-collapse: collapse; font-size: 12px; white-space: nowrap; }
     .report-table th {
-      background: #667eea; color: white; padding: 8px 10px;
-      text-align: center; font-weight: 600; border: 1px solid #5a6fd6;
+      background: #667eea; color: white; padding: 7px 10px;
+      text-align: center; font-weight: 600; border: 1px solid rgba(0,0,0,0.1);
     }
     .report-table th.col-meta { background: #4a5568; text-align: left; }
     .report-table th.grp-opening { background: #2d6a4f; }
@@ -217,14 +220,18 @@
     .report-table th.sub-sold    { background: #c1121f; }
     .report-table th.sub-stockin { background: #264b8a; }
     .report-table th.sub-closing { background: #9d4edd; }
+    .report-table th.sub-total   { background: #555; font-style: italic; }
     .report-table td {
-      padding: 7px 10px; border-bottom: 1px solid #eee; border-right: 1px solid #f0f0f0;
+      padding: 6px 8px; border-bottom: 1px solid #eee; border-right: 1px solid #f0f0f0;
       vertical-align: middle; text-align: center;
     }
     .report-table td.meta-col { text-align: left; }
     .report-table tr:hover td { background: #f8f9ff; }
+    .report-table tfoot td { background: #f0f4f8 !important; font-weight: 800; color: #333; border-top: 2px solid #ccc; }
+    .report-table tfoot td.tot-italic { background: #e2e8f5 !important; font-style: italic; }
     .rpt-num { font-weight: 700; color: #333; }
     .rpt-zero { color: #ccc; }
+    .rpt-toggle { margin-left:5px; background:none; border:1px solid rgba(255,255,255,0.6); color:white; border-radius:3px; padding:1px 5px; cursor:pointer; font-size:11px; font-weight:800; line-height:1.2; }
 
     @media (max-width: 768px) {
       .form-row { grid-template-columns: 1fr; }
@@ -698,6 +705,7 @@
             <tbody id="reportTbody">
               <tr><td colspan="5" style="text-align:center; color:#999; padding:30px;">Select a date range and click Generate</td></tr>
             </tbody>
+            <tfoot id="reportTfoot"></tfoot>
           </table>
         </div>
       </div>
