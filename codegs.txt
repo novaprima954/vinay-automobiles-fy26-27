@@ -9714,7 +9714,7 @@ const user = validation.user;
       const skuName = getSkuName(item.skuId);
       updateInvStock(item.skuId, locationId, -item.qty);
       logInvTransaction('OTC_SALE', item.skuId, skuName, locName, '', item.qty,
-        '', customerName, '', otcReceiptNo, saleAmount, '', remarks || '', user.name);
+        '', customerName, user.name, otcReceiptNo, saleAmount, '', remarks || '', user.name);
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.message }; }
