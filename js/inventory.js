@@ -50,10 +50,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // Set today's date on date fields
   const today = new Date().toISOString().split('T')[0];
-  ['siDate', 'otcDate', 'adDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo'].forEach(id => {
+  ['siDate', 'otcDate', 'adDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo', 'rpt_toDate'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = today;
   });
+  // Default report from-date = first day of current month
+  const firstOfMonth = new Date();
+  firstOfMonth.setDate(1);
+  const rptFrom = document.getElementById('rpt_fromDate');
+  if (rptFrom) rptFrom.value = firstOfMonth.toISOString().split('T')[0];
 
   showLoading(true);
   try {
@@ -183,6 +188,7 @@ function showTab(name) {
   if (name === 'history') loadHistory();
   if (name === 'masters') renderMasters();
   if (name === 'dashboard') renderDashboard();
+  if (name === 'reports') {} // user clicks Generate manually
 }
 
 // ==========================================
@@ -1110,3 +1116,216 @@ function goBack() {
 }
 
 function onSkuChange(prefix) { /* placeholder for future use */ }
+
+// ==========================================
+// REPORTS
+// ==========================================
+
+let lastReportRows = [];
+let lastReportFromDate = '';
+let lastReportToDate = '';
+
+async function loadReport() {
+  const fromDate = document.getElementById('rpt_fromDate').value;
+  const toDate   = document.getElementById('rpt_toDate').value;
+
+  if (!fromDate || !toDate) { showMessage('Please select both From and To dates', 'error'); return; }
+  if (fromDate > toDate)    { showMessage('From date cannot be after To date', 'error'); return; }
+
+  showRptStatus('⏳ Loading transactions…', '#d1ecf1', '#0c5460');
+  document.querySelector('#panel-reports .btn-primary').disabled = true;
+
+  try {
+    const res = await API.inventoryCall('getInvTransactions', {
+      sessionId: invSessionId,
+      type: '', locationId: '', fromDate: '', toDate: ''
+    });
+    document.querySelector('#panel-reports .btn-primary').disabled = false;
+
+    if (!res.success) { showRptStatus('❌ ' + (res.message || 'Failed'), '#f8d7da', '#721c24'); return; }
+
+    lastReportFromDate = fromDate;
+    lastReportToDate   = toDate;
+    computeAndRenderReport(res.transactions || [], fromDate, toDate);
+  } catch(e) {
+    document.querySelector('#panel-reports .btn-primary').disabled = false;
+    showRptStatus('❌ ' + e.message, '#f8d7da', '#721c24');
+  }
+}
+
+function computeAndRenderReport(allTxns, fromDate, toDate) {
+  // location name → id map
+  const locNameToId = {};
+  invLocations.forEach(function(l) { locNameToId[l.name] = l.locationId; });
+
+  // current stock: skuId|locationId → qty
+  const curStockMap = {};
+  invStock.forEach(function(s) { curStockMap[s.skuId + '|' + s.locationId] = s.qty || 0; });
+
+  // report[skuId][locationId] = { stockIn, sold, returnIn, transferIn, transferOut, afterDelta }
+  const report = {};
+
+  function initEntry(skuId, locId) {
+    if (!report[skuId]) report[skuId] = {};
+    if (!report[skuId][locId]) report[skuId][locId] = { stockIn: 0, sold: 0, returnIn: 0, transferIn: 0, transferOut: 0, afterDelta: 0 };
+  }
+
+  allTxns.forEach(function(t) {
+    const txnDate  = (t.date || '').substring(0, 10);
+    const qty      = parseInt(t.qty) || 0;
+    const skuId    = t.skuId;
+    if (!skuId || !qty) return;
+
+    const fromLocId = locNameToId[t.fromLocation] || '';
+    const toLocId   = locNameToId[t.toLocation]   || '';
+    const inPeriod  = txnDate >= fromDate && txnDate <= toDate;
+    const after     = txnDate > toDate;
+
+    if (t.type === 'STOCK_IN') {
+      if (toLocId) {
+        initEntry(skuId, toLocId);
+        if (inPeriod) report[skuId][toLocId].stockIn  += qty;
+        if (after)    report[skuId][toLocId].afterDelta += qty;
+      }
+    } else if (t.type === 'ISSUE' || t.type === 'OTC_SALE' || t.type === 'AD_SALE') {
+      if (fromLocId) {
+        initEntry(skuId, fromLocId);
+        if (inPeriod) report[skuId][fromLocId].sold      += qty;
+        if (after)    report[skuId][fromLocId].afterDelta -= qty;
+      }
+    } else if (t.type === 'RETURN') {
+      if (toLocId) {
+        initEntry(skuId, toLocId);
+        if (inPeriod) report[skuId][toLocId].returnIn  += qty;
+        if (after)    report[skuId][toLocId].afterDelta += qty;
+      }
+    } else if (t.type === 'TRANSFER') {
+      if (fromLocId) {
+        initEntry(skuId, fromLocId);
+        if (inPeriod) report[skuId][fromLocId].transferOut += qty;
+        if (after)    report[skuId][fromLocId].afterDelta  -= qty;
+      }
+      if (toLocId) {
+        initEntry(skuId, toLocId);
+        if (inPeriod) report[skuId][toLocId].transferIn  += qty;
+        if (after)    report[skuId][toLocId].afterDelta   += qty;
+      }
+    }
+  });
+
+  // Build rows — one per SKU
+  lastReportRows = invSkus.map(function(sku) {
+    const row = { sku: sku, locs: {} };
+    invLocations.forEach(function(loc) {
+      const cur   = curStockMap[sku.skuId + '|' + loc.locationId] || 0;
+      const d     = (report[sku.skuId] || {})[loc.locationId] || {};
+      const sIn   = d.stockIn   || 0;
+      const sold  = d.sold      || 0;
+      const retIn = d.returnIn  || 0;
+      const trIn  = d.transferIn  || 0;
+      const trOut = d.transferOut || 0;
+      const delta = d.afterDelta  || 0;
+
+      const closing = Math.max(0, cur - delta);
+      const opening = Math.max(0, closing - sIn - retIn - trIn + sold + trOut);
+
+      row.locs[loc.locationId] = { opening: opening, sold: sold, stockIn: sIn, closing: closing };
+    });
+    return row;
+  });
+
+  renderReportTable();
+  showRptStatus('✅ Report for ' + fromDate + ' to ' + toDate + ' — ' + lastReportRows.length + ' SKUs', '#d4edda', '#155724');
+}
+
+function renderReportTable() {
+  const thead = document.getElementById('reportThead');
+  const tbody = document.getElementById('reportTbody');
+
+  // ---- Build header (2-row grouped) ----
+  const metaCols  = ['SKU ID', 'Category', 'Type', 'Brand', 'Colour'];
+  const groups    = [
+    { label: 'Opening Stock', cls: 'grp-opening', subCls: 'sub-opening' },
+    { label: 'Items Sold',    cls: 'grp-sold',    subCls: 'sub-sold'    },
+    { label: 'Stock In',      cls: 'grp-stockin', subCls: 'sub-stockin' },
+    { label: 'Closing Stock', cls: 'grp-closing', subCls: 'sub-closing' }
+  ];
+
+  let row1 = '';
+  metaCols.forEach(function(c) { row1 += '<th class="col-meta" rowspan="2">' + c + '</th>'; });
+  groups.forEach(function(g) {
+    row1 += '<th class="' + g.cls + '" colspan="' + invLocations.length + '">' + g.label + '</th>';
+  });
+
+  let row2 = '';
+  groups.forEach(function(g) {
+    invLocations.forEach(function(l) {
+      row2 += '<th class="' + g.subCls + '">' + l.name + '</th>';
+    });
+  });
+
+  thead.innerHTML = '<tr>' + row1 + '</tr><tr>' + row2 + '</tr>';
+
+  // ---- Build body ----
+  if (!lastReportRows.length) {
+    tbody.innerHTML = '<tr><td colspan="' + (5 + invLocations.length * 4) + '" style="text-align:center;color:#999;padding:20px;">No data</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = lastReportRows.map(function(r) {
+    const s = r.sku;
+
+    function cell(val) {
+      if (!val) return '<td class="rpt-zero">-</td>';
+      return '<td class="rpt-num">' + val + '</td>';
+    }
+
+    const opening = invLocations.map(function(l) { return cell((r.locs[l.locationId] || {}).opening); }).join('');
+    const sold    = invLocations.map(function(l) { return cell((r.locs[l.locationId] || {}).sold);    }).join('');
+    const stockIn = invLocations.map(function(l) { return cell((r.locs[l.locationId] || {}).stockIn); }).join('');
+    const closing = invLocations.map(function(l) { return cell((r.locs[l.locationId] || {}).closing); }).join('');
+
+    return '<tr>' +
+      '<td class="meta-col" style="font-family:monospace;font-size:11px;color:#888;">' + (s.skuId || '-') + '</td>' +
+      '<td class="meta-col">' + (s.category || '-') + '</td>' +
+      '<td class="meta-col">' + (s.type     || '-') + '</td>' +
+      '<td class="meta-col">' + (s.brand    || '-') + '</td>' +
+      '<td class="meta-col">' + (s.color    || '-') + '</td>' +
+      opening + sold + stockIn + closing +
+    '</tr>';
+  }).join('');
+}
+
+function exportReportCSV() {
+  if (!lastReportRows.length) { showMessage('Generate a report first', 'error'); return; }
+
+  const groups = ['Opening Stock', 'Items Sold', 'Stock In', 'Closing Stock'];
+  const metaHeaders = ['SKU ID', 'Category', 'Type', 'Brand', 'Colour'];
+  const locHeaders  = [];
+  groups.forEach(function(g) {
+    invLocations.forEach(function(l) { locHeaders.push(g + ' - ' + l.name); });
+  });
+
+  let csv = metaHeaders.concat(locHeaders).map(function(h) { return '"' + h + '"'; }).join(',') + '\n';
+
+  lastReportRows.forEach(function(r) {
+    const s = r.sku;
+    const vals = [s.skuId, s.category, s.type, s.brand, s.color];
+    ['opening', 'sold', 'stockIn', 'closing'].forEach(function(key) {
+      invLocations.forEach(function(l) {
+        vals.push((r.locs[l.locationId] || {})[key] || 0);
+      });
+    });
+    csv += vals.map(function(v) { return '"' + String(v || '').replace(/"/g, '""') + '"'; }).join(',') + '\n';
+  });
+
+  downloadCSV(csv, 'Inventory_Report_' + lastReportFromDate + '_to_' + lastReportToDate + '.csv');
+}
+
+function showRptStatus(msg, bg, color) {
+  const el = document.getElementById('rpt_status');
+  el.textContent = msg;
+  el.style.background = bg;
+  el.style.color = color;
+  el.style.display = 'block';
+}
