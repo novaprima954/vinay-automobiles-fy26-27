@@ -51,6 +51,12 @@
       outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
     }
     .form-input:disabled, .form-select:disabled { background: #f5f5f5; color: #999; }
+    .form-textarea {
+      width: 100%; padding: 10px 12px; border: 2px solid #e8e8e8; border-radius: 8px;
+      font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; background: white;
+      resize: vertical; min-height: 70px; font-family: inherit;
+    }
+    .form-textarea:focus { outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1); }
 
     /* Accessories */
     .acc-grid {
@@ -214,7 +220,7 @@
     .quot-price-table th:last-child { text-align: right; }
     .quot-price-table td { padding: 4px 8px; font-size: 11px; border-bottom: 1px solid #eee; vertical-align: middle; }
     .quot-price-table td:last-child { text-align: right; white-space: nowrap; }
-    .quot-price-table tr.section-header td { background: #f9f9f9; font-weight: 800; padding-top: 8px; }
+    .quot-price-table tr.section-header td { background: #f9f9f9; font-weight: 800; padding-top: 8px; color: #222 !important; }
     .quot-price-table tr.total-row td { font-weight: 800; font-size: 12px; background: #f0f4ff; border-top: 2px solid #667eea; }
     .quot-price-table tr.grand-total td { font-weight: 900; font-size: 13px; background: #222; color: white; }
 
@@ -311,19 +317,50 @@
             <input type="tel" id="custMobile" class="form-input" placeholder="10-digit number" maxlength="10">
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Email</label>
-            <input type="email" id="custEmail" class="form-input" placeholder="Optional">
-          </div>
-          <div class="form-group">
-            <label class="form-label">District</label>
-            <input type="text" id="custDistrict" class="form-input" placeholder="e.g. Yavatmal">
-          </div>
+        <div class="form-group">
+          <label class="form-label">District</label>
+          <input type="text" id="custDistrict" class="form-input" placeholder="e.g. Yavatmal">
         </div>
         <div class="form-group">
           <label class="form-label">Address</label>
           <input type="text" id="custAddress" class="form-input" placeholder="Street / Village">
+        </div>
+      </div>
+    </div>
+
+    <!-- CRM Details (new customers only — hidden for existing leads) -->
+    <div class="section-card no-print" id="crmDetailsSection" style="display:none;">
+      <div class="section-card-title">📋 CRM Details</div>
+      <div class="section-card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Lead Source</label>
+            <select id="crmSource" class="form-select">
+              <option value="Walk-in">Walk-in</option>
+              <option value="Phone Call">Phone Call</option>
+              <option value="Reference">Reference</option>
+              <option value="Digital">Digital / Social Media</option>
+              <option value="Exhibition">Exhibition</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select id="crmStatus" class="form-select">
+              <option value="New">New</option>
+              <option value="Interested">Interested</option>
+              <option value="Hot Lead">🔥 Hot Lead</option>
+              <option value="Negotiating">Negotiating</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Next Follow-up Date</label>
+          <input type="date" id="crmFollowUp" class="form-input">
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Initial Note / Interaction</label>
+          <textarea id="crmNote" class="form-textarea" placeholder="What was discussed? Any specific requirements?"></textarea>
         </div>
       </div>
     </div>
@@ -393,46 +430,12 @@
     </div>
     <div class="no-print" style="margin-top:10px;">
       <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
-      <button class="btn-edit-quot" onclick="editQuotation()">✏️ Edit Quotation</button>
-    </div>
-  </div>
-
-  <!-- ══ SAVE TO CRM ══ (shown when generating quote for new customer) -->
-  <div id="saveLeadSection" class="section-card no-print" style="display:none; margin-top:12px;">
-    <div class="section-card-title">💾 Also Save This Lead to CRM</div>
-    <div class="section-card-body">
-      <p style="margin:0 0 12px;font-size:13px;color:#555;">This customer is not yet in your CRM. Save them as a lead to track follow-ups and manage the sale.</p>
-      <div class="form-row">
-        <div class="form-group">
-          <label class="form-label">Lead Source</label>
-          <select id="saveLeadSource" class="form-select">
-            <option value="Walk-in">Walk-in</option>
-            <option value="Phone Call">Phone Call</option>
-            <option value="Reference">Reference</option>
-            <option value="Digital">Digital / Social Media</option>
-            <option value="Exhibition">Exhibition</option>
-            <option value="Other">Other</option>
-          </select>
-        </div>
-        <div class="form-group">
-          <label class="form-label">Initial Status</label>
-          <select id="saveLeadStatus" class="form-select">
-            <option value="New">New</option>
-            <option value="Interested">Interested</option>
-            <option value="Hot Lead">Hot Lead</option>
-          </select>
-        </div>
-      </div>
-      <button id="btnSaveLead" onclick="saveLeadToCRM()"
-        style="width:100%;padding:13px;background:linear-gradient(135deg,#4CAF50,#388E3C);color:white;
-               border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:4px;">
-        💾 Save Lead to CRM
-      </button>
-      <button id="openLeadBtn" style="display:none;width:100%;padding:11px;background:#667eea;color:white;
-        border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;margin-top:8px;"
+      <button id="btnOpenLead" style="display:none;width:100%;padding:13px;background:linear-gradient(135deg,#4CAF50,#388E3C);
+        color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;"
         onclick="window.location.href='crm-detail.html?leadId='+leadId">
         📋 Open Lead in CRM →
       </button>
+      <button class="btn-edit-quot" onclick="editQuotation()">✏️ Edit / New Quotation</button>
     </div>
   </div>
 
@@ -441,6 +444,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
-<script src="js/crm-quote.js?v=2"></script>
+<script src="js/crm-quote.js?v=3"></script>
 </body>
 </html>

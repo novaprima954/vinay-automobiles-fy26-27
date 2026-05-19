@@ -30,8 +30,12 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Instant prefill from URL params (passed by lead detail page)
   if (urlParams.get('name'))    document.getElementById('custName').value    = urlParams.get('name');
   if (urlParams.get('mobile'))  document.getElementById('custMobile').value  = urlParams.get('mobile');
-  if (urlParams.get('email'))   document.getElementById('custEmail').value   = urlParams.get('email');
   if (urlParams.get('address')) document.getElementById('custAddress').value = urlParams.get('address');
+
+  // Show CRM details section only for new customers (no leadId)
+  if (!leadId) {
+    document.getElementById('crmDetailsSection').style.display = 'block';
+  }
 
   // Store model hint for after models load
   const modelHint = urlParams.get('model') || '';
@@ -297,7 +301,6 @@ async function generateQuotation() {
 
     const qty      = parseInt(document.getElementById('quantity').value) || 1;
     const color    = document.getElementById('vehicleColor').value.trim() || '-';
-    const email    = document.getElementById('custEmail').value.trim();
     const address  = document.getElementById('custAddress').value.trim();
     const district = document.getElementById('custDistrict').value.trim();
 
@@ -317,7 +320,7 @@ async function generateQuotation() {
     const grandTotal = (productTotal + accTotal) * qty;
 
     const html = buildQuotationHTML({
-      quotNo, date: new Date(), custName, mobile, email, address, district,
+      quotNo, date: new Date(), custName, mobile, address, district,
       model, variant, color, qty,
       exShowroom, insurance, rto, pdi, mandAcc, productTotal,
       selectedAcc, accTotal, grandTotal
@@ -325,14 +328,35 @@ async function generateQuotation() {
 
     document.getElementById('quotContent').innerHTML = html;
     document.getElementById('quotPreviewWrapper').style.display = 'block';
-    document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
 
-    // Show "Save Lead to CRM" section if not already a known lead
+    // Auto-save new lead to CRM if not already a known lead
     if (!leadId) {
-      document.getElementById('saveLeadSection').style.display = 'block';
-      document.getElementById('saveLeadSection').scrollIntoView({ behavior: 'smooth' });
+      const crmSource   = document.getElementById('crmSource').value;
+      const crmStatus   = document.getElementById('crmStatus').value;
+      const crmFollowUp = document.getElementById('crmFollowUp').value;
+      const crmNote     = document.getElementById('crmNote').value.trim();
+      try {
+        const addRes = await API.addLead({
+          customerName: custName,
+          mobileNo:     mobile,
+          address:      [address, district].filter(Boolean).join(', '),
+          interestedModel: model,
+          status:       crmStatus,
+          leadSource:   crmSource,
+          nextFollowupDate: crmFollowUp
+        });
+        if (addRes.success) {
+          leadId = addRes.leadId;
+          if (crmNote) {
+            await API.logCRMInteraction(leadId, 'Note', crmNote).catch(function() {});
+          }
+          document.getElementById('btnOpenLead').style.display = 'block';
+          document.getElementById('crmDetailsSection').style.display = 'none';
+        }
+      } catch(ce) {}
     }
 
+    document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
     API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, total: grandTotal }).catch(function() {});
 
   } catch (e) {
@@ -367,7 +391,7 @@ function buildQuotationHTML(d) {
     <div>
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
       <div class="quot-company-sub">Authorised TVS Dealer</div>
-      <div class="quot-company-addr">Yavatmal, Maharashtra</div>
+      <div class="quot-company-addr">Yavatmal, Maharashtra<br>📞 9130040050</div>
     </div>
     <div style="text-align:right;">
       <div class="quot-brand">TVS</div>
@@ -388,7 +412,6 @@ function buildQuotationHTML(d) {
         <div class="quot-box-body">
           <div class="quot-field"><strong>Name :</strong> <span>${d.custName}</span></div>
           <div class="quot-field"><strong>Mobile :</strong> <span>${d.mobile}</span></div>
-          ${d.email ? `<div class="quot-field"><strong>Email :</strong> <span>${d.email}</span></div>` : ''}
           <div class="quot-field"><strong>Address :</strong> <span>${addressFull}</span></div>
         </div>
       </div>
@@ -398,6 +421,7 @@ function buildQuotationHTML(d) {
           <div class="quot-field"><strong>Type :</strong> <span>${getVehicleType(d.model)}</span></div>
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
+          ${getVehicleType(d.model) === 'SCOOTER' ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Mandatory Accessories:</strong> Footrest, Side Stand</div>` : ''}
         </div>
       </div>
     </div>
@@ -412,7 +436,7 @@ function buildQuotationHTML(d) {
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
               ${d.insurance > 0 ? `<tr><td>Insurance (1st yr Comp. + 4 Yrs TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Registration Fee &amp; Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
-              ${d.pdi > 0 ? `<tr><td>PDI Cost</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
+              ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               ${mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
@@ -444,7 +468,7 @@ function buildQuotationHTML(d) {
     <strong>Terms and Conditions:</strong>
     <ol>
       <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are payable by you and are subject to change without notice at the time of delivery.</li>
-      <li>Payment terms — 100% to be made in the name of Vinay Automobiles by cheque / draft which is subject to realization. For online transfer please contact the showroom.</li>
+      <li>Payment terms — 100% to be made in the name of Vinay Automobiles by cheque / draft which is subject to realization.</li>
       <li>The company shall not be liable for any loss/damage incurred due to any prevention, hindrance or delay in manufacture, delivery, shortage of material, strike, riots, accident, machinery breakdown, government policies, Acts of God and all events beyond our control.</li>
       <li>All the above Terms &amp; Conditions of Sales are subject to change without notice.</li>
       <li>For disputes, if any, only the courts of Yavatmal shall have the jurisdiction.</li>
@@ -486,46 +510,3 @@ function goBack() {
   else window.location.href = 'crm.html';
 }
 
-// ── SAVE LEAD TO CRM ─────────────────────────
-
-async function saveLeadToCRM() {
-  const btn = document.getElementById('btnSaveLead');
-  const custName  = document.getElementById('custName').value.trim();
-  const mobile    = document.getElementById('custMobile').value.trim();
-  const model     = document.getElementById('modelSelect').value;
-  const email     = document.getElementById('custEmail').value.trim();
-  const address   = document.getElementById('custAddress').value.trim();
-  const district  = document.getElementById('custDistrict').value.trim();
-  const source    = document.getElementById('saveLeadSource').value;
-  const status    = document.getElementById('saveLeadStatus').value;
-
-  if (!custName || !mobile) { showMessage('Customer name and mobile are required', 'error'); return; }
-
-  btn.disabled = true; btn.textContent = 'Saving...';
-  try {
-    const response = await API.addLead({
-      customerName: custName,
-      mobileNo:     mobile,
-      email:        email,
-      address:      [address, district].filter(Boolean).join(', '),
-      interestedModel: model,
-      status:       status,
-      leadSource:   source
-    });
-    if (response.success) {
-      leadId = response.leadId;
-      btn.textContent = '✅ Saved to CRM!';
-      btn.style.background = '#ccc';
-      btn.disabled = true;
-      document.getElementById('openLeadBtn').style.display = 'block';
-    } else {
-      showMessage(response.message || 'Error saving lead', 'error');
-      btn.disabled = false;
-      btn.textContent = '💾 Save Lead to CRM';
-    }
-  } catch(e) {
-    showMessage('Error saving lead', 'error');
-    btn.disabled = false;
-    btn.textContent = '💾 Save Lead to CRM';
-  }
-}
