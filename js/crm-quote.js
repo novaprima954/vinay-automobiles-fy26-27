@@ -433,7 +433,7 @@ function buildQuotationHTML(d) {
     accRows += `<tr><td>${a.label}</td><td>₹ ${fmt(a.price)}</td></tr>`;
   });
 
-  const addressFull = [d.address, d.district].filter(Boolean).join(', ') || 'Maharashtra';
+  const addressFull = [d.address, d.district].filter(Boolean).join(', ');
 
   return `
 <div class="quot-wrap">
@@ -458,11 +458,11 @@ function buildQuotationHTML(d) {
   <div class="quot-body">
     <div class="quot-left">
       <div class="quot-box">
-        <div class="quot-box-title">Customer</div>
+        <div class="quot-box-title">Customer Details</div>
         <div class="quot-box-body">
           <div class="quot-field"><strong>Name :</strong> <span>${d.custName}</span></div>
           <div class="quot-field"><strong>Mobile :</strong> <span>${d.mobile}</span></div>
-          <div class="quot-field"><strong>Address :</strong> <span>${addressFull}</span></div>
+          ${addressFull ? `<div class="quot-field"><strong>Address :</strong> <span>${addressFull}</span></div>` : ''}
         </div>
       </div>
       <div class="quot-box">
@@ -488,12 +488,12 @@ function buildQuotationHTML(d) {
               ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
               ${mandAcc > 0 ? `<tr><td>Standard Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
-              <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
+              <tr class="total-row"><td><strong>Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
                 ${accRows}
-                <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
-              ` : `<tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ 0</strong></td></tr>`}
+                <tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
+              ` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
               <tr class="grand-total"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
