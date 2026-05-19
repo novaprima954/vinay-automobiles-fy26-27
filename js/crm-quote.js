@@ -5,6 +5,7 @@
 let currentUser = null;
 let leadId = null;
 let priceDetails = null;
+let lastQuotNo = '';
 
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
@@ -319,6 +320,7 @@ async function generateQuotation() {
     const accTotal   = selectedAcc.reduce(function(s, a) { return s + a.price; }, 0);
     const grandTotal = Math.max(0, productTotal + accTotal - discount);
 
+    lastQuotNo = quotNo;
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, address, district,
       model, variant, color, execName,
@@ -370,6 +372,54 @@ async function generateQuotation() {
 function editQuotation() {
   document.getElementById('quotPreviewWrapper').style.display = 'none';
   window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+async function savePDF() {
+  if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+    window.print();
+    return;
+  }
+
+  const btn = document.querySelector('.btn-save-pdf');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+
+  try {
+    const el = document.getElementById('quotContent');
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      scrollY: 0
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+    const pdfW = 210;
+    const pdfH = 297;
+    const imgW = pdfW;
+    const imgH = (canvas.height / canvas.width) * pdfW;
+
+    // If content fits, place as-is; otherwise scale to page height
+    if (imgH <= pdfH) {
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW, imgH);
+    } else {
+      const scale = pdfH / imgH;
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW * scale, pdfH);
+    }
+
+    const custName = (document.getElementById('custName').value || 'Customer')
+      .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+    pdf.save('Quotation_' + (lastQuotNo || custName) + '_' + custName + '.pdf');
+
+  } catch (e) {
+    showMessage('PDF generation failed, opening print dialog', 'error');
+    window.print();
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save PDF';
+  }
 }
 
 // ── BUILD HTML ───────────────────────────────

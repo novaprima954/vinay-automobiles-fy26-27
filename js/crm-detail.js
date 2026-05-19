@@ -70,7 +70,6 @@ function displayLeadDetails(lead) {
   document.getElementById('status').value       = lead.status || '';
   document.getElementById('expectedDate').value = lead.expectedDate ? formatDateForInput(lead.expectedDate) : '';
   document.getElementById('followUpDate').value = lead.followUpDate ? formatDateForInput(lead.followUpDate) : '';
-  document.getElementById('notes').value        = lead.notes || '';
 
   // Lost reason
   if (lead.lostReason) {
