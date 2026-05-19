@@ -2665,12 +2665,18 @@ function getCRMAnalytics(sessionId) {
 
     const sourceStats = {};
     const execStats = {};
+    const lostLeads = [];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const source     = row[6] || 'Unknown';
-      const status     = row[7] || '';
-      const assignedTo = row[8] || '';
+      const source       = row[6]  || 'Unknown';
+      const status       = row[7]  || '';
+      const assignedTo   = row[8]  || '';
+      const notes        = row[10] || '';
+      const followUpDate = row[12];
+      const lostReason   = row[16] || '';
 
       // Non-admin: only count rows assigned to themselves
       if (!isAdmin && assignedTo !== user.name) continue;
@@ -2682,29 +2688,54 @@ function getCRMAnalytics(sessionId) {
       else if (status) sourceStats[source].active++;
 
       if (assignedTo && status) {
-        if (!execStats[assignedTo]) execStats[assignedTo] = { total: 0, converted: 0, lost: 0, active: 0, hotLeads: 0 };
+        if (!execStats[assignedTo]) execStats[assignedTo] = { total: 0, converted: 0, lost: 0, active: 0, hotLeads: 0, overdue: 0 };
         execStats[assignedTo].total++;
         if (status === 'Converted') execStats[assignedTo].converted++;
         else if (status === 'Lost') execStats[assignedTo].lost++;
         else if (status === 'Hot Lead') execStats[assignedTo].hotLeads++;
         else execStats[assignedTo].active++;
+
+        // Check overdue (past follow-up date, not Converted/Lost)
+        if (followUpDate && status !== 'Converted' && status !== 'Lost') {
+          try {
+            const fDate = new Date(followUpDate);
+            fDate.setHours(0, 0, 0, 0);
+            if (fDate < today) execStats[assignedTo].overdue++;
+          } catch(de) {}
+        }
+      }
+
+      // Collect lost leads with notes
+      if (status === 'Lost') {
+        // Get last note line
+        var lastNote = '';
+        if (notes) {
+          var lines = notes.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l; });
+          if (lines.length > 0) lastNote = lines[lines.length - 1];
+        }
+        lostLeads.push({
+          customerName: row[1] || '',
+          mobileNo:     row[2] || '',
+          model:        row[5] || '',
+          lostReason:   lostReason,
+          assignedTo:   assignedTo,
+          lastNote:     lastNote
+        });
       }
     }
 
     var sourceArray = Object.keys(sourceStats).map(function(src) {
       var s = sourceStats[src];
-      return { source: src, total: s.total, converted: s.converted, lost: s.lost, active: s.active,
-               convRate: s.total > 0 ? Math.round((s.converted / s.total) * 100) : 0 };
+      return { source: src, total: s.total, converted: s.converted, lost: s.lost, active: s.active };
     }).sort(function(a, b) { return b.total - a.total; });
 
     var execArray = Object.keys(execStats).map(function(exec) {
       var e = execStats[exec];
       return { executive: exec, total: e.total, converted: e.converted, lost: e.lost,
-               active: e.active, hotLeads: e.hotLeads,
-               convRate: e.total > 0 ? Math.round((e.converted / e.total) * 100) : 0 };
-    }).sort(function(a, b) { return b.converted - a.converted; });
+               active: e.active, hotLeads: e.hotLeads, overdue: e.overdue };
+    }).sort(function(a, b) { return b.total - a.total; });
 
-    return { success: true, isAdmin: isAdmin, analytics: { sourceStats: sourceArray, execStats: execArray } };
+    return { success: true, isAdmin: isAdmin, analytics: { sourceStats: sourceArray, execStats: execArray, lostLeads: lostLeads } };
 
   } catch (error) {
     Logger.log('Error in getCRMAnalytics: ' + error.toString());

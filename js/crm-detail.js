@@ -349,9 +349,10 @@ function whatsappLead() {
   if (!currentLead || !currentLead.mobileNo) return;
   const exec  = currentUser ? currentUser.name : 'Team';
   const model = currentLead.model || '';
+  const clean = String(currentLead.mobileNo).replace(/\D/g, '');
   const text  = 'Hi ' + (currentLead.customerName || '') + ', This is ' + exec + '. Thanks for enquiring '
     + (model ? model + ' at ' : 'at ') + 'Vinay Automobiles. Please let us know if any further help is required.';
-  window.location.href = 'https://wa.me/91' + currentLead.mobileNo + '?text=' + encodeURIComponent(text);
+  window.open('https://wa.me/91' + clean + '?text=' + encodeURIComponent(text), '_blank');
 }
 
 function copyMobile() {

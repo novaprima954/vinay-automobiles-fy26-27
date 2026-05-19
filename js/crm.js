@@ -117,8 +117,13 @@ function renderFollowupsList() {
   let type = 'week';
 
   if (currentFollowupFilter === 'overdue') {
-    // Exclude Lost leads from overdue — backend does this but double-check client-side
-    leads = (dashboardData.overdueLeads || []).filter(function(l) { return l.status !== 'Lost'; });
+    // Filter: exclude Lost, and if not admin, show only current user's leads
+    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
+    leads = (dashboardData.overdueLeads || []).filter(function(l) {
+      if (l.status === 'Lost') return false;
+      if (!isAdmin && l.assignedTo && l.assignedTo !== currentUser.name) return false;
+      return true;
+    });
     type = 'overdue';
   } else if (currentFollowupFilter === 'today') {
     leads = dashboardData.urgentFollowUps || [];
@@ -409,11 +414,11 @@ async function loadAnalytics() {
       return;
     }
 
-    const { sourceStats, execStats } = response.analytics;
+    const { sourceStats, execStats, lostLeads } = response.analytics;
     const isAdmin = response.isAdmin;
     titleEl.textContent = isAdmin ? '📊 Analytics' : '📊 My Performance';
 
-    // Source effectiveness table
+    // Source effectiveness table (no Conv%)
     let srcRows = '';
     sourceStats.forEach(function(s) {
       srcRows += `<tr>
@@ -421,37 +426,71 @@ async function loadAnalytics() {
         <td>${s.total}</td>
         <td style="color:#66BB6A;font-weight:700;">${s.converted}</td>
         <td style="color:#ef5350;">${s.lost}</td>
-        <td>
-          <span class="conv-rate">${s.convRate}%</span>
-          <div class="conv-bar"><div class="conv-bar-fill" style="width:${s.convRate}%"></div></div>
-        </td>
+        <td style="color:#1565c0;">${s.active}</td>
       </tr>`;
     });
 
-    // Executive performance table
+    // Executive performance table (with overdue, no Conv%)
     let execRows = '';
     execStats.forEach(function(e) {
-      const isMe = !isAdmin; // non-admin only sees themselves
+      const isMe = !isAdmin;
+      const overdueColor = e.overdue > 0 ? 'color:#ef5350;font-weight:700;' : 'color:#aaa;';
       execRows += `<tr style="${isMe ? 'background:#f0f4ff;' : ''}">
         <td><strong>${e.executive}</strong></td>
         <td>${e.total}</td>
         <td style="color:#FF7043;font-weight:600;">${e.hotLeads}</td>
         <td style="color:#66BB6A;font-weight:700;">${e.converted}</td>
-        <td>
-          <span class="conv-rate">${e.convRate}%</span>
-          <div class="conv-bar"><div class="conv-bar-fill" style="width:${e.convRate}%"></div></div>
-        </td>
+        <td style="${overdueColor}">${e.overdue > 0 ? '⚠️ ' + e.overdue : '0'}</td>
       </tr>`;
     });
 
+    // Lost customer analysis
+    let lostReasonRows = '';
+    let recentLostRows = '';
+    if (lostLeads && lostLeads.length > 0) {
+      const reasonMap = {};
+      lostLeads.forEach(function(l) {
+        const r = l.lostReason || 'No reason given';
+        reasonMap[r] = (reasonMap[r] || 0) + 1;
+      });
+      Object.entries(reasonMap).sort(function(a,b){return b[1]-a[1];}).forEach(function(entry) {
+        lostReasonRows += `<tr><td>${entry[0]}</td><td style="text-align:center;font-weight:700;color:#ef5350;">${entry[1]}</td></tr>`;
+      });
+
+      lostLeads.slice(0, 15).forEach(function(l) {
+        const note = l.lastNote ? `<div style="font-size:11px;color:#888;margin-top:2px;">${escHtml(l.lastNote.substring(0,80))}${l.lastNote.length>80?'...':''}</div>` : '';
+        recentLostRows += `<tr>
+          <td><strong>${escHtml(l.customerName)}</strong>${note}</td>
+          <td style="font-size:12px;">${l.model || '-'}</td>
+          <td style="color:#ef5350;font-size:12px;">${l.lostReason || '-'}</td>
+          ${isAdmin ? `<td style="font-size:12px;">${l.assignedTo || '-'}</td>` : ''}
+        </tr>`;
+      });
+    }
+
     const execTableTitle = isAdmin ? '👤 Executive Performance' : '👤 My Stats';
+    const lostSection = (lostLeads && lostLeads.length > 0) ? `
+      <div class="analytics-card">
+        <div class="analytics-card-title">📉 Lost Leads Analysis (${lostLeads.length} total)</div>
+        <div style="overflow-x:auto;">
+          <table class="analytics-table" style="margin-bottom:12px;">
+            <thead><tr><th>Reason</th><th style="text-align:center;">Count</th></tr></thead>
+            <tbody>${lostReasonRows}</tbody>
+          </table>
+          <div style="font-size:12px;font-weight:700;color:#555;padding:6px 0 4px;">Recent Lost Leads</div>
+          <table class="analytics-table">
+            <thead><tr><th>Customer</th><th>Model</th><th>Reason</th>${isAdmin ? '<th>Executive</th>' : ''}</tr></thead>
+            <tbody>${recentLostRows}</tbody>
+          </table>
+        </div>
+      </div>` : '';
 
     container.innerHTML = `
       <div class="analytics-card">
         <div class="analytics-card-title">🎯 ${isAdmin ? 'Source Effectiveness' : 'My Leads by Source'}</div>
         <div style="overflow-x:auto;">
           <table class="analytics-table">
-            <thead><tr><th>Source</th><th>Total</th><th>Won</th><th>Lost</th><th>Conv%</th></tr></thead>
+            <thead><tr><th>Source</th><th>Total</th><th>✅Won</th><th>❌Lost</th><th>🔵Active</th></tr></thead>
             <tbody>${srcRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
           </table>
         </div>
@@ -460,11 +499,12 @@ async function loadAnalytics() {
         <div class="analytics-card-title">${execTableTitle}</div>
         <div style="overflow-x:auto;">
           <table class="analytics-table">
-            <thead><tr><th>${isAdmin ? 'Executive' : 'Name'}</th><th>Total</th><th>🔥Hot</th><th>✅Won</th><th>Conv%</th></tr></thead>
+            <thead><tr><th>${isAdmin ? 'Executive' : 'Name'}</th><th>Total</th><th>🔥Hot</th><th>✅Won</th><th>⚠️Overdue</th></tr></thead>
             <tbody>${execRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
           </table>
         </div>
       </div>
+      ${lostSection}
     `;
   } catch (error) {
     container.innerHTML = `<div style="padding:16px;color:#999;">Error loading analytics</div>`;
@@ -502,11 +542,12 @@ function callLead(mobileNo) {
 }
 
 function openWhatsApp(mobileNo, customerName, modelName) {
-  const exec = currentUser ? currentUser.name : 'Team';
+  const exec  = currentUser ? currentUser.name : 'Team';
   const model = modelName || '';
-  const text = 'Hi ' + customerName + ', This is ' + exec + '. Thanks for enquiring '
+  const clean = String(mobileNo).replace(/\D/g, '');
+  const text  = 'Hi ' + customerName + ', This is ' + exec + '. Thanks for enquiring '
     + (model ? model + ' at ' : 'at ') + 'Vinay Automobiles. Please let us know if any further help is required.';
-  window.location.href = 'https://wa.me/91' + mobileNo + '?text=' + encodeURIComponent(text);
+  window.open('https://wa.me/91' + clean + '?text=' + encodeURIComponent(text), '_blank');
 }
 
 async function callAndClaimLead(leadId, mobileNo) {
