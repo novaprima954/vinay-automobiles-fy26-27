@@ -385,15 +385,9 @@
             </select>
           </div>
         </div>
-        <div class="form-row">
-          <div class="form-group">
-            <label class="form-label">Color</label>
-            <input type="text" id="vehicleColor" class="form-input" placeholder="e.g. Pearl White">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Quantity</label>
-            <input type="number" id="quantity" class="form-input" value="1" min="1" max="10" oninput="recalculate()">
-          </div>
+        <div class="form-group">
+          <label class="form-label">Color</label>
+          <input type="text" id="vehicleColor" class="form-input" placeholder="e.g. Pearl White">
         </div>
       </div>
     </div>
@@ -410,7 +404,11 @@
           <div class="summary-row"><span class="lbl">PDI / Service Charge</span><span class="val" id="sumPdi">₹0</span></div>
           <div class="summary-row" id="mandAccRow" style="display:none;"><span class="lbl">Mandatory Accessories</span><span class="val" id="sumMandAcc">₹0</span></div>
           <div class="summary-row"><span class="lbl">Extra Accessories</span><span class="val" id="sumAcc">₹0</span></div>
-          <div class="summary-row total"><span class="lbl">Total (×<span id="sumQty">1</span>)</span><span class="val" id="sumTotal">₹0</span></div>
+          <div class="summary-row" style="align-items:center;gap:8px;">
+            <span class="lbl" style="color:#ef5350;">Discount (₹)</span>
+            <input type="number" id="discount" class="form-input" style="width:110px;padding:7px 10px;font-size:13px;text-align:right;border-color:#ffcdd2;" placeholder="0" min="0" oninput="recalculate()">
+          </div>
+          <div class="summary-row total"><span class="lbl">Final Total</span><span class="val" id="sumTotal">₹0</span></div>
         </div>
       </div>
     </div>

@@ -2784,7 +2784,7 @@ function findLeadByMobile(sessionId, mobile) {
 }
 
 /**
- * Get next sequential quotation number
+ * Get random quotation number VA/XXXXXX (6-digit random)
  */
 function getNextQuotationNumber(sessionId) {
   try {
@@ -2798,11 +2798,9 @@ function getNextQuotationNumber(sessionId) {
       sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
     }
 
-    // Sequential number based on row count (rows after header = quote count)
-    const nextNum = sheet.getLastRow(); // header = row 1, first quote = row 2 = num 1
-    const num = String(nextNum).padStart(4, '0');
-    const dateStr = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MMM-yyyy');
-    const quotNo = 'VA/' + dateStr + '/' + num;
+    // Random 6-digit number
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    const quotNo = 'VA/' + randomNum;
 
     return { success: true, quotNo: quotNo };
 

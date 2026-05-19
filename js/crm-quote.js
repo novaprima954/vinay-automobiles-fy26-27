@@ -255,20 +255,20 @@ function toggleAcc(el) {
 
 function recalculate() {
   if (!priceDetails) return;
-  const qty = parseInt(document.getElementById('quantity').value) || 1;
   const exShowroom = Number(priceDetails.exShowroom) || 0;
   const insurance  = Number(priceDetails.insurance)  || 0;
   const rto        = Number(priceDetails.rto)        || 0;
   const pdi        = Number(priceDetails.serviceCharge) || 0;
   const mandAcc    = Number(priceDetails.mandAccessories) || 0;
   const productTotal = exShowroom + insurance + rto + pdi + mandAcc;
+  const discount   = Math.max(0, Number(document.getElementById('discount').value) || 0);
 
   let accTotal = 0;
   document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
     accTotal += Number(cb.dataset.price) || 0;
   });
 
-  const grandTotal = (productTotal + accTotal) * qty;
+  const grandTotal = Math.max(0, productTotal + accTotal - discount);
   document.getElementById('sumExShowroom').textContent = '₹' + fmt(exShowroom);
   document.getElementById('sumInsurance').textContent  = '₹' + fmt(insurance);
   document.getElementById('sumRto').textContent        = '₹' + fmt(rto);
@@ -276,7 +276,6 @@ function recalculate() {
   const mandEl = document.getElementById('sumMandAcc');
   if (mandEl) { mandEl.textContent = '₹' + fmt(mandAcc); mandEl.closest('.summary-row').style.display = mandAcc > 0 ? 'flex' : 'none'; }
   document.getElementById('sumAcc').textContent        = '₹' + fmt(accTotal);
-  document.getElementById('sumQty').textContent        = qty;
   document.getElementById('sumTotal').textContent      = '₹' + fmt(grandTotal);
 }
 
@@ -299,10 +298,11 @@ async function generateQuotation() {
     const qnRes  = await API.getNextQuotationNumber();
     const quotNo = qnRes.success ? qnRes.quotNo : 'VA/' + fmtDateStr(new Date()) + '/0001';
 
-    const qty      = parseInt(document.getElementById('quantity').value) || 1;
     const color    = document.getElementById('vehicleColor').value.trim() || '-';
     const address  = document.getElementById('custAddress').value.trim();
     const district = document.getElementById('custDistrict').value.trim();
+    const discount = Math.max(0, Number(document.getElementById('discount').value) || 0);
+    const execName = currentUser ? currentUser.name : '';
 
     const exShowroom   = Number(priceDetails.exShowroom) || 0;
     const insurance    = Number(priceDetails.insurance)  || 0;
@@ -317,13 +317,13 @@ async function generateQuotation() {
       if (acc) selectedAcc.push({ label: acc.label, price: Number(cb.dataset.price) });
     });
     const accTotal   = selectedAcc.reduce(function(s, a) { return s + a.price; }, 0);
-    const grandTotal = (productTotal + accTotal) * qty;
+    const grandTotal = Math.max(0, productTotal + accTotal - discount);
 
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, address, district,
-      model, variant, color, qty,
+      model, variant, color, execName,
       exShowroom, insurance, rto, pdi, mandAcc, productTotal,
-      selectedAcc, accTotal, grandTotal
+      selectedAcc, accTotal, discount, grandTotal
     });
 
     document.getElementById('quotContent').innerHTML = html;
@@ -381,7 +381,6 @@ function buildQuotationHTML(d) {
   d.selectedAcc.forEach(function(a) {
     accRows += `<tr><td>${a.label}</td><td>₹ ${fmt(a.price)}</td></tr>`;
   });
-  let mandAccRow = ''; // Mandatory accessories shown in product section, not here
 
   const addressFull = [d.address, d.district].filter(Boolean).join(', ') || 'Maharashtra';
 
@@ -391,7 +390,7 @@ function buildQuotationHTML(d) {
     <div>
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
       <div class="quot-company-sub">Authorised TVS Dealer</div>
-      <div class="quot-company-addr">Yavatmal, Maharashtra<br>📞 9130040050</div>
+      <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>📞 9130040050</div>
     </div>
     <div style="text-align:right;">
       <div class="quot-brand">TVS</div>
@@ -422,6 +421,7 @@ function buildQuotationHTML(d) {
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
           ${getVehicleType(d.model) === 'SCOOTER' ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Mandatory Accessories:</strong> Footrest, Side Stand</div>` : ''}
+          ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}</div>` : ''}
         </div>
       </div>
     </div>
@@ -435,17 +435,16 @@ function buildQuotationHTML(d) {
             <tbody>
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
               ${d.insurance > 0 ? `<tr><td>Insurance (1st yr Comp. + 4 Yrs TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
-              ${d.rto > 0 ? `<tr><td>Registration Fee &amp; Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
-              ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
+              ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
               ${mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
+              ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
                 ${accRows}
                 <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : `<tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ 0</strong></td></tr>`}
-              <tr><td><strong>C. Quantity</strong></td><td><strong>${d.qty}</strong></td></tr>
-              <tr class="total-row"><td><strong>D. Quotation Total (A+B)×C</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
+              ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
               <tr class="grand-total"><td><strong>Final Offer Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
           </table>
@@ -459,22 +458,21 @@ function buildQuotationHTML(d) {
     <div class="quot-desc-body" style="display:flex;gap:24px;flex-wrap:wrap;">
       <div><strong>Bank Name :</strong> HDFC Bank</div>
       <div><strong>Account No :</strong> 50200038743479</div>
-      <div><strong>IFSC Code :</strong> HDFC0001017</div>
+      <div><strong>IFSC :</strong> HDFC0001017</div>
+      <div><strong>Branch :</strong> Yavatmal</div>
       <div><strong>Account Name :</strong> Vinay Automobiles</div>
     </div>
   </div>
-  <div class="quot-footer-note">This is a computer generated quotation — no signature required</div>
   <div class="quot-terms">
     <strong>Terms and Conditions:</strong>
     <ol>
-      <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are payable by you and are subject to change without notice at the time of delivery.</li>
-      <li>Payment terms — 100% to be made in the name of Vinay Automobiles by cheque / draft which is subject to realization.</li>
-      <li>The company shall not be liable for any loss/damage incurred due to any prevention, hindrance or delay in manufacture, delivery, shortage of material, strike, riots, accident, machinery breakdown, government policies, Acts of God and all events beyond our control.</li>
+      <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are subject to change without notice at the time of delivery.</li>
+      <li>Booking subject to availability.</li>
       <li>All the above Terms &amp; Conditions of Sales are subject to change without notice.</li>
-      <li>For disputes, if any, only the courts of Yavatmal shall have the jurisdiction.</li>
+      <li>All matters are subject to Yavatmal jurisdiction only.</li>
     </ol>
   </div>
-  <div class="quot-company-footer">Vinay Automobiles — Yavatmal, Maharashtra | Authorised TVS Dealer</div>
+  <div class="quot-company-footer">Vinay Automobiles — Darwha Road, Yavatmal, Maharashtra | Authorised TVS Dealer</div>
 </div>`;
 }
 
