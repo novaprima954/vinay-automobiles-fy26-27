@@ -681,28 +681,28 @@ function buildBPCLExcel(records, startVoucher) {
   records.forEach(function(r, i) {
     var voucherNo = 'BPCL/' + (startVoucher + i);
 
-    // Row 1: BPCL ( PETROL ) — DR
+    // Row 1: P.D.I. VEHICLE EXPENCES — DR
     outputRows.push([
-      'BPCL',               // A: Voucher Series
-      r.date,               // B: Voucher Date
-      voucherNo,            // C: Voucher Number
-      'Not Applicable',     // D: GST Nature
-      'BPCL ( PETROL )',    // E: Account Name
-      r.amount,             // F: Amount DR
-      '',                   // G: Amount CR
-      r.narration           // H: Short Narration
+      'BPCL',                     // A: Voucher Series
+      r.date,                     // B: Voucher Date
+      voucherNo,                  // C: Voucher Number
+      'Not Applicable',           // D: GST Nature
+      'P.D.I. VEHICLE EXPENCES',  // E: Account Name
+      r.amount,                   // F: Amount DR
+      '',                         // G: Amount CR
+      r.narration                 // H: Short Narration
     ]);
 
-    // Row 2: P.D.I. VEHICLE EXPENCES — CR
+    // Row 2: BPCL ( PETROL ) — CR
     outputRows.push([
-      '',                         // A
-      '',                         // B
-      '',                         // C
-      '',                         // D
-      'P.D.I. VEHICLE EXPENCES',  // E: Account Name
-      '',                         // F: Amount DR
-      r.amount,                   // G: Amount CR
-      r.narration                 // H: Short Narration
+      '',                   // A
+      '',                   // B
+      '',                   // C
+      '',                   // D
+      'BPCL ( PETROL )',    // E: Account Name
+      '',                   // F: Amount DR
+      r.amount,             // G: Amount CR
+      r.narration           // H: Short Narration
     ]);
   });
 
