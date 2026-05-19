@@ -435,6 +435,46 @@ const API = {
       leadId
     });
   },
+
+  /**
+   * Log a CRM interaction (call, WhatsApp, visit, etc.)
+   */
+  async logCRMInteraction(leadId, mode, notes) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('logCRMInteraction', { sessionId, leadId, mode, notes });
+  },
+
+  /**
+   * Get all interactions for a lead
+   */
+  async getCRMInteractions(leadId) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getCRMInteractions', { sessionId, leadId });
+  },
+
+  /**
+   * Get CRM analytics (admin only) — source effectiveness + exec performance
+   */
+  async getCRMAnalytics() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getCRMAnalytics', { sessionId });
+  },
+
+  /**
+   * Add note to lead
+   */
+  async addLeadNote(leadId, note) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('addLeadNote', { sessionId, leadId, note });
+  },
+
+  /**
+   * Convert lead to sale
+   */
+  async convertLeadToSale(leadId) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('convertLeadToSale', { sessionId, leadId });
+  },
   
   /**
    * Get Dashboard Data

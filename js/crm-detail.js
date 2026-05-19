@@ -1,251 +1,352 @@
 // ==========================================
-// LEAD DETAILS PAGE LOGIC
+// LEAD DETAILS PAGE LOGIC  v2
 // ==========================================
 
 let currentLead = null;
 let leadId = null;
 let currentUser = null;
+let selectedMode = 'Call';
 
 document.addEventListener('DOMContentLoaded', async function() {
-  console.log('=== LEAD DETAILS PAGE ===');
-  
-  // Check authentication
   const session = SessionManager.getSession();
-  
-  if (!session) {
-    console.log('❌ No session - redirecting to login');
-    window.location.href = 'index.html';
-    return;
-  }
-  
+  if (!session) { window.location.href = 'index.html'; return; }
   currentUser = session.user;
-  console.log('✅ User:', currentUser.name);
-  
-  // Get lead ID from URL
+
   const urlParams = new URLSearchParams(window.location.search);
   leadId = urlParams.get('leadId');
-  
+
   if (!leadId) {
     showMessage('Lead ID not found', 'error');
-    setTimeout(() => window.location.href = 'crm.html', 2000);
+    setTimeout(function() { window.location.href = 'crm.html'; }, 2000);
     return;
   }
-  
-  // Load lead details
+
   await loadLeadDetails();
-  
-  // Form submission
   document.getElementById('updateForm').addEventListener('submit', handleUpdate);
 });
 
-/**
- * Load lead details
- */
+// ── LOAD ───────────────────────────────────
+
 async function loadLeadDetails() {
   try {
     const response = await API.getLeadDetails(leadId);
-    
     if (response.success) {
       currentLead = response.lead;
       displayLeadDetails(currentLead);
-      
-      // Hide loading, show content
       document.getElementById('loadingState').style.display = 'none';
-      document.getElementById('tabsContainer').style.display = 'block';
+      document.getElementById('tabsWrapper').style.display = 'block';
     } else {
       showMessage(response.message, 'error');
-      setTimeout(() => window.location.href = 'crm.html', 2000);
+      setTimeout(function() { window.location.href = 'crm.html'; }, 2000);
     }
   } catch (error) {
-    console.error('Load error:', error);
     showMessage('Error loading lead details', 'error');
   }
 }
 
-/**
- * Display lead details
- */
+// ── DISPLAY ────────────────────────────────
+
 function displayLeadDetails(lead) {
-  // Header
   document.getElementById('leadName').textContent = lead.customerName;
-  
-  // Info tab (read-only fields)
-  document.getElementById('infoMobile').textContent = lead.mobileNo || '-';
-  document.getElementById('infoModel').textContent = lead.model || '-';
-  document.getElementById('infoSource').textContent = lead.source || '-';
-  document.getElementById('infoAssigned').textContent = lead.assignedTo || 'Unassigned';
-  
+
+  // Info grid
+  document.getElementById('infoMobileText').textContent = lead.mobileNo || '-';
+  document.getElementById('infoModel').textContent      = lead.model    || '-';
+  document.getElementById('infoSource').textContent     = lead.source   || '-';
+  document.getElementById('infoAssigned').textContent   = lead.assignedTo || 'Unassigned';
+  document.getElementById('infoCreated').textContent    = (lead.createdDate || '-') + (lead.createdBy ? ' by ' + lead.createdBy : '');
+  document.getElementById('infoLastContact').textContent = lead.lastContactDate || '-';
+
+  if (lead.email) {
+    document.getElementById('infoEmailRow').style.display = '';
+    document.getElementById('infoEmail').textContent = lead.email;
+  }
+  if (lead.address) {
+    document.getElementById('infoAddressRow').style.display = '';
+    document.getElementById('infoAddress').textContent = lead.address;
+  }
+
   // Editable fields
-  document.getElementById('status').value = lead.status || '';
+  document.getElementById('status').value       = lead.status || '';
   document.getElementById('expectedDate').value = lead.expectedDate ? formatDateForInput(lead.expectedDate) : '';
   document.getElementById('followUpDate').value = lead.followUpDate ? formatDateForInput(lead.followUpDate) : '';
-  document.getElementById('notes').value = lead.notes || '';
-  
-  // Show/hide convert button based on status
-  const btnConvert = document.getElementById('btnConvert');
-  if (lead.status === 'Hot Lead') {
-    btnConvert.style.display = 'block';
-  } else {
-    btnConvert.style.display = 'none';
+  document.getElementById('notes').value        = lead.notes || '';
+
+  // Lost reason
+  if (lead.lostReason) {
+    document.getElementById('lostReason').value = lead.lostReason;
   }
-  
-  // Display activity timeline
-  displayActivity(lead);
+  onStatusChange(); // Show/hide lost reason based on current status
+
+  // Aging display in header
+  displayAging(lead);
+
+  // Status banner
+  displayStatusBanner(lead.status);
+
+  // Convert button
+  document.getElementById('btnConvert').style.display = lead.status === 'Hot Lead' ? 'block' : 'none';
+
+  // Notes
+  displayNotes();
 }
 
-/**
- * Display activity timeline
- */
-function displayActivity(lead) {
-  const timeline = document.getElementById('activityTimeline');
-  const activities = [];
-  
-  // Lead created
-  if (lead.createdDate) {
-    activities.push({
-      icon: '🆕',
-      type: 'Lead Created',
-      date: lead.createdDate,
-      text: `Created by ${lead.createdBy || 'System'}`
-    });
-  }
-  
-  // Status changes (we can enhance this later to track history)
-  if (lead.status && lead.assignedTo) {
-    activities.push({
-      icon: '👤',
-      type: 'Lead Assigned',
-      date: lead.lastContactDate || lead.createdDate,
-      text: `Assigned to ${lead.assignedTo} with status: ${lead.status}`
-    });
-  }
-  
-  // Last contact
-  if (lead.lastContactDate) {
-    activities.push({
-      icon: '📞',
-      type: 'Last Contact',
-      date: lead.lastContactDate,
-      text: 'Lead was contacted'
-    });
-  }
-  
-  // Future follow-up
-  if (lead.followUpDate) {
-    const followUpDateObj = new Date(lead.followUpDate);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    followUpDateObj.setHours(0, 0, 0, 0);
-    
-    if (followUpDateObj >= today) {
-      activities.push({
-        icon: '📅',
-        type: 'Follow-up Scheduled',
-        date: lead.followUpDate,
-        text: 'Next follow-up planned'
-      });
+function displayAging(lead) {
+  const agingEl = document.getElementById('headerAging');
+  const statusClass = (lead.status || '').replace(' ', '-').toLowerCase();
+
+  // Calculate aging (days since last contact or created date)
+  let agingDays = 0;
+  const refDate = lead.lastContactDate && lead.lastContactDate !== '-' ? lead.lastContactDate : lead.createdDate;
+  if (refDate && refDate !== '-') {
+    const parsed = new Date(refDate);
+    if (!isNaN(parsed)) {
+      agingDays = Math.max(0, Math.floor((new Date() - parsed) / (24 * 60 * 60 * 1000)));
     }
   }
-  
-  if (activities.length > 0) {
-    timeline.innerHTML = '';
-    activities.forEach(activity => {
-      const item = document.createElement('div');
-      item.className = 'activity-item';
-      item.innerHTML = `
-        <div class="activity-icon">${activity.icon}</div>
-        <div class="activity-type">${activity.type}</div>
-        <div class="activity-date">${activity.date}</div>
-        <div class="activity-text">${activity.text}</div>
-      `;
-      timeline.appendChild(item);
-    });
-  } else {
-    timeline.innerHTML = '<div class="empty-state">No activity recorded yet</div>';
+
+  const lines = [];
+  const agingClass = agingDays >= 14 ? 'danger' : agingDays >= 7 ? 'warn' : '';
+  lines.push(`<span class="aging-pill ${agingClass}">🕑 ${agingDays}d inactive</span>`);
+
+  // Overdue check
+  if (lead.followUpDate && lead.followUpDate !== '-' && lead.status !== 'Converted' && lead.status !== 'Lost') {
+    const followUpParsed = new Date(formatDateForInput(lead.followUpDate));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (!isNaN(followUpParsed) && followUpParsed < today) {
+      const daysOverdue = Math.floor((today - followUpParsed) / (24 * 60 * 60 * 1000));
+      lines.push(`<span class="overdue-pill">⚠️ ${daysOverdue}d overdue</span>`);
+    }
+  }
+
+  if (lines.length > 0) {
+    agingEl.innerHTML = lines.join(' ');
+    agingEl.style.display = 'flex';
   }
 }
 
-/**
- * Handle update form submission
- */
+function displayStatusBanner(status) {
+  const banner = document.getElementById('statusBanner');
+  if (!status) { banner.style.display = 'none'; return; }
+
+  const classMap = {
+    'Hot Lead': 'hot', 'New': 'new', 'Interested': 'interested',
+    'Negotiating': 'negotiating', 'Contacted': 'contacted',
+    'Cold Lead': 'cold', 'Lost': 'lost', 'Converted': 'converted'
+  };
+  const emojiMap = {
+    'Hot Lead': '🔥', 'New': '🆕', 'Interested': '👀', 'Negotiating': '💬',
+    'Contacted': '📞', 'Cold Lead': '❄️', 'Lost': '❌', 'Converted': '✅'
+  };
+
+  banner.className = 'status-banner ' + (classMap[status] || '');
+  banner.innerHTML = `<span>${(emojiMap[status] || '📊')} ${status}</span>`;
+  if (currentLead && currentLead.lostReason) {
+    banner.innerHTML += `<span style="font-size:12px;font-weight:600;opacity:0.8;">${currentLead.lostReason}</span>`;
+  }
+  banner.style.display = 'flex';
+}
+
+// ── STATUS CHANGE HANDLER ──────────────────
+
+function onStatusChange() {
+  const status = document.getElementById('status').value;
+  const lostGroup = document.getElementById('lostReasonGroup');
+  if (status === 'Lost') {
+    lostGroup.style.display = 'block';
+  } else {
+    lostGroup.style.display = 'none';
+  }
+}
+
+// ── UPDATE FORM ────────────────────────────
+
 async function handleUpdate(e) {
   e.preventDefault();
-  
+
+  const status = document.getElementById('status').value;
+
+  // Validate lost reason if Lost
+  if (status === 'Lost' && !document.getElementById('lostReason').value) {
+    showMessage('Please select a reason for loss', 'error');
+    return;
+  }
+
   const data = {
-    status: document.getElementById('status').value,
+    status:       status,
     expectedDate: document.getElementById('expectedDate').value,
     followUpDate: document.getElementById('followUpDate').value,
-    notes: document.getElementById('notes').value
+    notes:        document.getElementById('notes').value,
+    lostReason:   document.getElementById('lostReason').value || ''
   };
-  
-  console.log('Updating lead:', data);
-  
+
+  const btn = document.getElementById('btnUpdate');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
   try {
     const response = await API.updateLead(leadId, data);
-    
     if (response.success) {
       showMessage('✅ Lead updated successfully!', 'success');
-      
-      // Reload lead details
       await loadLeadDetails();
     } else {
       showMessage(response.message, 'error');
     }
   } catch (error) {
-    console.error('Update error:', error);
     showMessage('Error updating lead', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Save Changes';
   }
 }
 
-/**
- * Add note
- */
-async function addNote() {
-  const noteText = document.getElementById('newNote').value.trim();
-  
-  if (!noteText) {
-    showMessage('Please enter a note', 'error');
+// ── INTERACTIONS TAB ───────────────────────
+
+function selectMode(el) {
+  document.querySelectorAll('.mode-chip').forEach(function(c) { c.classList.remove('selected'); });
+  el.classList.add('selected');
+  selectedMode = el.getAttribute('data-mode');
+}
+
+async function loadInteractions() {
+  const container = document.getElementById('interactionsList');
+  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading...</div></div>';
+
+  try {
+    const response = await API.getCRMInteractions(leadId);
+    if (response.success) {
+      renderInteractions(response.interactions);
+    } else {
+      container.innerHTML = '<div class="empty-state"><div class="e-icon">📞</div><div class="e-text">Could not load interactions</div></div>';
+    }
+  } catch (error) {
+    container.innerHTML = '<div class="empty-state"><div class="e-icon">⚠️</div><div class="e-text">Error loading interactions</div></div>';
+  }
+}
+
+function renderInteractions(interactions) {
+  const container = document.getElementById('interactionsList');
+  if (!interactions || interactions.length === 0) {
+    container.innerHTML = '<div class="empty-state"><div class="e-icon">📞</div><div class="e-text">No interactions logged yet. Log your first one above.</div></div>';
     return;
   }
-  
+
+  container.innerHTML = '';
+  const list = document.createElement('div');
+  list.className = 'interaction-list';
+
+  interactions.forEach(function(item) {
+    const modeClass = (item.mode || 'other').toLowerCase().replace(' ', '');
+    const modeEmojiMap = { 'call': '📞', 'whatsapp': '💬', 'visit': '🚗', 'other': '📋' };
+    const emoji = modeEmojiMap[modeClass] || '📋';
+
+    const div = document.createElement('div');
+    div.className = 'interaction-item ' + modeClass;
+    div.innerHTML = `
+      <div class="interaction-meta">
+        <span class="interaction-mode">${emoji} ${item.mode || 'Other'}</span>
+        <span class="interaction-time">${item.timestamp || ''}</span>
+      </div>
+      <div class="interaction-by">👤 ${item.executiveName || '-'}</div>
+      ${item.notes ? `<div class="interaction-notes">${escHtml(item.notes)}</div>` : ''}
+    `;
+    list.appendChild(div);
+  });
+
+  container.appendChild(list);
+}
+
+async function logInteraction() {
+  const notes = document.getElementById('interactionNotes').value.trim();
+  const btn = document.querySelector('.btn-log');
+  btn.disabled = true;
+  btn.textContent = 'Logging...';
+
+  try {
+    const response = await API.logCRMInteraction(leadId, selectedMode, notes);
+    if (response.success) {
+      document.getElementById('interactionNotes').value = '';
+      showMessage('✅ Interaction logged!', 'success');
+      await loadInteractions();
+    } else {
+      showMessage(response.message, 'error');
+    }
+  } catch (error) {
+    showMessage('Error logging interaction', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '✅ Log Interaction';
+  }
+}
+
+// ── NOTES TAB ──────────────────────────────
+
+async function addNote() {
+  const noteText = document.getElementById('newNote').value.trim();
+  if (!noteText) { showMessage('Please enter a note', 'error'); return; }
+
   try {
     const response = await API.addLeadNote(leadId, noteText);
-    
     if (response.success) {
-      showMessage('✅ Note added!', 'success');
-      
-      // Clear input
       document.getElementById('newNote').value = '';
-      
-      // Reload to show new note
+      showMessage('✅ Note added!', 'success');
       await loadLeadDetails();
-      
-      // Switch to notes tab to show the new note
       switchTab('notes');
     } else {
       showMessage(response.message, 'error');
     }
   } catch (error) {
-    console.error('Add note error:', error);
     showMessage('Error adding note', 'error');
   }
 }
 
-/**
- * Switch tabs
- */
+function displayNotes() {
+  const notesList = document.getElementById('notesList');
+
+  if (!currentLead || !currentLead.notes) {
+    notesList.innerHTML = '<div class="empty-state"><div class="e-icon">📋</div><div class="e-text">No notes yet</div></div>';
+    return;
+  }
+
+  const notes = currentLead.notes.split('\n').filter(function(n) { return n.trim(); });
+
+  if (notes.length === 0) {
+    notesList.innerHTML = '<div class="empty-state"><div class="e-icon">📋</div><div class="e-text">No notes yet</div></div>';
+    return;
+  }
+
+  notesList.innerHTML = '';
+  notes.forEach(function(note) {
+    const item = document.createElement('div');
+    item.className = 'note-item';
+    // Note format: "dd-MMM-yyyy HH:mm - Author: content"
+    const match = note.match(/^(\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}) - ([^:]+): (.*)$/s);
+    if (match) {
+      item.innerHTML = `
+        <div class="note-meta">${match[1]} · ${match[2]}</div>
+        <div class="note-text">${escHtml(match[3])}</div>
+      `;
+    } else {
+      item.innerHTML = `<div class="note-text">${escHtml(note)}</div>`;
+    }
+    notesList.appendChild(item);
+  });
+}
+
+// ── TAB SWITCHING ──────────────────────────
+
 function switchTab(tabName) {
-  // Remove active class from all tabs
-  document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
-  
-  // Add active class to selected tab
+  document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
+
   if (tabName === 'info') {
     document.querySelectorAll('.tab')[0].classList.add('active');
     document.getElementById('infoTab').classList.add('active');
-  } else if (tabName === 'activity') {
+  } else if (tabName === 'interactions') {
     document.querySelectorAll('.tab')[1].classList.add('active');
-    document.getElementById('activityTab').classList.add('active');
+    document.getElementById('interactionsTab').classList.add('active');
+    loadInteractions();
   } else if (tabName === 'notes') {
     document.querySelectorAll('.tab')[2].classList.add('active');
     document.getElementById('notesTab').classList.add('active');
@@ -253,128 +354,88 @@ function switchTab(tabName) {
   }
 }
 
-/**
- * Display notes
- */
-function displayNotes() {
-  const notesList = document.getElementById('notesList');
-  
-  if (currentLead && currentLead.notes) {
-    // Parse notes (assuming they're newline-separated with timestamp)
-    const notes = currentLead.notes.split('\n').filter(n => n.trim());
-    
-    if (notes.length > 0) {
-      notesList.innerHTML = '';
-      notes.forEach(note => {
-        const item = document.createElement('div');
-        item.className = 'note-item';
-        
-        // Try to parse timestamp and content
-        const parts = note.split(': ');
-        if (parts.length >= 2) {
-          const timestamp = parts[0];
-          const content = parts.slice(1).join(': ');
-          
-          item.innerHTML = `
-            <div class="note-header">
-              <span>${timestamp}</span>
-            </div>
-            <div class="note-text">${content}</div>
-          `;
-        } else {
-          item.innerHTML = `<div class="note-text">${note}</div>`;
-        }
-        
-        notesList.appendChild(item);
-      });
-    } else {
-      notesList.innerHTML = '<div class="empty-state">No notes yet</div>';
-    }
-  } else {
-    notesList.innerHTML = '<div class="empty-state">No notes yet</div>';
-  }
-}
+// ── ACTIONS ────────────────────────────────
 
-/**
- * Call lead
- */
 function callLead() {
   if (currentLead && currentLead.mobileNo) {
-    window.location.href = `tel:${currentLead.mobileNo}`;
+    window.location.href = 'tel:' + currentLead.mobileNo;
   }
 }
 
-/**
- * Convert lead to sale
- */
+function whatsappLead() {
+  if (!currentLead || !currentLead.mobileNo) return;
+  const msg = encodeURIComponent('Hi ' + (currentLead.customerName || '') + ', this is Vinay Automobiles. ');
+  window.open('https://wa.me/91' + currentLead.mobileNo + '?text=' + msg, '_blank');
+}
+
+function copyMobile() {
+  if (!currentLead || !currentLead.mobileNo) return;
+  navigator.clipboard.writeText(currentLead.mobileNo).then(function() {
+    showMessage('📋 Mobile number copied!', 'success');
+  }).catch(function() {
+    // Fallback
+    const el = document.createElement('textarea');
+    el.value = currentLead.mobileNo;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showMessage('📋 Mobile number copied!', 'success');
+  });
+}
+
 async function convertToSale() {
-  if (!confirm('Convert this lead to a sale? This will mark the lead as "Converted" and redirect you to the Sales Entry page.')) {
-    return;
-  }
-  
+  if (!confirm('Convert this lead to a sale? This will mark the lead as Converted and redirect to Sales Entry.')) return;
+
   try {
     const response = await API.convertLeadToSale(leadId);
-    
     if (response.success) {
-      showMessage('✅ Lead converted! Redirecting to Sales Entry...', 'success');
-      
-      // Redirect to sales entry with pre-filled data
-      setTimeout(() => {
+      showMessage('✅ Lead converted! Redirecting...', 'success');
+      setTimeout(function() {
         const params = new URLSearchParams({
           customerName: response.leadData.customerName,
-          mobileNo: response.leadData.mobileNo,
-          model: response.leadData.model
+          mobileNo:     response.leadData.mobileNo,
+          model:        response.leadData.model
         });
-        window.location.href = `sales.html?${params.toString()}`;
+        window.location.href = 'sales.html?' + params.toString();
       }, 1500);
     } else {
       showMessage(response.message, 'error');
     }
   } catch (error) {
-    console.error('Convert error:', error);
     showMessage('Error converting lead', 'error');
   }
 }
 
-/**
- * Format date for input field (YYYY-MM-DD)
- */
+// ── HELPERS ────────────────────────────────
+
 function formatDateForInput(dateStr) {
   if (!dateStr || dateStr === '-') return '';
-  
-  // Handle different date formats
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return '';
-  
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Show message
- */
-function showMessage(text, type) {
-  const msgDiv = document.getElementById('statusMessage');
-  msgDiv.textContent = text;
-  msgDiv.className = 'message ' + type;
-  msgDiv.style.display = 'block';
-  
-  // Scroll to top
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  
-  if (type === 'success') {
-    setTimeout(() => {
-      msgDiv.style.display = 'none';
-    }, 3000);
+  // Try DD-Mon-YYYY or D/M/YYYY or YYYY-MM-DD formats
+  const mName = { Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12 };
+  const m1 = dateStr.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (m1) {
+    const mo = mName[m1[2].charAt(0).toUpperCase() + m1[2].slice(1).toLowerCase()];
+    if (mo) return m1[3] + '-' + String(mo).padStart(2,'0') + '-' + String(m1[1]).padStart(2,'0');
   }
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-/**
- * Go back to CRM
- */
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showMessage(text, type) {
+  const el = document.getElementById('statusMessage');
+  el.textContent = text;
+  el.className = 'message ' + type;
+  el.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (type === 'success') setTimeout(function() { el.style.display = 'none'; }, 3000);
+}
+
 function goBack() {
   window.location.href = 'crm.html';
 }

@@ -9,495 +9,489 @@
   <title>CRM - Vinay Automobiles</title>
   <link rel="stylesheet" href="css/common.css">
   <style>
-    /* Mobile-First CRM Styles */
-    body {
-      padding: 0;
-      margin: 0;
-    }
+    body { padding: 0; margin: 0; background: #f0f2f5; }
 
-    .crm-container {
-      max-width: 100%;
-      margin: 0;
-      padding-bottom: 70px; /* Space for bottom nav */
-    }
+    .crm-container { max-width: 100%; margin: 0; padding-bottom: 75px; }
 
-    /* Header */
+    /* ── Header ── */
     .crm-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       color: white;
-      padding: 15px 20px;
+      padding: 14px 18px 12px;
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+    }
+    .header-top { display: flex; justify-content: space-between; align-items: center; }
+    .header-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .header-user-pill {
+      background: rgba(255,255,255,0.2);
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
     }
 
-    .header-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .header-title {
-      font-size: 20px;
-      font-weight: 700;
-    }
-
-    .header-user {
-      font-size: 14px;
-      opacity: 0.9;
-    }
-
-    /* Dashboard Cards */
+    /* ── Dashboard stat cards ── */
     .dashboard-cards {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
-      gap: 15px;
-      padding: 20px;
+      gap: 12px;
+      padding: 16px 16px 0;
     }
-
     .stat-card {
       background: white;
-      border-radius: 15px;
-      padding: 20px;
+      border-radius: 14px;
+      padding: 18px 16px;
       text-align: center;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
       cursor: pointer;
-      transition: all 0.3s;
-      min-height: 120px;
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+      position: relative;
+      overflow: hidden;
     }
-
-    .stat-card:active {
-      transform: scale(0.95);
+    .stat-card:active { transform: scale(0.96); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
     }
+    .stat-card.overdue::before { background: #ef5350; }
+    .stat-card.hot::before    { background: #FF7043; }
+    .stat-card.available::before { background: #42A5F5; }
+    .stat-card.converted::before { background: #66BB6A; }
+    .stat-card-icon { font-size: 30px; margin-bottom: 8px; }
+    .stat-card-label { font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-card-count { font-size: 34px; font-weight: 800; color: #222; line-height: 1; }
+    .stat-card.overdue .stat-card-count { color: #ef5350; }
+    .stat-card-sub { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-    .stat-card-icon {
-      font-size: 36px;
-      margin-bottom: 10px;
-    }
-
-    .stat-card-label {
-      font-size: 12px;
-      color: #666;
-      font-weight: 600;
-      margin-bottom: 5px;
-      text-transform: uppercase;
-    }
-
-    .stat-card-count {
-      font-size: 32px;
-      font-weight: 700;
-      color: #333;
-    }
-
-    .stat-card.new { border-left: 5px solid #2196F3; }
-    .stat-card.hot { border-left: 5px solid #F44336; }
-    .stat-card.available { border-left: 5px solid #FF9800; }
-    .stat-card.converted { border-left: 5px solid #4CAF50; }
-
-    /* Urgent Follow-ups */
-    .urgent-section {
-      margin: 0 20px 20px 20px;
-      background: white;
-      border-radius: 15px;
-      padding: 20px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-    }
-
-    .urgent-header {
+    /* ── Section header ── */
+    .section-header {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 15px;
-      color: #F44336;
-      font-weight: 700;
-      font-size: 16px;
-    }
-
-    .urgent-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .urgent-item {
-      display: flex;
       justify-content: space-between;
-      align-items: center;
-      padding: 15px;
-      background: #FFF3E0;
-      border-radius: 10px;
-      border-left: 4px solid #FF9800;
+      padding: 16px 16px 8px;
     }
-
-    .urgent-info {
-      flex: 1;
-    }
-
-    .urgent-name {
-      font-weight: 700;
-      color: #333;
-      margin-bottom: 3px;
-    }
-
-    .urgent-details {
-      font-size: 13px;
-      color: #666;
-    }
-
-    .btn-call {
-      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      border-radius: 8px;
-      font-weight: 600;
+    .section-title {
       font-size: 14px;
-      cursor: pointer;
+      font-weight: 800;
+      color: #333;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .section-badge {
+      background: #667eea;
+      color: white;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 10px;
+    }
+    .section-badge.red { background: #ef5350; }
+    .section-badge.orange { background: #FF7043; }
+
+    /* ── Follow-up cards ── */
+    .followup-card {
+      background: white;
+      border-radius: 12px;
+      margin: 0 16px 10px;
+      padding: 14px 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .followup-card.overdue { border-left: 4px solid #ef5350; }
+    .followup-card.today   { border-left: 4px solid #FF7043; }
+    .followup-card.week    { border-left: 4px solid #42A5F5; }
+    .followup-info { flex: 1; min-width: 0; }
+    .followup-name { font-weight: 700; color: #222; font-size: 15px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .followup-meta { font-size: 12px; color: #777; }
+    .followup-date-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 8px;
       white-space: nowrap;
     }
-
-    .btn-call:active {
-      transform: scale(0.95);
-    }
-
-    /* Add Lead Button */
-    .add-lead-btn {
-      position: fixed;
-      bottom: 80px;
-      right: 20px;
-      width: 60px;
-      height: 60px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    .followup-date-badge.overdue { background: #ffebee; color: #ef5350; }
+    .followup-date-badge.today   { background: #fff3e0; color: #FF7043; }
+    .followup-date-badge.week    { background: #e3f2fd; color: #1976D2; }
+    .btn-open {
+      background: linear-gradient(135deg, #667eea, #764ba2);
       color: white;
       border: none;
-      border-radius: 50%;
-      font-size: 30px;
-      box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 13px;
       cursor: pointer;
-      z-index: 90;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    /* ── Filter tabs (My Leads) ── */
+    .filter-row {
+      padding: 10px 16px 6px;
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .filter-row::-webkit-scrollbar { display: none; }
+    .filter-chip {
+      flex-shrink: 0;
+      padding: 7px 14px;
+      border: 2px solid #e0e0e0;
+      background: white;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #666;
+      cursor: pointer;
+      white-space: nowrap;
       display: flex;
       align-items: center;
-      justify-content: center;
+      gap: 5px;
+      transition: all 0.2s;
     }
-
-    .add-lead-btn:active {
-      transform: scale(0.9);
-    }
-
-    /* Bottom Navigation */
-    .bottom-nav {
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background: white;
-      box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
-      display: flex;
-      justify-content: space-around;
-      padding: 10px 0;
-      z-index: 100;
-    }
-
-    .nav-item {
-      flex: 1;
-      text-align: center;
-      padding: 5px;
-      cursor: pointer;
-      transition: all 0.3s;
-      border: none;
-      background: none;
-    }
-
-    .nav-item.active {
-      color: #667eea;
-    }
-
-    .nav-icon {
-      font-size: 24px;
-      margin-bottom: 3px;
-    }
-
-    .nav-label {
+    .filter-chip.active { background: #667eea; color: white; border-color: #667eea; }
+    .filter-chip .chip-count {
+      background: rgba(0,0,0,0.15);
+      border-radius: 10px;
+      padding: 1px 6px;
       font-size: 11px;
-      font-weight: 600;
     }
+    .filter-chip.active .chip-count { background: rgba(255,255,255,0.3); }
 
-    /* Tabs Content */
-    .tab-content {
-      display: none;
-      padding: 20px;
-    }
-
-    .tab-content.active {
-      display: block;
-    }
-
-    /* Lead Card */
+    /* ── Lead card ── */
     .lead-card {
       background: white;
       border-radius: 12px;
-      padding: 15px;
-      margin-bottom: 15px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      padding: 14px 16px;
+      margin: 0 16px 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
       border-left: 4px solid #667eea;
+      transition: box-shadow 0.2s;
     }
+    .lead-card.hot     { border-left-color: #FF7043; }
+    .lead-card.new     { border-left-color: #42A5F5; }
+    .lead-card.lost    { border-left-color: #bbb; opacity: 0.8; }
+    .lead-card.converted { border-left-color: #66BB6A; }
 
-    .lead-card.hot { border-left-color: #F44336; }
-    .lead-card.new { border-left-color: #2196F3; }
-    .lead-card.available { border-left-color: #FF9800; }
+    .lead-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .lead-name { font-size: 16px; font-weight: 700; color: #222; }
+    .lead-badges { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
 
-    .lead-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 10px;
-    }
-
-    .lead-name {
-      font-size: 16px;
+    .status-pill {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 10px;
       font-weight: 700;
-      color: #333;
-    }
-
-    .lead-status {
-      font-size: 11px;
-      padding: 4px 10px;
-      border-radius: 12px;
-      font-weight: 600;
       white-space: nowrap;
     }
+    .pill-hot       { background: #FFF3E0; color: #E65100; }
+    .pill-new       { background: #E3F2FD; color: #1565C0; }
+    .pill-interested{ background: #E8F5E9; color: #2E7D32; }
+    .pill-negotiating{ background: #F3E5F5; color: #6A1B9A; }
+    .pill-contacted { background: #E0F2F1; color: #00695C; }
+    .pill-cold      { background: #ECEFF1; color: #546E7A; }
+    .pill-lost      { background: #FFEBEE; color: #B71C1C; }
+    .pill-converted { background: #E8F5E9; color: #1B5E20; }
 
-    .status-hot { background: #FFEBEE; color: #F44336; }
-    .status-new { background: #E3F2FD; color: #2196F3; }
-    .status-available { background: #FFF3E0; color: #FF9800; }
-
-    .lead-details {
-      font-size: 14px;
-      color: #666;
-      margin-bottom: 10px;
+    .overdue-badge {
+      background: #ffebee;
+      color: #ef5350;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 8px;
     }
-
-    .lead-actions {
-      display: flex;
-      gap: 8px;
-      margin-top: 12px;
+    .aging-badge {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 3px 7px;
+      border-radius: 8px;
+      background: #f5f5f5;
+      color: #888;
     }
+    .aging-badge.warn { background: #fff8e1; color: #F57F17; }
+    .aging-badge.danger { background: #ffebee; color: #ef5350; }
 
-    .btn-action {
+    .lead-info { font-size: 13px; color: #666; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
+    .lead-info-row { display: flex; align-items: center; gap: 5px; }
+
+    .lead-actions { display: flex; gap: 8px; }
+    .btn-act {
       flex: 1;
-      padding: 10px;
+      padding: 9px 8px;
       border: none;
       border-radius: 8px;
-      font-weight: 600;
+      font-weight: 700;
       font-size: 13px;
       cursor: pointer;
-      transition: all 0.2s;
+      text-align: center;
+      transition: opacity 0.2s;
     }
+    .btn-act:active { opacity: 0.8; }
+    .btn-call-act   { background: linear-gradient(135deg, #4CAF50, #388E3C); color: white; }
+    .btn-wa-act     { background: linear-gradient(135deg, #25D366, #128C7E); color: white; }
+    .btn-edit-act   { background: #f0f0f0; color: #444; }
+    .btn-claim-act  { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
 
-    .btn-action:active {
-      transform: scale(0.95);
+    /* ── Reports (admin) ── */
+    .analytics-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .analytics-table th {
+      background: #f5f5f5;
+      padding: 10px 8px;
+      text-align: left;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: #666;
+      border-bottom: 2px solid #e0e0e0;
     }
+    .analytics-table td { padding: 10px 8px; border-bottom: 1px solid #f0f0f0; color: #333; vertical-align: middle; }
+    .analytics-table tr:last-child td { border-bottom: none; }
+    .conv-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 4px; }
+    .conv-bar-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 3px; }
+    .conv-rate { font-weight: 700; color: #667eea; }
 
-    .btn-primary-action {
-      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-      color: white;
+    .analytics-card {
+      background: white;
+      border-radius: 12px;
+      margin: 0 16px 12px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      overflow: hidden;
     }
-
-    .btn-secondary-action {
-      background: #f0f0f0;
+    .analytics-card-title {
+      font-size: 14px;
+      font-weight: 800;
       color: #333;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     }
 
-    .btn-claim {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-    }
+    /* ── Tab content ── */
+    .tab-content { display: none; padding-top: 4px; }
+    .tab-content.active { display: block; }
 
-    /* Empty State */
+    /* ── Empty state ── */
     .empty-state {
       text-align: center;
-      padding: 60px 20px;
-      color: #999;
+      padding: 50px 20px;
+      color: #bbb;
     }
+    .empty-icon { font-size: 50px; margin-bottom: 12px; }
+    .empty-title { font-size: 15px; font-weight: 600; color: #999; margin-bottom: 6px; }
+    .empty-sub { font-size: 13px; }
 
-    .empty-icon {
-      font-size: 60px;
-      margin-bottom: 15px;
-    }
-
-    /* Messages */
-    .message {
-      padding: 12px 20px;
-      margin: 20px;
-      border-radius: 10px;
-      font-weight: 600;
-      text-align: center;
-      display: none;
-    }
-
-    .message.success {
-      background: #d4edda;
-      color: #155724;
-    }
-
-    .message.error {
-      background: #f8d7da;
-      color: #721c24;
-    }
-
-    /* Loading */
-    .loading {
-      text-align: center;
-      padding: 40px;
-      font-size: 16px;
-      color: #666;
-    }
-
+    /* ── Loading ── */
+    .loading { text-align: center; padding: 40px 20px; color: #999; }
     .spinner {
-      display: inline-block;
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
+      display: inline-block; width: 36px; height: 36px;
+      border: 4px solid #e0e0e0; border-top-color: #667eea;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
       margin-bottom: 10px;
     }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    /* ── Messages ── */
+    .message {
+      padding: 12px 18px; margin: 12px 16px; border-radius: 10px;
+      font-weight: 600; font-size: 14px; text-align: center; display: none;
+    }
+    .message.success { background: #d4edda; color: #155724; }
+    .message.error   { background: #f8d7da; color: #721c24; }
+
+    /* ── Bottom nav ── */
+    .bottom-nav {
+      position: fixed; bottom: 0; left: 0; right: 0;
+      background: white;
+      box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+      display: flex;
+      padding: 8px 0 10px;
+      z-index: 100;
+    }
+    .nav-item {
+      flex: 1; text-align: center; cursor: pointer;
+      border: none; background: none; padding: 4px 2px;
+      transition: all 0.2s;
+    }
+    .nav-item.active { color: #667eea; }
+    .nav-icon { font-size: 22px; margin-bottom: 2px; position: relative; display: inline-block; }
+    .nav-label { font-size: 10px; font-weight: 700; color: #999; display: block; }
+    .nav-item.active .nav-label { color: #667eea; }
+    .nav-badge {
+      position: absolute; top: -4px; right: -8px;
+      background: #ef5350; color: white;
+      font-size: 9px; font-weight: 700;
+      min-width: 16px; height: 16px; line-height: 16px;
+      border-radius: 8px; padding: 0 3px; text-align: center;
     }
 
-    /* Responsive */
-    @media (min-width: 768px) {
-      .crm-container {
-        max-width: 600px;
-        margin: 0 auto;
-      }
+    /* ── FAB ── */
+    .fab {
+      position: fixed; bottom: 78px; right: 18px;
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border: none; border-radius: 50%;
+      font-size: 26px;
+      box-shadow: 0 4px 14px rgba(102,126,234,0.45);
+      cursor: pointer; z-index: 90;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .fab:active { transform: scale(0.92); }
 
-      .dashboard-cards {
-        grid-template-columns: repeat(2, 1fr);
-      }
+    @media (min-width: 600px) {
+      .dashboard-cards { grid-template-columns: repeat(4, 1fr); }
+      .crm-container { max-width: 640px; margin: 0 auto; }
     }
   </style>
 </head>
 <body>
-  <div class="crm-container">
-    <!-- Header -->
-    <div class="crm-header">
-      <div class="header-top">
-        <div class="header-title">🎯 CRM Dashboard</div>
-        <div class="header-user" id="currentUser">Loading...</div>
-      </div>
-    </div>
+<div class="crm-container">
 
-    <!-- Status Message -->
-    <div id="statusMessage" class="message"></div>
-
-    <!-- Dashboard Tab -->
-    <div id="dashboardTab" class="tab-content active">
-      <!-- Dashboard Cards -->
-      <div class="dashboard-cards">
-        <div class="stat-card hot" onclick="switchTab('myLeads')">
-          <div class="stat-card-icon">🔔</div>
-          <div class="stat-card-label">Today's Follow-up</div>
-          <div class="stat-card-count" id="todayFollowUpCount">0</div>
-        </div>
-
-        <div class="stat-card new" onclick="switchTab('myLeads')">
-          <div class="stat-card-icon">📋</div>
-          <div class="stat-card-label">My Leads</div>
-          <div class="stat-card-count" id="myLeadsCount">0</div>
-        </div>
-
-        <div class="stat-card available" onclick="switchTab('available')">
-          <div class="stat-card-icon">📦</div>
-          <div class="stat-card-label">Available</div>
-          <div class="stat-card-count" id="availableCount">0</div>
-        </div>
-
-        <div class="stat-card converted">
-          <div class="stat-card-icon">✅</div>
-          <div class="stat-card-label">Converted</div>
-          <div class="stat-card-count" id="convertedCount">0</div>
-        </div>
-      </div>
-
-      <!-- Urgent Follow-ups -->
-      <div class="urgent-section" id="urgentSection" style="display: none;">
-        <div class="urgent-header">
-          <span>🔔</span>
-          <span>URGENT FOLLOW-UPS TODAY</span>
-        </div>
-        <div class="urgent-list" id="urgentList"></div>
-      </div>
-    </div>
-
-    <!-- Available Leads Tab -->
-    <div id="availableTab" class="tab-content">
-      <div class="loading" id="availableLoading">
-        <div class="spinner"></div>
-        <div>Loading available leads...</div>
-      </div>
-      <div id="availableLeads"></div>
-    </div>
-
-    <!-- My Leads Tab -->
-    <div id="myLeadsTab" class="tab-content">
-      <!-- Status Filter -->
-      <div style="padding: 0 0 15px 0;">
-        <select id="statusFilter" class="form-select" onchange="filterMyLeads()" style="width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; background: white;">
-          <option value="all">📋 All Leads</option>
-          <option value="New">🆕 New</option>
-          <option value="Contacted">📞 Contacted</option>
-          <option value="Interested">👀 Interested</option>
-          <option value="Negotiating">💬 Negotiating</option>
-          <option value="Hot Lead">🔥 Hot Lead</option>
-          <option value="Cold Lead">❄️ Cold Lead</option>
-          <option value="Lost">❌ Lost</option>
-        </select>
-      </div>
-      
-      <div class="loading" id="myLeadsLoading">
-        <div class="spinner"></div>
-        <div>Loading your leads...</div>
-      </div>
-      <div id="myLeads"></div>
-    </div>
-
-    <!-- Add Lead Button -->
-    <button class="add-lead-btn" onclick="addNewLead()">➕</button>
-
-    <!-- Bottom Navigation -->
-    <div class="bottom-nav">
-      <button class="nav-item active" onclick="switchTab('dashboard')" id="navDashboard">
-        <div class="nav-icon">🏠</div>
-        <div class="nav-label">Home</div>
-      </button>
-      <button class="nav-item" onclick="switchTab('available')" id="navAvailable">
-        <div class="nav-icon">📦</div>
-        <div class="nav-label">Available</div>
-      </button>
-      <button class="nav-item" onclick="switchTab('myLeads')" id="navMyLeads">
-        <div class="nav-icon">📋</div>
-        <div class="nav-label">My Leads</div>
-      </button>
-      <button class="nav-item" onclick="goBack()">
-        <div class="nav-icon">←</div>
-        <div class="nav-label">Back</div>
-      </button>
+  <!-- Header -->
+  <div class="crm-header">
+    <div class="header-top">
+      <div class="header-title">🎯 CRM</div>
+      <div class="header-user-pill" id="currentUser">...</div>
     </div>
   </div>
 
-  <script src="js/config.js"></script>
-  <script src="js/auth.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/crm.js"></script>
+  <div id="statusMessage" class="message"></div>
+
+  <!-- ═══ DASHBOARD TAB ═══ -->
+  <div id="dashboardTab" class="tab-content active">
+    <div class="dashboard-cards">
+      <div class="stat-card overdue" onclick="switchTab('followups')">
+        <div class="stat-card-icon">⚠️</div>
+        <div class="stat-card-label">Overdue</div>
+        <div class="stat-card-count" id="overdueCount">0</div>
+        <div class="stat-card-sub">follow-ups missed</div>
+      </div>
+      <div class="stat-card hot" onclick="switchTab('followups')">
+        <div class="stat-card-icon">🔔</div>
+        <div class="stat-card-label">Due This Week</div>
+        <div class="stat-card-count" id="weekCount">0</div>
+        <div class="stat-card-sub">incl. today</div>
+      </div>
+      <div class="stat-card available" onclick="switchTab('available')">
+        <div class="stat-card-icon">📦</div>
+        <div class="stat-card-label">Available</div>
+        <div class="stat-card-count" id="availableCount">0</div>
+        <div class="stat-card-sub">unclaimed</div>
+      </div>
+      <div class="stat-card converted">
+        <div class="stat-card-icon">✅</div>
+        <div class="stat-card-label">Converted</div>
+        <div class="stat-card-count" id="convertedCount">0</div>
+        <div class="stat-card-sub">this year</div>
+      </div>
+    </div>
+
+    <!-- Today's urgent follow-ups -->
+    <div id="urgentSection" style="display:none; margin-top:8px;">
+      <div class="section-header">
+        <div class="section-title">🔥 Today's Follow-ups</div>
+        <div class="section-badge orange" id="todayBadge">0</div>
+      </div>
+      <div id="urgentList"></div>
+    </div>
+
+    <!-- Admin: Reports section -->
+    <div id="adminReportsSection" style="display:none; margin-top:8px;">
+      <div class="section-header">
+        <div class="section-title">📊 Analytics</div>
+        <button onclick="loadAnalytics()" style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;">Refresh</button>
+      </div>
+      <div id="analyticsContent">
+        <div class="loading" style="padding:20px;">
+          <div class="spinner"></div>
+          <div>Loading analytics...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOLLOW-UPS TAB ═══ -->
+  <div id="followupsTab" class="tab-content">
+    <div class="filter-row" id="followupFilterRow">
+      <div class="filter-chip active" onclick="setFollowupFilter('overdue', this)">⚠️ Overdue <span class="chip-count" id="fc_overdue">0</span></div>
+      <div class="filter-chip" onclick="setFollowupFilter('today', this)">🔥 Today <span class="chip-count" id="fc_today">0</span></div>
+      <div class="filter-chip" onclick="setFollowupFilter('week', this)">📅 This Week <span class="chip-count" id="fc_week">0</span></div>
+    </div>
+    <div id="followupsList"></div>
+  </div>
+
+  <!-- ═══ AVAILABLE LEADS TAB ═══ -->
+  <div id="availableTab" class="tab-content">
+    <div class="loading" id="availableLoading" style="padding-top:30px;">
+      <div class="spinner"></div>
+      <div>Loading available leads...</div>
+    </div>
+    <div id="availableLeads"></div>
+  </div>
+
+  <!-- ═══ MY LEADS TAB ═══ -->
+  <div id="myLeadsTab" class="tab-content">
+    <div class="filter-row" id="statusFilterRow">
+      <div class="filter-chip active" data-status="all" onclick="filterMyLeads('all', this)">All <span class="chip-count" id="cnt_all">0</span></div>
+      <div class="filter-chip" data-status="Hot Lead" onclick="filterMyLeads('Hot Lead', this)">🔥 Hot <span class="chip-count" id="cnt_hot">0</span></div>
+      <div class="filter-chip" data-status="New" onclick="filterMyLeads('New', this)">🆕 New <span class="chip-count" id="cnt_new">0</span></div>
+      <div class="filter-chip" data-status="Interested" onclick="filterMyLeads('Interested', this)">👀 Interested <span class="chip-count" id="cnt_interested">0</span></div>
+      <div class="filter-chip" data-status="Negotiating" onclick="filterMyLeads('Negotiating', this)">💬 Nego. <span class="chip-count" id="cnt_negotiating">0</span></div>
+      <div class="filter-chip" data-status="Contacted" onclick="filterMyLeads('Contacted', this)">📞 Contacted <span class="chip-count" id="cnt_contacted">0</span></div>
+      <div class="filter-chip" data-status="Cold Lead" onclick="filterMyLeads('Cold Lead', this)">❄️ Cold <span class="chip-count" id="cnt_cold">0</span></div>
+      <div class="filter-chip" data-status="Lost" onclick="filterMyLeads('Lost', this)">❌ Lost <span class="chip-count" id="cnt_lost">0</span></div>
+    </div>
+    <div class="loading" id="myLeadsLoading" style="padding-top:30px; display:none;">
+      <div class="spinner"></div>
+      <div>Loading your leads...</div>
+    </div>
+    <div id="myLeads"></div>
+  </div>
+
+  <!-- FAB Add Lead -->
+  <button class="fab" onclick="addNewLead()">➕</button>
+
+  <!-- Bottom Nav -->
+  <div class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('dashboard')" id="navDashboard">
+      <div class="nav-icon">🏠</div>
+      <div class="nav-label">Home</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('followups')" id="navFollowups">
+      <div class="nav-icon">🔔<span class="nav-badge" id="overdueNavBadge" style="display:none;">0</span></div>
+      <div class="nav-label">Follow-ups</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('available')" id="navAvailable">
+      <div class="nav-icon">📦</div>
+      <div class="nav-label">Available</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('myLeads')" id="navMyLeads">
+      <div class="nav-icon">📋</div>
+      <div class="nav-label">My Leads</div>
+    </button>
+    <button class="nav-item" onclick="goBack()">
+      <div class="nav-icon">←</div>
+      <div class="nav-label">Back</div>
+    </button>
+  </div>
+
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/crm.js?v=2"></script>
 </body>
 </html>
