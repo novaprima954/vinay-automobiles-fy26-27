@@ -485,6 +485,14 @@ const API = {
   },
 
   /**
+   * Search CRM leads by name, mobile, or quotation number
+   */
+  async searchCRMLeads(query) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('searchCRMLeads', { sessionId, query });
+  },
+
+  /**
    * Add note to lead
    */
   async addLeadNote(leadId, note) {

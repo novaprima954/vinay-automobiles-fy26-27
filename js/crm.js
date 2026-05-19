@@ -22,10 +22,25 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ── DASHBOARD ──────────────────────────────
 
 async function loadDashboard() {
+  // Show cached data instantly if fresh (< 90s)
+  try {
+    const cached = localStorage.getItem('crm_dash_v3');
+    if (cached) {
+      const { data, ts } = JSON.parse(cached);
+      if (Date.now() - ts < 90000) {
+        dashboardData = data;
+        displayDashboard(data);
+        _bgRefreshDashboard(); // refresh in background
+        return;
+      }
+    }
+  } catch(ce) {}
+
   try {
     const response = await API.getCRMDashboard();
     if (response.success) {
       dashboardData = response.dashboard;
+      try { localStorage.setItem('crm_dash_v3', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(se) {}
       displayDashboard(dashboardData);
     } else {
       showMessage(response.message, 'error');
@@ -33,6 +48,17 @@ async function loadDashboard() {
   } catch (error) {
     showMessage('Error loading dashboard', 'error');
   }
+}
+
+async function _bgRefreshDashboard() {
+  try {
+    const response = await API.getCRMDashboard();
+    if (response.success) {
+      dashboardData = response.dashboard;
+      try { localStorage.setItem('crm_dash_v3', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(se) {}
+      displayDashboard(dashboardData);
+    }
+  } catch(e) {}
 }
 
 function displayDashboard(data) {
@@ -71,8 +97,6 @@ function displayDashboard(data) {
     urgentSection.style.display = 'none';
   }
 
-  // Load analytics for all CRM users
-  loadAnalytics();
 }
 
 // ── FOLLOW-UPS TAB ─────────────────────────
@@ -218,7 +242,7 @@ function createAvailableLeadCard(lead) {
     </div>
     <div class="lead-actions">
       <button class="btn-act btn-call-act" onclick="callAndClaimLead('${lead.leadId}','${lead.mobileNo}')">📞 CALL</button>
-      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}')">💬 WhatsApp</button>
+      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}','${escHtml(lead.model||'')}')">💬 WhatsApp</button>
     </div>
   `;
   return card;
@@ -364,7 +388,7 @@ function createMyLeadCard(lead) {
     </div>
     <div class="lead-actions">
       <button class="btn-act btn-call-act" onclick="callLead('${lead.mobileNo}')">📞</button>
-      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}')">💬</button>
+      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}','${escHtml(lead.model||'')}')">💬</button>
       <button class="btn-act btn-edit-act" style="flex:2;" onclick="viewLeadDetails('${lead.leadId}')">✏️ Open</button>
     </div>
   `;
@@ -477,9 +501,12 @@ function callLead(mobileNo) {
   window.location.href = 'tel:' + mobileNo;
 }
 
-function openWhatsApp(mobileNo, customerName) {
-  const msg = encodeURIComponent('Hi ' + customerName + ', this is Vinay Automobiles. ');
-  window.open('https://wa.me/91' + mobileNo + '?text=' + msg, '_blank');
+function openWhatsApp(mobileNo, customerName, modelName) {
+  const exec = currentUser ? currentUser.name : 'Team';
+  const model = modelName || '';
+  const text = 'Hi ' + customerName + ', This is ' + exec + '. Thanks for enquiring '
+    + (model ? model + ' at ' : 'at ') + 'Vinay Automobiles. Please let us know if any further help is required.';
+  window.location.href = 'https://wa.me/91' + mobileNo + '?text=' + encodeURIComponent(text);
 }
 
 async function callAndClaimLead(leadId, mobileNo) {
@@ -504,7 +531,7 @@ function viewLeadDetails(leadId) {
 }
 
 function addNewLead() {
-  window.location.href = 'crm-add.html';
+  window.location.href = 'crm-quote.html';
 }
 
 // ── HELPERS ────────────────────────────────
@@ -523,4 +550,96 @@ function showMessage(text, type) {
 
 function goBack() {
   window.location.href = 'home.html';
+}
+
+// ── SEARCH MODAL ────────────────────────────
+
+let searchDebounceTimer = null;
+
+function openSearchModal() {
+  document.getElementById('searchOverlay').classList.add('open');
+  setTimeout(function() { document.getElementById('searchInput').focus(); }, 100);
+}
+
+function closeSearchModal() {
+  document.getElementById('searchOverlay').classList.remove('open');
+  document.getElementById('searchInput').value = '';
+  document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type to search customers or quotation numbers</div>';
+}
+
+function handleSearchOverlayClick(e) {
+  if (e.target === document.getElementById('searchOverlay')) closeSearchModal();
+}
+
+function onSearchInput() {
+  clearTimeout(searchDebounceTimer);
+  const q = document.getElementById('searchInput').value.trim();
+  if (q.length < 2) {
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type to search customers or quotation numbers</div>';
+    return;
+  }
+  searchDebounceTimer = setTimeout(doSearch, 400);
+}
+
+async function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (q.length < 2) return;
+
+  const container = document.getElementById('searchResults');
+  container.innerHTML = '<div class="search-empty"><div class="spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;display:block;"></div>Searching...</div>';
+
+  try {
+    const response = await API.searchCRMLeads(q);
+    if (!response.success) {
+      container.innerHTML = '<div class="search-empty">' + response.message + '</div>';
+      return;
+    }
+    renderSearchResults(response.leads || [], response.quotation);
+  } catch(e) {
+    container.innerHTML = '<div class="search-empty">Error searching. Try again.</div>';
+  }
+}
+
+function renderSearchResults(leads, quotation) {
+  const container = document.getElementById('searchResults');
+  container.innerHTML = '';
+
+  if (quotation) {
+    const qCard = document.createElement('div');
+    qCard.className = 'search-quot-card';
+    qCard.innerHTML = `
+      <div class="search-quot-title">📄 Quotation Found</div>
+      <div class="search-quot-row"><strong>${quotation.quotNo}</strong> · ${quotation.date}</div>
+      <div class="search-quot-row">👤 ${quotation.customerName} · 🏍️ ${quotation.model} ${quotation.variant || ''}</div>
+      <div class="search-quot-row">💰 ₹${Number(quotation.total||0).toLocaleString('en-IN')} · Generated by ${quotation.generatedBy}</div>
+      ${quotation.leadId ? '<button onclick="viewLeadDetails(\'' + quotation.leadId + '\');closeSearchModal();" style="margin-top:8px;width:100%;padding:8px;background:#667eea;color:white;border:none;border-radius:7px;font-weight:700;cursor:pointer;">Open Lead →</button>' : ''}
+    `;
+    container.appendChild(qCard);
+  }
+
+  if (leads.length === 0 && !quotation) {
+    container.innerHTML = '<div class="search-empty">No results found. Try a different name or mobile.</div>';
+    return;
+  }
+
+  leads.forEach(function(lead) {
+    const statusColors = {
+      'Hot Lead': '#fff3e0::#e65100', 'New': '#e3f2fd::#1565c0',
+      'Interested': '#e8f5e9::#2e7d32', 'Negotiating': '#f3e5f5::#6a1b9a',
+      'Contacted': '#fce4ec::#880e4f', 'Cold Lead': '#eceff1::#546e7a',
+      'Lost': '#ffebee::#c62828', 'Converted': '#e8f5e9::#2e7d32'
+    };
+    const [bg, fg] = (statusColors[lead.status] || '#f5f5f5::#333').split('::');
+
+    const item = document.createElement('div');
+    item.className = 'search-result-item';
+    item.onclick = function() { viewLeadDetails(lead.leadId); closeSearchModal(); };
+    item.innerHTML = `
+      <div class="search-result-name">${escHtml(lead.customerName)}</div>
+      <div class="search-result-meta">📱 ${lead.mobileNo || '-'} · 🏍️ ${lead.model || '-'}</div>
+      <span class="search-result-status" style="background:${bg};color:${fg};">${lead.status || 'Available'}</span>
+      ${lead.assignedTo ? '<span style="font-size:11px;color:#aaa;margin-left:6px;">👤 ' + lead.assignedTo + '</span>' : ''}
+    `;
+    container.appendChild(item);
+  });
 }

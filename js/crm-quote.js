@@ -256,7 +256,8 @@ function recalculate() {
   const insurance  = Number(priceDetails.insurance)  || 0;
   const rto        = Number(priceDetails.rto)        || 0;
   const pdi        = Number(priceDetails.serviceCharge) || 0;
-  const productTotal = exShowroom + insurance + rto + pdi;
+  const mandAcc    = Number(priceDetails.mandAccessories) || 0;
+  const productTotal = exShowroom + insurance + rto + pdi + mandAcc;
 
   let accTotal = 0;
   document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
@@ -268,6 +269,8 @@ function recalculate() {
   document.getElementById('sumInsurance').textContent  = '₹' + fmt(insurance);
   document.getElementById('sumRto').textContent        = '₹' + fmt(rto);
   document.getElementById('sumPdi').textContent        = '₹' + fmt(pdi);
+  const mandEl = document.getElementById('sumMandAcc');
+  if (mandEl) { mandEl.textContent = '₹' + fmt(mandAcc); mandEl.closest('.summary-row').style.display = mandAcc > 0 ? 'flex' : 'none'; }
   document.getElementById('sumAcc').textContent        = '₹' + fmt(accTotal);
   document.getElementById('sumQty').textContent        = qty;
   document.getElementById('sumTotal').textContent      = '₹' + fmt(grandTotal);
@@ -302,7 +305,8 @@ async function generateQuotation() {
     const insurance    = Number(priceDetails.insurance)  || 0;
     const rto          = Number(priceDetails.rto)        || 0;
     const pdi          = Number(priceDetails.serviceCharge) || 0;
-    const productTotal = exShowroom + insurance + rto + pdi;
+    const mandAcc      = Number(priceDetails.mandAccessories) || 0;
+    const productTotal = exShowroom + insurance + rto + pdi + mandAcc;
 
     const selectedAcc = [];
     document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
@@ -315,13 +319,19 @@ async function generateQuotation() {
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, email, address, district,
       model, variant, color, qty,
-      exShowroom, insurance, rto, pdi, productTotal,
+      exShowroom, insurance, rto, pdi, mandAcc, productTotal,
       selectedAcc, accTotal, grandTotal
     });
 
     document.getElementById('quotContent').innerHTML = html;
     document.getElementById('quotPreviewWrapper').style.display = 'block';
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
+
+    // Show "Save Lead to CRM" section if not already a known lead
+    if (!leadId) {
+      document.getElementById('saveLeadSection').style.display = 'block';
+      document.getElementById('saveLeadSection').scrollIntoView({ behavior: 'smooth' });
+    }
 
     API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, total: grandTotal }).catch(function() {});
 
@@ -341,16 +351,15 @@ function editQuotation() {
 
 function buildQuotationHTML(d) {
   const today = fmtDateDisplay(d.date);
-  const mandAcc = Number(priceDetails.mandAccessories) || 0;
+  const mandAcc = d.mandAcc || 0;
 
   let accRows = '';
   d.selectedAcc.forEach(function(a) {
     accRows += `<tr><td>${a.label}</td><td>₹ ${fmt(a.price)}</td></tr>`;
   });
-  let mandAccRow = mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : '';
+  let mandAccRow = ''; // Mandatory accessories shown in product section, not here
 
   const addressFull = [d.address, d.district].filter(Boolean).join(', ') || 'Maharashtra';
-  const totalAccWithMand = d.accTotal + mandAcc;
 
   return `
 <div class="quot-wrap">
@@ -404,11 +413,12 @@ function buildQuotationHTML(d) {
               ${d.insurance > 0 ? `<tr><td>Insurance (1st yr Comp. + 4 Yrs TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Registration Fee &amp; Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>PDI Cost</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
+              ${mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
-              ${(d.selectedAcc.length > 0 || mandAcc > 0) ? `
+              ${d.selectedAcc.length > 0 ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
-                ${mandAccRow}${accRows}
-                <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(totalAccWithMand)}</strong></td></tr>
+                ${accRows}
+                <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : `<tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ 0</strong></td></tr>`}
               <tr><td><strong>C. Quantity</strong></td><td><strong>${d.qty}</strong></td></tr>
               <tr class="total-row"><td><strong>D. Quotation Total (A+B)×C</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
@@ -420,6 +430,15 @@ function buildQuotationHTML(d) {
     </div>
   </div>
 
+  <div class="quot-desc" style="margin-top:10px;">
+    <div class="quot-desc-title">🏦 Bank Details (for Online Transfer)</div>
+    <div class="quot-desc-body" style="display:flex;gap:24px;flex-wrap:wrap;">
+      <div><strong>Bank Name :</strong> HDFC Bank</div>
+      <div><strong>Account No :</strong> 50200038743479</div>
+      <div><strong>IFSC Code :</strong> HDFC0001017</div>
+      <div><strong>Account Name :</strong> Vinay Automobiles</div>
+    </div>
+  </div>
   <div class="quot-footer-note">This is a computer generated quotation — no signature required</div>
   <div class="quot-terms">
     <strong>Terms and Conditions:</strong>
@@ -465,4 +484,48 @@ function showMessage(text, type) {
 function goBack() {
   if (leadId) window.location.href = 'crm-detail.html?leadId=' + leadId;
   else window.location.href = 'crm.html';
+}
+
+// ── SAVE LEAD TO CRM ─────────────────────────
+
+async function saveLeadToCRM() {
+  const btn = document.getElementById('btnSaveLead');
+  const custName  = document.getElementById('custName').value.trim();
+  const mobile    = document.getElementById('custMobile').value.trim();
+  const model     = document.getElementById('modelSelect').value;
+  const email     = document.getElementById('custEmail').value.trim();
+  const address   = document.getElementById('custAddress').value.trim();
+  const district  = document.getElementById('custDistrict').value.trim();
+  const source    = document.getElementById('saveLeadSource').value;
+  const status    = document.getElementById('saveLeadStatus').value;
+
+  if (!custName || !mobile) { showMessage('Customer name and mobile are required', 'error'); return; }
+
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const response = await API.addLead({
+      customerName: custName,
+      mobileNo:     mobile,
+      email:        email,
+      address:      [address, district].filter(Boolean).join(', '),
+      interestedModel: model,
+      status:       status,
+      leadSource:   source
+    });
+    if (response.success) {
+      leadId = response.leadId;
+      btn.textContent = '✅ Saved to CRM!';
+      btn.style.background = '#ccc';
+      btn.disabled = true;
+      document.getElementById('openLeadBtn').style.display = 'block';
+    } else {
+      showMessage(response.message || 'Error saving lead', 'error');
+      btn.disabled = false;
+      btn.textContent = '💾 Save Lead to CRM';
+    }
+  } catch(e) {
+    showMessage('Error saving lead', 'error');
+    btn.disabled = false;
+    btn.textContent = '💾 Save Lead to CRM';
+  }
 }

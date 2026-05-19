@@ -154,11 +154,17 @@ function handleRequest(e) {
       case 'getCRMAnalytics':
         result = getCRMAnalytics(params.sessionId);
         break;
+      case 'findLeadByMobile':
+        result = findLeadByMobile(params.sessionId, params.mobile);
+        break;
       case 'getNextQuotationNumber':
         result = getNextQuotationNumber(params.sessionId);
         break;
       case 'saveCRMQuotation':
         result = saveCRMQuotation(params.sessionId, JSON.parse(params.data));
+        break;
+      case 'searchCRMLeads':
+        result = searchCRMLeads(params.sessionId, params.query);
         break;
       case 'getSalesDashboard':
         result = getSalesDashboard(params.sessionId, params.dateFilter);
@@ -1868,7 +1874,15 @@ function getCRMDashboard(sessionId) {
         message: 'Access denied. CRM is only available to admin and sales users.'
       };
     }
-    
+
+    // ScriptCache for performance (90 second TTL per user)
+    const cache = CacheService.getScriptCache();
+    const cacheKey = 'crm_dash_v1_' + String(user.name || sessionId).replace(/\W/g, '_').substring(0, 20);
+    try {
+      const cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch(ce) {}
+
     const sheet = getSheet('CRM_Leads');
     const data = sheet.getDataRange().getValues();
     
@@ -1961,7 +1975,7 @@ function getCRMDashboard(sessionId) {
     // Sort overdue by most overdue first
     overdueLeads.sort(function(a, b) { return b.daysOverdue - a.daysOverdue; });
 
-    return {
+    const dashResult = {
       success: true,
       dashboard: {
         myNew: myNew,
@@ -1977,7 +1991,9 @@ function getCRMDashboard(sessionId) {
         weekFollowUpLeads: weekFollowUpLeads
       }
     };
-    
+    try { cache.put(cacheKey, JSON.stringify(dashResult), 90); } catch(ce) {}
+    return dashResult;
+
   } catch (error) {
     Logger.log('Error in getCRMDashboard: ' + error.toString());
     return {
@@ -2642,9 +2658,7 @@ function getCRMAnalytics(sessionId) {
     if (!validation.success) return validation;
 
     const user = validation.user;
-    if (user.role !== 'admin') {
-      return { success: false, message: 'Access denied. Admin only.' };
-    }
+    const isAdmin = (user.role === 'admin' || user.role === 'manager');
 
     const sheet = getSheet('CRM_Leads');
     const data = sheet.getDataRange().getValues();
@@ -2654,18 +2668,19 @@ function getCRMAnalytics(sessionId) {
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
-      const source = row[6] || 'Unknown';
-      const status = row[7] || '';
+      const source     = row[6] || 'Unknown';
+      const status     = row[7] || '';
       const assignedTo = row[8] || '';
 
-      // Source stats (all leads including unassigned)
+      // Non-admin: only count rows assigned to themselves
+      if (!isAdmin && assignedTo !== user.name) continue;
+
       if (!sourceStats[source]) sourceStats[source] = { total: 0, converted: 0, lost: 0, active: 0 };
       sourceStats[source].total++;
       if (status === 'Converted') sourceStats[source].converted++;
       else if (status === 'Lost') sourceStats[source].lost++;
       else if (status) sourceStats[source].active++;
 
-      // Exec stats (assigned leads only)
       if (assignedTo && status) {
         if (!execStats[assignedTo]) execStats[assignedTo] = { total: 0, converted: 0, lost: 0, active: 0, hotLeads: 0 };
         execStats[assignedTo].total++;
@@ -2689,11 +2704,51 @@ function getCRMAnalytics(sessionId) {
                convRate: e.total > 0 ? Math.round((e.converted / e.total) * 100) : 0 };
     }).sort(function(a, b) { return b.converted - a.converted; });
 
-    return { success: true, analytics: { sourceStats: sourceArray, execStats: execArray } };
+    return { success: true, isAdmin: isAdmin, analytics: { sourceStats: sourceArray, execStats: execArray } };
 
   } catch (error) {
     Logger.log('Error in getCRMAnalytics: ' + error.toString());
     return { success: false, message: 'Error loading analytics: ' + error.toString() };
+  }
+}
+
+/**
+ * Find a lead by mobile number
+ */
+function findLeadByMobile(sessionId, mobile) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const sheet = getSheet('CRM_Leads');
+    const data = sheet.getDataRange().getValues();
+    const clean = String(mobile || '').replace(/\D/g, '');
+    if (!clean) return { success: false, message: 'Mobile number required' };
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (String(row[2]).replace(/\D/g, '') === clean) {
+        return {
+          success: true,
+          lead: {
+            leadId:       row[0],
+            customerName: row[1],
+            mobileNo:     row[2],
+            email:        row[3],
+            address:      row[4],
+            model:        row[5],
+            source:       row[6],
+            status:       row[7],
+            assignedTo:   row[8]
+          }
+        };
+      }
+    }
+    return { success: false, message: 'No lead found with mobile ' + mobile };
+
+  } catch (error) {
+    Logger.log('Error in findLeadByMobile: ' + error.toString());
+    return { success: false, message: 'Error searching: ' + error.toString() };
   }
 }
 
@@ -2758,6 +2813,76 @@ function saveCRMQuotation(sessionId, data) {
   } catch (error) {
     Logger.log('Error in saveCRMQuotation: ' + error.toString());
     return { success: false, message: 'Error saving quotation: ' + error.toString() };
+  }
+}
+
+/**
+ * Search CRM leads by customer name, mobile, or quotation number
+ */
+function searchCRMLeads(sessionId, query) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const q = String(query || '').trim().toLowerCase();
+    if (!q || q.length < 2) return { success: false, message: 'Enter at least 2 characters to search' };
+
+    const sheet = getSheet('CRM_Leads');
+    const data = sheet.getDataRange().getValues();
+    const results = [];
+    const qDigits = q.replace(/\D/g, '');
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const name   = String(row[1] || '').toLowerCase();
+      const mobile = String(row[2] || '').replace(/\D/g, '');
+      const nameMatch   = name.includes(q);
+      const mobileMatch = qDigits.length >= 4 && mobile.includes(qDigits);
+      if (nameMatch || mobileMatch) {
+        results.push({
+          leadId:       row[0],
+          customerName: row[1],
+          mobileNo:     row[2],
+          model:        row[5],
+          status:       row[7],
+          assignedTo:   row[8]
+        });
+        if (results.length >= 20) break;
+      }
+    }
+
+    // Also search quotations (by quotNo or customer name)
+    let quotResult = null;
+    try {
+      const quotSheet = getSheet('CRM_Quotations');
+      if (quotSheet.getLastRow() > 1) {
+        const quotData = quotSheet.getDataRange().getValues();
+        for (let i = 1; i < quotData.length; i++) {
+          const row = quotData[i];
+          const quotNo = String(row[0] || '').toLowerCase();
+          const qCust  = String(row[3] || '').toLowerCase();
+          if (quotNo.includes(q) || qCust.includes(q)) {
+            quotResult = {
+              quotNo:       row[0],
+              date:         row[1] ? Utilities.formatDate(new Date(row[1]), 'Asia/Kolkata', 'dd-MMM-yyyy') : '',
+              leadId:       row[2],
+              customerName: row[3],
+              model:        row[4],
+              variant:      row[5],
+              total:        row[6],
+              generatedBy:  row[7]
+            };
+            break;
+          }
+        }
+      }
+    } catch(qe) {}
+
+    return { success: true, leads: results, quotation: quotResult };
+
+  } catch (error) {
+    Logger.log('Error in searchCRMLeads: ' + error.toString());
+    return { success: false, message: 'Search error: ' + error.toString() };
   }
 }
 
