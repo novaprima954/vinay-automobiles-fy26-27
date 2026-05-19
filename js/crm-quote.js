@@ -417,10 +417,9 @@ function buildQuotationHTML(d) {
       <div class="quot-box">
         <div class="quot-box-title">Model</div>
         <div class="quot-box-body">
-          <div class="quot-field"><strong>Type :</strong> <span>${getVehicleType(d.model)}</span></div>
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
-          ${getVehicleType(d.model) === 'SCOOTER' ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Mandatory Accessories:</strong> Footrest, Side Stand</div>` : ''}
+          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Mandatory Accessories:</strong> ${getMandatoryAccDescription(d.model)}</div>` : ''}
           ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}</div>` : ''}
         </div>
       </div>
@@ -445,7 +444,7 @@ function buildQuotationHTML(d) {
                 <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : `<tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ 0</strong></td></tr>`}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
-              <tr class="grand-total"><td><strong>Final Offer Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
+              <tr class="grand-total"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
           </table>
         </div>
@@ -480,8 +479,16 @@ function buildQuotationHTML(d) {
 
 function getVehicleType(model) {
   const m = (model || '').toLowerCase();
-  if (m.includes('jupiter') || m.includes('ntorq') || m.includes('iqube')) return 'SCOOTER';
+  if (m.includes('jupiter') || m.includes('ntorq') || m.includes('iqube') || m.includes('zest') || m.includes('orbiter')) return 'SCOOTER';
   return 'MOTORCYCLE';
+}
+
+function getMandatoryAccDescription(model) {
+  const m = (model || '').toLowerCase();
+  const models = ['jupiter 110', 'jupiter 125', 'ntorq', 'zest', 'orbiter', 'iqube'];
+  if (models.some(function(s) { return m.includes(s); })) return 'Footrest, Side Stand';
+  if (m.includes('jupiter')) return 'Footrest, Side Stand'; // fallback for other Jupiter variants
+  return '';
 }
 
 function fmt(n) {

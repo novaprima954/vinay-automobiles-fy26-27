@@ -130,13 +130,15 @@
       letter-spacing: 0.5px; margin-bottom: 8px; padding: 0 2px;
     }
     #quotPreviewBox {
-      border: 2px solid #667eea; border-radius: 10px; overflow: hidden;
-      background: white;
+      background: #c0c0c0;
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
     }
-    /* Scale down the A4 quotation on small screens */
     #quotContent {
-      transform-origin: top left;
-      width: 100%;
+      width: 720px;
+      min-width: 720px;
+      margin: 0 auto;
     }
 
     /* ══════════════════════════════════
@@ -144,11 +146,12 @@
     ══════════════════════════════════ */
     .quot-wrap {
       font-family: Arial, Helvetica, sans-serif;
-      font-size: 12px;
+      font-size: 11px;
       color: #111;
-      padding: 20px 24px;
+      padding: 14px 18px;
       background: white;
-      max-width: 800px;
+      width: 720px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.18);
     }
 
     /* Header */
@@ -160,21 +163,21 @@
       padding-bottom: 10px;
       margin-bottom: 10px;
     }
-    .quot-company-name { font-size: 20px; font-weight: 900; letter-spacing: 0.5px; }
-    .quot-company-sub { font-size: 11px; color: #555; margin-top: 2px; }
-    .quot-company-addr { font-size: 10px; color: #777; margin-top: 3px; line-height: 1.5; }
-    .quot-brand { font-size: 26px; font-weight: 900; color: #222; letter-spacing: 1px; }
-    .quot-brand-sub { font-size: 10px; color: #777; text-align: right; }
+    .quot-company-name { font-size: 18px; font-weight: 900; letter-spacing: 0.5px; }
+    .quot-company-sub { font-size: 10px; color: #555; margin-top: 2px; }
+    .quot-company-addr { font-size: 9.5px; color: #777; margin-top: 3px; line-height: 1.5; }
+    .quot-brand { font-size: 22px; font-weight: 900; color: #222; letter-spacing: 1px; }
+    .quot-brand-sub { font-size: 9.5px; color: #777; text-align: right; }
 
     .quot-heading {
       text-align: center;
-      font-size: 17px;
+      font-size: 15px;
       font-weight: 900;
       letter-spacing: 3px;
       text-transform: uppercase;
-      margin: 8px 0 6px;
+      margin: 6px 0 5px;
       border-bottom: 1px solid #ccc;
-      padding-bottom: 6px;
+      padding-bottom: 5px;
     }
     .quot-meta {
       display: flex;
@@ -187,10 +190,10 @@
     /* Two-column body */
     .quot-body {
       display: flex;
-      gap: 12px;
+      gap: 10px;
     }
-    .quot-left { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-    .quot-right { width: 320px; flex-shrink: 0; }
+    .quot-left { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+    .quot-right { width: 300px; flex-shrink: 0; }
 
     .quot-box {
       border: 1px solid #bbb;
@@ -256,11 +259,11 @@
       .no-print { display: none !important; }
       body { background: white; margin: 0; padding: 0; }
       .page-container { max-width: none; margin: 0; padding: 0; }
-      #quotPreviewWrapper { display: block !important; margin: 0; border: none; }
-      #quotPreviewBox { border: none; border-radius: 0; }
-      #quotContent { transform: none !important; width: auto; }
-      .quot-wrap { padding: 10mm 12mm; max-width: none; }
-      @page { size: A4; margin: 0; }
+      #quotPreviewWrapper { display: block !important; margin: 0; padding: 0; }
+      #quotPreviewBox { background: white; padding: 0; overflow: visible; border-radius: 0; }
+      #quotContent { transform: none !important; width: 100%; min-width: 0; }
+      .quot-wrap { padding: 0; width: 100%; min-width: 0; max-width: none; box-shadow: none; }
+      @page { size: A4 portrait; margin: 10mm 12mm; }
     }
   </style>
 </head>
