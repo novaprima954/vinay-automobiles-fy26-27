@@ -363,13 +363,23 @@ function callLead() {
 }
 
 function generateQuote() {
-  window.location.href = 'crm-quote.html?leadId=' + leadId;
+  if (!currentLead) return;
+  const params = new URLSearchParams({
+    leadId:  leadId,
+    name:    currentLead.customerName || '',
+    mobile:  currentLead.mobileNo    || '',
+    email:   currentLead.email       || '',
+    address: currentLead.address     || '',
+    district: '',
+    model:   currentLead.model       || ''
+  });
+  window.location.href = 'crm-quote.html?' + params.toString();
 }
 
 function whatsappLead() {
   if (!currentLead || !currentLead.mobileNo) return;
   const msg = encodeURIComponent('Hi ' + (currentLead.customerName || '') + ', this is Vinay Automobiles. ');
-  window.open('https://wa.me/91' + currentLead.mobileNo + '?text=' + msg, '_blank');
+  window.location.href = 'https://wa.me/91' + currentLead.mobileNo + '?text=' + msg;
 }
 
 function copyMobile() {

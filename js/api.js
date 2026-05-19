@@ -461,6 +461,14 @@ const API = {
   },
 
   /**
+   * Find lead by mobile number
+   */
+  async findLeadByMobile(mobile) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('findLeadByMobile', { sessionId, mobile });
+  },
+
+  /**
    * Get next sequential quotation number
    */
   async getNextQuotationNumber() {

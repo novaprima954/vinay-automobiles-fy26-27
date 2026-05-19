@@ -16,11 +16,6 @@ document.addEventListener('DOMContentLoaded', async function() {
   currentUser = session.user;
   document.getElementById('currentUser').textContent = currentUser.name;
 
-  // Show admin analytics section
-  if (currentUser.role === 'admin') {
-    document.getElementById('adminReportsSection').style.display = 'block';
-  }
-
   await loadDashboard();
 });
 
@@ -50,6 +45,8 @@ function displayDashboard(data) {
   document.getElementById('fc_overdue').textContent = data.overdueCount   || 0;
   document.getElementById('fc_today').textContent   = (data.urgentFollowUps || []).length;
   document.getElementById('fc_week').textContent    = data.weekFollowUps  || 0;
+  // Lost count shown once myLeads loads; set placeholder
+  document.getElementById('fc_lost').textContent    = '...';
 
   // Overdue badge on nav icon
   const overdueNavBadge = document.getElementById('overdueNavBadge');
@@ -74,10 +71,8 @@ function displayDashboard(data) {
     urgentSection.style.display = 'none';
   }
 
-  // Load analytics for admin
-  if (currentUser && currentUser.role === 'admin') {
-    loadAnalytics();
-  }
+  // Load analytics for all CRM users
+  loadAnalytics();
 }
 
 // ── FOLLOW-UPS TAB ─────────────────────────
@@ -98,22 +93,42 @@ function renderFollowupsList() {
   let type = 'week';
 
   if (currentFollowupFilter === 'overdue') {
-    leads = dashboardData.overdueLeads || [];
+    // Exclude Lost leads from overdue — backend does this but double-check client-side
+    leads = (dashboardData.overdueLeads || []).filter(function(l) { return l.status !== 'Lost'; });
     type = 'overdue';
   } else if (currentFollowupFilter === 'today') {
     leads = dashboardData.urgentFollowUps || [];
     type = 'today';
   } else if (currentFollowupFilter === 'week') {
-    leads = dashboardData.weekFollowUpLeads || [];
+    leads = (dashboardData.weekFollowUpLeads || []).filter(function(l) { return l.status !== 'Lost'; });
     type = 'week';
+  } else if (currentFollowupFilter === 'lost') {
+    // Pull from myLeadsCache — load if needed
+    if (myLeadsCache.length === 0) {
+      container.innerHTML = '<div class="loading" style="padding-top:30px;"><div class="spinner"></div><div>Loading lost leads...</div></div>';
+      loadMyLeads().then(function() {
+        // After load, re-render
+        renderFollowupsList();
+      });
+      return;
+    }
+    leads = myLeadsCache.filter(function(l) { return l.status === 'Lost'; });
+    type = 'lost';
   }
 
   if (leads.length === 0) {
+    const msgs = {
+      overdue: ['✅', 'No overdue follow-ups!', 'Great work — all follow-ups are on track.'],
+      today:   ['🔔', 'No follow-ups today', 'Enjoy the free day!'],
+      week:    ['📅', 'No follow-ups this week', 'Check back later.'],
+      lost:    ['😔', 'No lost leads', 'Great conversion rate!']
+    };
+    const m = msgs[type] || msgs['week'];
     container.innerHTML = `
       <div class="empty-state">
-        <div class="empty-icon">${type === 'overdue' ? '✅' : '📅'}</div>
-        <div class="empty-title">${type === 'overdue' ? 'No overdue follow-ups!' : 'No follow-ups scheduled'}</div>
-        <div class="empty-sub">${type === 'overdue' ? 'Great work — all follow-ups are on track.' : 'Check back later.'}</div>
+        <div class="empty-icon">${m[0]}</div>
+        <div class="empty-title">${m[1]}</div>
+        <div class="empty-sub">${m[2]}</div>
       </div>`;
     return;
   }
@@ -125,23 +140,28 @@ function renderFollowupsList() {
 
 function makeFollowupCard(lead, type) {
   const div = document.createElement('div');
-  div.className = 'followup-card ' + type;
+  div.className = 'followup-card ' + (type === 'lost' ? 'lost' : type);
 
   let dateBadgeHtml = '';
   if (type === 'overdue') {
     dateBadgeHtml = `<div class="followup-date-badge overdue">⚠️ ${lead.daysOverdue}d overdue</div>`;
   } else if (type === 'today') {
     dateBadgeHtml = `<div class="followup-date-badge today">🔥 Today</div>`;
+  } else if (type === 'lost') {
+    const reason = lead.lostReason ? ' · ' + lead.lostReason : '';
+    dateBadgeHtml = `<div class="followup-date-badge" style="background:#ffebee;color:#ef5350;">❌ Lost${reason}</div>`;
   } else {
     dateBadgeHtml = `<div class="followup-date-badge week">📅 ${lead.followUpDate || ''}</div>`;
   }
 
-  const assignedInfo = lead.assignedTo ? `👤 ${lead.assignedTo} · ` : '';
+  const assignedInfo = lead.assignedTo ? '👤 ' + lead.assignedTo + ' · ' : '';
+  const mobile = lead.mobile || lead.mobileNo || '-';
+  const name   = lead.name   || lead.customerName || '-';
 
   div.innerHTML = `
     <div class="followup-info">
-      <div class="followup-name">${lead.name}</div>
-      <div class="followup-meta">${assignedInfo}🏍️ ${lead.model || '-'} · 📱 ${lead.mobile || '-'}</div>
+      <div class="followup-name">${name}</div>
+      <div class="followup-meta">${assignedInfo}🏍️ ${lead.model || '-'} · 📱 ${mobile}</div>
       ${dateBadgeHtml}
     </div>
     <button class="btn-open" onclick="viewLeadDetails('${lead.leadId}')">Open →</button>
@@ -247,6 +267,8 @@ function updateStatusCounts(leads) {
   document.getElementById('cnt_contacted').textContent  = counts['Contacted'];
   document.getElementById('cnt_cold').textContent       = counts['Cold Lead'];
   document.getElementById('cnt_lost').textContent       = counts['Lost'];
+  // Also update Lost count in Follow-ups tab
+  document.getElementById('fc_lost').textContent        = counts['Lost'];
 }
 
 function filterMyLeads(status, el) {
@@ -353,6 +375,7 @@ function createMyLeadCard(lead) {
 
 async function loadAnalytics() {
   const container = document.getElementById('analyticsContent');
+  const titleEl   = document.getElementById('analyticsSection').querySelector('.section-title');
   container.innerHTML = '<div class="loading" style="padding:16px;"><div class="spinner"></div><div>Loading...</div></div>';
 
   try {
@@ -363,55 +386,58 @@ async function loadAnalytics() {
     }
 
     const { sourceStats, execStats } = response.analytics;
+    const isAdmin = response.isAdmin;
+    titleEl.textContent = isAdmin ? '📊 Analytics' : '📊 My Performance';
 
     // Source effectiveness table
     let srcRows = '';
     sourceStats.forEach(function(s) {
-      srcRows += `
-        <tr>
-          <td><strong>${s.source}</strong></td>
-          <td>${s.total}</td>
-          <td style="color:#66BB6A;font-weight:700;">${s.converted}</td>
-          <td style="color:#ef5350;">${s.lost}</td>
-          <td>
-            <span class="conv-rate">${s.convRate}%</span>
-            <div class="conv-bar"><div class="conv-bar-fill" style="width:${s.convRate}%"></div></div>
-          </td>
-        </tr>`;
+      srcRows += `<tr>
+        <td><strong>${s.source}</strong></td>
+        <td>${s.total}</td>
+        <td style="color:#66BB6A;font-weight:700;">${s.converted}</td>
+        <td style="color:#ef5350;">${s.lost}</td>
+        <td>
+          <span class="conv-rate">${s.convRate}%</span>
+          <div class="conv-bar"><div class="conv-bar-fill" style="width:${s.convRate}%"></div></div>
+        </td>
+      </tr>`;
     });
 
     // Executive performance table
     let execRows = '';
     execStats.forEach(function(e) {
-      execRows += `
-        <tr>
-          <td><strong>${e.executive}</strong></td>
-          <td>${e.total}</td>
-          <td style="color:#FF7043;font-weight:600;">${e.hotLeads}</td>
-          <td style="color:#66BB6A;font-weight:700;">${e.converted}</td>
-          <td>
-            <span class="conv-rate">${e.convRate}%</span>
-            <div class="conv-bar"><div class="conv-bar-fill" style="width:${e.convRate}%"></div></div>
-          </td>
-        </tr>`;
+      const isMe = !isAdmin; // non-admin only sees themselves
+      execRows += `<tr style="${isMe ? 'background:#f0f4ff;' : ''}">
+        <td><strong>${e.executive}</strong></td>
+        <td>${e.total}</td>
+        <td style="color:#FF7043;font-weight:600;">${e.hotLeads}</td>
+        <td style="color:#66BB6A;font-weight:700;">${e.converted}</td>
+        <td>
+          <span class="conv-rate">${e.convRate}%</span>
+          <div class="conv-bar"><div class="conv-bar-fill" style="width:${e.convRate}%"></div></div>
+        </td>
+      </tr>`;
     });
+
+    const execTableTitle = isAdmin ? '👤 Executive Performance' : '👤 My Stats';
 
     container.innerHTML = `
       <div class="analytics-card">
-        <div class="analytics-card-title">🎯 Source Effectiveness</div>
+        <div class="analytics-card-title">🎯 ${isAdmin ? 'Source Effectiveness' : 'My Leads by Source'}</div>
         <div style="overflow-x:auto;">
           <table class="analytics-table">
             <thead><tr><th>Source</th><th>Total</th><th>Won</th><th>Lost</th><th>Conv%</th></tr></thead>
-            <tbody>${srcRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data</td></tr>'}</tbody>
+            <tbody>${srcRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
           </table>
         </div>
       </div>
       <div class="analytics-card">
-        <div class="analytics-card-title">👤 Executive Performance</div>
+        <div class="analytics-card-title">${execTableTitle}</div>
         <div style="overflow-x:auto;">
           <table class="analytics-table">
-            <thead><tr><th>Executive</th><th>Total</th><th>🔥Hot</th><th>✅Won</th><th>Conv%</th></tr></thead>
-            <tbody>${execRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data</td></tr>'}</tbody>
+            <thead><tr><th>${isAdmin ? 'Executive' : 'Name'}</th><th>Total</th><th>🔥Hot</th><th>✅Won</th><th>Conv%</th></tr></thead>
+            <tbody>${execRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
           </table>
         </div>
       </div>

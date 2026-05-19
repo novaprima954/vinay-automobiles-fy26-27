@@ -1,12 +1,11 @@
 // ==========================================
-// CRM QUOTATION GENERATOR  v1
+// CRM QUOTATION GENERATOR  v2
 // ==========================================
 
 let currentUser = null;
 let leadId = null;
 let priceDetails = null;
 
-// Accessory config: key matches PriceMaster field, label shown on quotation
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
   { key: 'gripPrice',       label: 'Grip Cover' },
@@ -25,36 +24,79 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (!session) { window.location.href = 'index.html'; return; }
   currentUser = session.user;
 
-  // Pre-fill from lead if leadId provided
   const urlParams = new URLSearchParams(window.location.search);
   leadId = urlParams.get('leadId');
-  if (leadId) await prefillFromLead(leadId);
 
-  await loadModels();
+  // Instant prefill from URL params (passed by lead detail page)
+  if (urlParams.get('name'))    document.getElementById('custName').value    = urlParams.get('name');
+  if (urlParams.get('mobile'))  document.getElementById('custMobile').value  = urlParams.get('mobile');
+  if (urlParams.get('email'))   document.getElementById('custEmail').value   = urlParams.get('email');
+  if (urlParams.get('address')) document.getElementById('custAddress').value = urlParams.get('address');
+
+  // Store model hint for after models load
+  const modelHint = urlParams.get('model') || '';
+
+  await loadModels(modelHint);
 });
 
-// ── PRE-FILL ────────────────────────────────
+// ── LEAD SEARCH ─────────────────────────────
 
-async function prefillFromLead(id) {
+async function searchLead() {
+  const mobile = document.getElementById('searchMobile').value.trim();
+  if (!mobile || mobile.length < 10) {
+    showMessage('Enter a valid 10-digit mobile number', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSearch');
+  btn.disabled = true; btn.textContent = 'Searching...';
+
   try {
-    const response = await API.getLeadDetails(id);
+    const response = await API.findLeadByMobile(mobile);
     if (response.success) {
       const lead = response.lead;
       document.getElementById('custName').value    = lead.customerName || '';
-      document.getElementById('custMobile').value  = lead.mobileNo || '';
-      document.getElementById('custEmail').value   = lead.email || '';
-      document.getElementById('custAddress').value = lead.address || '';
-      // Pre-select model if it matches
+      document.getElementById('custMobile').value  = lead.mobileNo    || '';
+      document.getElementById('custEmail').value   = lead.email       || '';
+      document.getElementById('custAddress').value = lead.address     || '';
+      leadId = lead.leadId;
+
+      // Try to select model
       if (lead.model) {
-        document.getElementById('modelSelect').dataset.prefill = lead.model;
+        const matched = setModelValue(lead.model);
+        if (matched) await onModelChange(lead.model);
       }
+
+      // Collapse search box
+      document.getElementById('searchBox').style.display = 'none';
+      document.getElementById('toggleSearchBtn').textContent = '🔍 Search Existing Lead';
+      showMessage('✅ Lead details filled from ' + lead.customerName + ' (' + (lead.status || 'available') + ')', 'success');
+    } else {
+      showMessage(response.message, 'error');
     }
-  } catch (e) { /* silent — optional pre-fill */ }
+  } catch (e) {
+    showMessage('Error searching lead', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Find';
+  }
+}
+
+function toggleSearch() {
+  const box = document.getElementById('searchBox');
+  const btn = document.getElementById('toggleSearchBtn');
+  if (box.style.display === 'none') {
+    box.style.display = 'block';
+    btn.textContent = '✕ Cancel Search';
+    document.getElementById('searchMobile').focus();
+  } else {
+    box.style.display = 'none';
+    btn.textContent = '🔍 Search Existing Lead';
+  }
 }
 
 // ── MODELS ──────────────────────────────────
 
-async function loadModels() {
+async function loadModels(modelHint) {
   try {
     const response = await API.getPriceMasterModels();
     const sel = document.getElementById('modelSelect');
@@ -64,11 +106,10 @@ async function loadModels() {
         opt.value = m; opt.textContent = m;
         sel.appendChild(opt);
       });
-      // Apply pre-fill if set
-      const pre = sel.dataset.prefill;
-      if (pre) {
-        sel.value = pre;
-        if (sel.value) await onModelChange();
+      // Try to pre-select from hint
+      if (modelHint) {
+        const matched = setModelValue(modelHint);
+        if (matched) await onModelChange(modelHint);
       }
     }
   } catch (e) {
@@ -76,7 +117,36 @@ async function loadModels() {
   }
 }
 
-async function onModelChange() {
+/**
+ * Try to match model name — exact, case-insensitive, or contains match.
+ * Returns true if a match was found and selected.
+ */
+function setModelValue(hint) {
+  const sel = document.getElementById('modelSelect');
+  const opts = Array.from(sel.options).slice(1); // skip placeholder
+  const h = hint.trim().toLowerCase();
+
+  // 1. Exact
+  const exact = opts.find(function(o) { return o.value.toLowerCase() === h; });
+  if (exact) { sel.value = exact.value; return true; }
+
+  // 2. PriceMaster model is contained in the hint (e.g. hint="Jupiter 110", PM model="Jupiter 110")
+  const contains = opts.find(function(o) { return h.includes(o.value.toLowerCase()); });
+  if (contains) { sel.value = contains.value; return true; }
+
+  // 3. Hint is contained in PriceMaster model
+  const hintIn = opts.find(function(o) { return o.value.toLowerCase().includes(h); });
+  if (hintIn) { sel.value = hintIn.value; return true; }
+
+  // 4. Starts-with match (first word)
+  const firstWord = h.split(' ')[0];
+  const starts = opts.find(function(o) { return o.value.toLowerCase().startsWith(firstWord); });
+  if (starts) { sel.value = starts.value; return true; }
+
+  return false;
+}
+
+async function onModelChange(variantHint) {
   const model = document.getElementById('modelSelect').value;
   const varSel = document.getElementById('variantSelect');
   varSel.innerHTML = '<option value="">-- Select Variant --</option>';
@@ -84,7 +154,6 @@ async function onModelChange() {
   document.getElementById('accessoriesCard').style.display = 'none';
   document.getElementById('btnGenerate').disabled = true;
   priceDetails = null;
-
   if (!model) return;
 
   try {
@@ -96,9 +165,21 @@ async function onModelChange() {
         varSel.appendChild(opt);
       });
       varSel.disabled = false;
+
+      // Auto-select if only one variant
       if (response.variants.length === 1) {
         varSel.value = response.variants[0];
         await onVariantChange();
+      } else if (variantHint) {
+        // Try to match variant from hint
+        const h = String(variantHint).toLowerCase();
+        const match = response.variants.find(function(v) {
+          return v.toLowerCase().includes(h) || h.includes(v.toLowerCase());
+        });
+        if (match) {
+          varSel.value = match;
+          await onVariantChange();
+        }
       }
     }
   } catch (e) {
@@ -135,7 +216,6 @@ async function onVariantChange() {
 function renderAccessories(details) {
   const grid = document.getElementById('accGrid');
   grid.innerHTML = '';
-
   const available = ACC_CONFIG.filter(function(a) { return details[a.key] && Number(details[a.key]) > 0; });
 
   if (available.length === 0) {
@@ -172,7 +252,6 @@ function toggleAcc(el) {
 function recalculate() {
   if (!priceDetails) return;
   const qty = parseInt(document.getElementById('quantity').value) || 1;
-
   const exShowroom = Number(priceDetails.exShowroom) || 0;
   const insurance  = Number(priceDetails.insurance)  || 0;
   const rto        = Number(priceDetails.rto)        || 0;
@@ -185,7 +264,6 @@ function recalculate() {
   });
 
   const grandTotal = (productTotal + accTotal) * qty;
-
   document.getElementById('sumExShowroom').textContent = '₹' + fmt(exShowroom);
   document.getElementById('sumInsurance').textContent  = '₹' + fmt(insurance);
   document.getElementById('sumRto').textContent        = '₹' + fmt(rto);
@@ -195,10 +273,9 @@ function recalculate() {
   document.getElementById('sumTotal').textContent      = '₹' + fmt(grandTotal);
 }
 
-// ── GENERATE QUOTATION ──────────────────────
+// ── GENERATE ────────────────────────────────
 
 async function generateQuotation() {
-  // Validate
   const custName = document.getElementById('custName').value.trim();
   const mobile   = document.getElementById('custMobile').value.trim();
   const model    = document.getElementById('modelSelect').value;
@@ -212,24 +289,21 @@ async function generateQuotation() {
   btn.disabled = true; btn.textContent = 'Generating...';
 
   try {
-    // Get quotation number
-    const qnRes = await API.getNextQuotationNumber();
+    const qnRes  = await API.getNextQuotationNumber();
     const quotNo = qnRes.success ? qnRes.quotNo : 'VA/' + fmtDateStr(new Date()) + '/0001';
 
-    // Collect data
-    const qty    = parseInt(document.getElementById('quantity').value) || 1;
-    const color  = document.getElementById('vehicleColor').value.trim() || '-';
-    const email  = document.getElementById('custEmail').value.trim();
+    const qty      = parseInt(document.getElementById('quantity').value) || 1;
+    const color    = document.getElementById('vehicleColor').value.trim() || '-';
+    const email    = document.getElementById('custEmail').value.trim();
     const address  = document.getElementById('custAddress').value.trim();
     const district = document.getElementById('custDistrict').value.trim();
 
-    const exShowroom = Number(priceDetails.exShowroom) || 0;
-    const insurance  = Number(priceDetails.insurance)  || 0;
-    const rto        = Number(priceDetails.rto)        || 0;
-    const pdi        = Number(priceDetails.serviceCharge) || 0;
+    const exShowroom   = Number(priceDetails.exShowroom) || 0;
+    const insurance    = Number(priceDetails.insurance)  || 0;
+    const rto          = Number(priceDetails.rto)        || 0;
+    const pdi          = Number(priceDetails.serviceCharge) || 0;
     const productTotal = exShowroom + insurance + rto + pdi;
 
-    // Collect selected accessories
     const selectedAcc = [];
     document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
       const acc = ACC_CONFIG.find(function(a) { return a.key === cb.dataset.key; });
@@ -238,7 +312,6 @@ async function generateQuotation() {
     const accTotal   = selectedAcc.reduce(function(s, a) { return s + a.price; }, 0);
     const grandTotal = (productTotal + accTotal) * qty;
 
-    // Render quotation HTML
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, email, address, district,
       model, variant, color, qty,
@@ -250,12 +323,7 @@ async function generateQuotation() {
     document.getElementById('quotPreviewWrapper').style.display = 'block';
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
 
-    // Save record silently
-    API.saveCRMQuotation({
-      quotNo, leadId: leadId || '',
-      customerName: custName, model, variant,
-      total: grandTotal
-    }).catch(function() {});
+    API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, total: grandTotal }).catch(function() {});
 
   } catch (e) {
     showMessage('Error generating quotation', 'error');
@@ -269,29 +337,23 @@ function editQuotation() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// ── BUILD QUOTATION HTML ────────────────────
+// ── BUILD HTML ───────────────────────────────
 
 function buildQuotationHTML(d) {
   const today = fmtDateDisplay(d.date);
+  const mandAcc = Number(priceDetails.mandAccessories) || 0;
 
-  // Accessories rows
   let accRows = '';
   d.selectedAcc.forEach(function(a) {
     accRows += `<tr><td>${a.label}</td><td>₹ ${fmt(a.price)}</td></tr>`;
   });
-
-  const mandAcc = Number(priceDetails.mandAccessories) || 0;
-  let mandAccRow = '';
-  if (mandAcc > 0) {
-    mandAccRow = `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>`;
-  }
+  let mandAccRow = mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : '';
 
   const addressFull = [d.address, d.district].filter(Boolean).join(', ') || 'Maharashtra';
+  const totalAccWithMand = d.accTotal + mandAcc;
 
   return `
 <div class="quot-wrap">
-
-  <!-- Company Header -->
   <div class="quot-header">
     <div>
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
@@ -305,15 +367,12 @@ function buildQuotationHTML(d) {
   </div>
 
   <div class="quot-heading">QUOTATION</div>
-
   <div class="quot-meta">
     <div>Quotation No : <span>${d.quotNo}</span></div>
     <div>Date : <span>${today}</span></div>
   </div>
 
-  <!-- Two-column body -->
   <div class="quot-body">
-    <!-- LEFT -->
     <div class="quot-left">
       <div class="quot-box">
         <div class="quot-box-title">Customer</div>
@@ -334,29 +393,23 @@ function buildQuotationHTML(d) {
       </div>
     </div>
 
-    <!-- RIGHT -->
     <div class="quot-right">
       <div class="quot-box">
         <div class="quot-box-title">Price</div>
         <div class="quot-box-body" style="padding:0;">
           <table class="quot-price-table">
-            <thead>
-              <tr><th>Type</th><th>Amount (Rs.)</th></tr>
-            </thead>
+            <thead><tr><th>Type</th><th>Amount (Rs.)</th></tr></thead>
             <tbody>
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
               ${d.insurance > 0 ? `<tr><td>Insurance (1st yr Comp. + 4 Yrs TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Registration Fee &amp; Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>PDI Cost</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
-
               ${(d.selectedAcc.length > 0 || mandAcc > 0) ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
-                ${mandAccRow}
-                ${accRows}
-                <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal + mandAcc)}</strong></td></tr>
+                ${mandAccRow}${accRows}
+                <tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ ${fmt(totalAccWithMand)}</strong></td></tr>
               ` : `<tr class="total-row"><td><strong>B. Accessories Total</strong></td><td><strong>₹ 0</strong></td></tr>`}
-
               <tr><td><strong>C. Quantity</strong></td><td><strong>${d.qty}</strong></td></tr>
               <tr class="total-row"><td><strong>D. Quotation Total (A+B)×C</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
               <tr class="grand-total"><td><strong>Final Offer Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
@@ -365,29 +418,21 @@ function buildQuotationHTML(d) {
         </div>
       </div>
     </div>
-  </div><!-- /quot-body -->
+  </div>
 
-  <!-- Footer note -->
   <div class="quot-footer-note">This is a computer generated quotation — no signature required</div>
-
-  <!-- Terms -->
   <div class="quot-terms">
     <strong>Terms and Conditions:</strong>
     <ol>
       <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are payable by you and are subject to change without notice at the time of delivery.</li>
       <li>Payment terms — 100% to be made in the name of Vinay Automobiles by cheque / draft which is subject to realization. For online transfer please contact the showroom.</li>
-      <li>The company shall not be liable for any loss / damage incurred by you due to any prevention, hindrance or delay in manufacture, delivery of vehicle or accessories, shortage of material, strike, riots, accident, machinery breakdown, government policies, Acts of God and Nature, and all events beyond our control.</li>
+      <li>The company shall not be liable for any loss/damage incurred due to any prevention, hindrance or delay in manufacture, delivery, shortage of material, strike, riots, accident, machinery breakdown, government policies, Acts of God and all events beyond our control.</li>
       <li>All the above Terms &amp; Conditions of Sales are subject to change without notice.</li>
       <li>For disputes, if any, only the courts of Yavatmal shall have the jurisdiction.</li>
     </ol>
   </div>
-
-  <div class="quot-company-footer">
-    Vinay Automobiles — Yavatmal, Maharashtra &nbsp;|&nbsp; Authorised TVS Dealer
-  </div>
-
-</div>
-  `;
+  <div class="quot-company-footer">Vinay Automobiles — Yavatmal, Maharashtra | Authorised TVS Dealer</div>
+</div>`;
 }
 
 // ── HELPERS ─────────────────────────────────
@@ -403,7 +448,6 @@ function fmt(n) {
 }
 
 function fmtDateDisplay(d) {
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
 }
 

@@ -107,6 +107,7 @@
     .followup-card.overdue { border-left: 4px solid #ef5350; }
     .followup-card.today   { border-left: 4px solid #FF7043; }
     .followup-card.week    { border-left: 4px solid #42A5F5; }
+    .followup-card.lost    { border-left: 4px solid #bbb; opacity: 0.85; }
     .followup-info { flex: 1; min-width: 0; }
     .followup-name { font-weight: 700; color: #222; font-size: 15px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .followup-meta { font-size: 12px; color: #777; }
@@ -414,16 +415,16 @@
       </a>
     </div>
 
-    <!-- Admin: Reports section -->
-    <div id="adminReportsSection" style="display:none; margin-top:8px;">
+    <!-- Analytics section (all users) -->
+    <div id="analyticsSection" style="margin-top:8px;">
       <div class="section-header">
-        <div class="section-title">📊 Analytics</div>
+        <div class="section-title">📊 My Analytics</div>
         <button onclick="loadAnalytics()" style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;">Refresh</button>
       </div>
       <div id="analyticsContent">
         <div class="loading" style="padding:20px;">
           <div class="spinner"></div>
-          <div>Loading analytics...</div>
+          <div>Loading...</div>
         </div>
       </div>
     </div>
@@ -435,6 +436,7 @@
       <div class="filter-chip active" onclick="setFollowupFilter('overdue', this)">⚠️ Overdue <span class="chip-count" id="fc_overdue">0</span></div>
       <div class="filter-chip" onclick="setFollowupFilter('today', this)">🔥 Today <span class="chip-count" id="fc_today">0</span></div>
       <div class="filter-chip" onclick="setFollowupFilter('week', this)">📅 This Week <span class="chip-count" id="fc_week">0</span></div>
+      <div class="filter-chip" onclick="setFollowupFilter('lost', this)">❌ Lost <span class="chip-count" id="fc_lost">0</span></div>
     </div>
     <div id="followupsList"></div>
   </div>
