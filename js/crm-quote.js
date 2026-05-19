@@ -13,7 +13,7 @@ const ACC_CONFIG = [
   { key: 'matinPrice',      label: 'Matin' },
   { key: 'tankCoverPrice',  label: 'Tank Cover' },
   { key: 'handleHookPrice', label: 'Handle Hook / Ladies Hook' },
-  { key: 'helmetPrice',     label: 'Genuine Helmet' },
+  { key: 'helmetPrice',     label: 'TVS Genuine Helmet' },
   { key: 'rainCoverPrice',  label: 'Rain Cover' },
   { key: 'buzzerPrice',     label: 'Buzzer' },
   { key: 'backRestPrice',   label: 'Back Rest' }

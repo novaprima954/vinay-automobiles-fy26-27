@@ -2798,8 +2798,8 @@ function getNextQuotationNumber(sessionId) {
       sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
     }
 
-    // Random 6-digit number
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    // Random 4-digit number
+    const randomNum = Math.floor(1000 + Math.random() * 9000);
     const quotNo = 'VA/' + randomNum;
 
     return { success: true, quotNo: quotNo };
