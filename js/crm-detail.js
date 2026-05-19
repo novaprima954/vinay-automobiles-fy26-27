@@ -87,8 +87,8 @@ function displayLeadDetails(lead) {
   // Convert button
   document.getElementById('btnConvert').style.display = lead.status === 'Hot Lead' ? 'block' : 'none';
 
-  // Notes
-  displayNotes();
+  // Clear update note field on reload
+  document.getElementById('notes').value = '';
 }
 
 function displayAging(lead) {
@@ -153,10 +153,13 @@ function displayStatusBanner(status) {
 function onStatusChange() {
   const status = document.getElementById('status').value;
   const lostGroup = document.getElementById('lostReasonGroup');
-  if (status === 'Lost') {
-    lostGroup.style.display = 'block';
-  } else {
-    lostGroup.style.display = 'none';
+  const followUpReq = document.getElementById('followUpRequired');
+
+  lostGroup.style.display = (status === 'Lost') ? 'block' : 'none';
+
+  // Follow-up date is not required for Cold Lead or Lost
+  if (followUpReq) {
+    followUpReq.style.display = (status === 'Cold Lead' || status === 'Lost') ? 'none' : 'inline';
   }
 }
 
@@ -165,7 +168,9 @@ function onStatusChange() {
 async function handleUpdate(e) {
   e.preventDefault();
 
-  const status = document.getElementById('status').value;
+  const status     = document.getElementById('status').value;
+  const followUpDate = document.getElementById('followUpDate').value;
+  const updateNote = document.getElementById('notes').value.trim();
 
   // Validate lost reason if Lost
   if (status === 'Lost' && !document.getElementById('lostReason').value) {
@@ -173,11 +178,25 @@ async function handleUpdate(e) {
     return;
   }
 
+  // Follow-up date mandatory for all except Cold Lead and Lost
+  if (status !== 'Cold Lead' && status !== 'Lost' && !followUpDate) {
+    showMessage('Next follow-up date is required for this status', 'error');
+    document.getElementById('followUpDate').focus();
+    return;
+  }
+
+  // Update note is always mandatory
+  if (!updateNote) {
+    showMessage('Please enter an update note before saving', 'error');
+    document.getElementById('notes').focus();
+    return;
+  }
+
   const data = {
     status:       status,
     expectedDate: document.getElementById('expectedDate').value,
-    followUpDate: document.getElementById('followUpDate').value,
-    notes:        document.getElementById('notes').value,
+    followUpDate: followUpDate,
+    notes:        updateNote,
     lostReason:   document.getElementById('lostReason').value || ''
   };
 
@@ -188,6 +207,8 @@ async function handleUpdate(e) {
   try {
     const response = await API.updateLead(leadId, data);
     if (response.success) {
+      // Auto-log update note as an interaction
+      await API.logCRMInteraction(leadId, 'Note', updateNote).catch(function() {});
       showMessage('✅ Lead updated successfully!', 'success');
       await loadLeadDetails();
     } else {
@@ -259,6 +280,11 @@ function renderInteractions(interactions) {
 
 async function logInteraction() {
   const notes = document.getElementById('interactionNotes').value.trim();
+  if (!notes) {
+    showMessage('Please describe the interaction before logging', 'error');
+    document.getElementById('interactionNotes').focus();
+    return;
+  }
   const btn = document.querySelector('.btn-log');
   btn.disabled = true;
   btn.textContent = 'Logging...';
@@ -280,59 +306,6 @@ async function logInteraction() {
   }
 }
 
-// ── NOTES TAB ──────────────────────────────
-
-async function addNote() {
-  const noteText = document.getElementById('newNote').value.trim();
-  if (!noteText) { showMessage('Please enter a note', 'error'); return; }
-
-  try {
-    const response = await API.addLeadNote(leadId, noteText);
-    if (response.success) {
-      document.getElementById('newNote').value = '';
-      showMessage('✅ Note added!', 'success');
-      await loadLeadDetails();
-      switchTab('notes');
-    } else {
-      showMessage(response.message, 'error');
-    }
-  } catch (error) {
-    showMessage('Error adding note', 'error');
-  }
-}
-
-function displayNotes() {
-  const notesList = document.getElementById('notesList');
-
-  if (!currentLead || !currentLead.notes) {
-    notesList.innerHTML = '<div class="empty-state"><div class="e-icon">📋</div><div class="e-text">No notes yet</div></div>';
-    return;
-  }
-
-  const notes = currentLead.notes.split('\n').filter(function(n) { return n.trim(); });
-
-  if (notes.length === 0) {
-    notesList.innerHTML = '<div class="empty-state"><div class="e-icon">📋</div><div class="e-text">No notes yet</div></div>';
-    return;
-  }
-
-  notesList.innerHTML = '';
-  notes.forEach(function(note) {
-    const item = document.createElement('div');
-    item.className = 'note-item';
-    // Note format: "dd-MMM-yyyy HH:mm - Author: content"
-    const match = note.match(/^(\d{2}-[A-Za-z]{3}-\d{4} \d{2}:\d{2}) - ([^:]+): (.*)$/s);
-    if (match) {
-      item.innerHTML = `
-        <div class="note-meta">${match[1]} · ${match[2]}</div>
-        <div class="note-text">${escHtml(match[3])}</div>
-      `;
-    } else {
-      item.innerHTML = `<div class="note-text">${escHtml(note)}</div>`;
-    }
-    notesList.appendChild(item);
-  });
-}
 
 // ── TAB SWITCHING ──────────────────────────
 
@@ -347,10 +320,6 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab')[1].classList.add('active');
     document.getElementById('interactionsTab').classList.add('active');
     loadInteractions();
-  } else if (tabName === 'notes') {
-    document.querySelectorAll('.tab')[2].classList.add('active');
-    document.getElementById('notesTab').classList.add('active');
-    displayNotes();
   }
 }
 
