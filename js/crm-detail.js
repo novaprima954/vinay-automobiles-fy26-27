@@ -362,6 +362,10 @@ function callLead() {
   }
 }
 
+function generateQuote() {
+  window.location.href = 'crm-quote.html?leadId=' + leadId;
+}
+
 function whatsappLead() {
   if (!currentLead || !currentLead.mobileNo) return;
   const msg = encodeURIComponent('Hi ' + (currentLead.customerName || '') + ', this is Vinay Automobiles. ');

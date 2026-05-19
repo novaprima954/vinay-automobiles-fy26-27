@@ -62,6 +62,7 @@
     .btn-hdr-call    { background: rgba(76,175,80,0.9); color: white; }
     .btn-hdr-wa      { background: rgba(37,211,102,0.9); color: white; }
     .btn-hdr-convert { background: rgba(255,152,0,0.9); color: white; }
+    .btn-hdr-quote   { background: rgba(255,255,255,0.25); color: white; border: 1.5px solid rgba(255,255,255,0.5); }
 
     /* ── Status badge ── */
     .status-banner {
@@ -246,6 +247,7 @@
     <div class="header-actions">
       <button class="btn-hdr btn-hdr-call" id="btnCall" onclick="callLead()">📞 Call</button>
       <button class="btn-hdr btn-hdr-wa"   id="btnWA"   onclick="whatsappLead()">💬 WhatsApp</button>
+      <button class="btn-hdr btn-hdr-quote" onclick="generateQuote()">📄 Quote</button>
       <button class="btn-hdr btn-hdr-convert" id="btnConvert" onclick="convertToSale()" style="display:none;">✅ Convert</button>
     </div>
   </div>

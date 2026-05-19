@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Generate Quotation - Vinay Automobiles</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    /* ══════════════════════════════════
+       SCREEN STYLES
+    ══════════════════════════════════ */
+    body { background: #f0f2f5; padding: 0; margin: 0; }
+    .page-container { max-width: 700px; margin: 0 auto; padding-bottom: 40px; }
+
+    .page-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; padding: 14px 18px; position: sticky; top: 0; z-index: 100;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.2);
+      display: flex; align-items: center; gap: 14px;
+    }
+    .btn-back {
+      background: rgba(255,255,255,0.2); border: none; color: white;
+      font-size: 18px; width: 38px; height: 38px; border-radius: 50%;
+      cursor: pointer; flex-shrink: 0;
+    }
+    .page-header h1 { font-size: 19px; font-weight: 700; margin: 0; flex: 1; }
+
+    .section-card {
+      background: white; margin: 14px 14px 0; border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden;
+    }
+    .section-card-title {
+      background: #f8f9fa; padding: 12px 16px;
+      font-size: 13px; font-weight: 800; color: #555;
+      text-transform: uppercase; letter-spacing: 0.4px;
+      border-bottom: 1px solid #eee;
+    }
+    .section-card-body { padding: 16px; }
+
+    .form-row { display: flex; gap: 12px; }
+    .form-row .form-group { flex: 1; }
+    .form-group { margin-bottom: 14px; }
+    .form-group:last-child { margin-bottom: 0; }
+    .form-label { display: block; font-weight: 700; margin-bottom: 6px; color: #444; font-size: 13px; }
+    .form-input, .form-select {
+      width: 100%; padding: 10px 12px; border: 2px solid #e8e8e8; border-radius: 8px;
+      font-size: 14px; box-sizing: border-box; transition: border-color 0.2s; background: white;
+    }
+    .form-input:focus, .form-select:focus {
+      outline: none; border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+    }
+    .form-input:disabled, .form-select:disabled { background: #f5f5f5; color: #999; }
+
+    /* Accessories */
+    .acc-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 8px;
+    }
+    .acc-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; background: #f8f9fa; border-radius: 8px;
+      border: 2px solid #f0f0f0; cursor: pointer; transition: all 0.15s;
+    }
+    .acc-item.checked { background: #f0f4ff; border-color: #667eea; }
+    .acc-item input[type="checkbox"] { width: 16px; height: 16px; cursor: pointer; accent-color: #667eea; flex-shrink: 0; }
+    .acc-item-info { flex: 1; }
+    .acc-item-name { font-size: 13px; font-weight: 600; color: #333; }
+    .acc-item-price { font-size: 12px; color: #667eea; font-weight: 700; }
+
+    /* Summary bar */
+    .summary-bar {
+      background: #f0f4ff; border: 2px solid #667eea; border-radius: 10px;
+      padding: 14px 16px; margin-top: 14px;
+    }
+    .summary-row { display: flex; justify-content: space-between; font-size: 14px; color: #555; margin-bottom: 6px; }
+    .summary-row:last-child { margin-bottom: 0; }
+    .summary-row.total { font-size: 16px; font-weight: 800; color: #222; border-top: 2px solid #667eea; padding-top: 10px; margin-top: 6px; }
+    .summary-row .lbl { font-weight: 600; }
+    .summary-row .val { font-weight: 700; }
+
+    /* Generate button */
+    .btn-generate {
+      width: 100%; padding: 15px; background: linear-gradient(135deg, #667eea, #764ba2);
+      color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+      cursor: pointer; margin-top: 16px; box-shadow: 0 4px 14px rgba(102,126,234,0.35);
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn-generate:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .btn-print {
+      width: 100%; padding: 13px; background: linear-gradient(135deg, #4CAF50, #388E3C);
+      color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 10px;
+    }
+    .btn-edit-quot {
+      width: 100%; padding: 11px; background: #f0f0f0; color: #444;
+      border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px;
+    }
+
+    .message {
+      padding: 12px 16px; margin: 10px 14px; border-radius: 10px;
+      font-weight: 600; font-size: 14px; text-align: center; display: none;
+    }
+    .message.success { background: #d4edda; color: #155724; }
+    .message.error   { background: #f8d7da; color: #721c24; }
+
+    .loading { text-align: center; padding: 20px; color: #aaa; }
+    .spinner {
+      display: inline-block; width: 28px; height: 28px;
+      border: 3px solid #e0e0e0; border-top-color: #667eea;
+      border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Preview wrapper (screen only) */
+    #quotPreviewWrapper {
+      margin: 14px;
+      display: none;
+    }
+    #quotPreviewWrapper .preview-label {
+      font-size: 12px; font-weight: 700; color: #667eea; text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 8px; padding: 0 2px;
+    }
+    #quotPreviewBox {
+      border: 2px solid #667eea; border-radius: 10px; overflow: hidden;
+      background: white;
+    }
+    /* Scale down the A4 quotation on small screens */
+    #quotContent {
+      transform-origin: top left;
+      width: 100%;
+    }
+
+    /* ══════════════════════════════════
+       QUOTATION PRINT LAYOUT
+    ══════════════════════════════════ */
+    .quot-wrap {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 12px;
+      color: #111;
+      padding: 20px 24px;
+      background: white;
+      max-width: 800px;
+    }
+
+    /* Header */
+    .quot-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 3px solid #111;
+      padding-bottom: 10px;
+      margin-bottom: 10px;
+    }
+    .quot-company-name { font-size: 20px; font-weight: 900; letter-spacing: 0.5px; }
+    .quot-company-sub { font-size: 11px; color: #555; margin-top: 2px; }
+    .quot-company-addr { font-size: 10px; color: #777; margin-top: 3px; line-height: 1.5; }
+    .quot-brand { font-size: 26px; font-weight: 900; color: #222; letter-spacing: 1px; }
+    .quot-brand-sub { font-size: 10px; color: #777; text-align: right; }
+
+    .quot-heading {
+      text-align: center;
+      font-size: 17px;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      margin: 8px 0 6px;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 6px;
+    }
+    .quot-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      margin-bottom: 12px;
+    }
+    .quot-meta span { font-weight: 600; }
+
+    /* Two-column body */
+    .quot-body {
+      display: flex;
+      gap: 12px;
+    }
+    .quot-left { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .quot-right { width: 320px; flex-shrink: 0; }
+
+    .quot-box {
+      border: 1px solid #bbb;
+      border-radius: 0;
+    }
+    .quot-box-title {
+      background: #f5f5f5;
+      padding: 5px 10px;
+      font-weight: 800;
+      font-size: 11px;
+      border-bottom: 1px solid #bbb;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .quot-box-body { padding: 8px 10px; }
+    .quot-field { margin-bottom: 4px; font-size: 11px; }
+    .quot-field strong { color: #111; }
+    .quot-field span { color: #444; }
+
+    /* Price table */
+    .quot-price-table { width: 100%; border-collapse: collapse; }
+    .quot-price-table th {
+      background: #f5f5f5; padding: 5px 8px;
+      text-align: left; font-size: 11px; font-weight: 700;
+      border-bottom: 1px solid #bbb;
+    }
+    .quot-price-table th:last-child { text-align: right; }
+    .quot-price-table td { padding: 4px 8px; font-size: 11px; border-bottom: 1px solid #eee; vertical-align: middle; }
+    .quot-price-table td:last-child { text-align: right; white-space: nowrap; }
+    .quot-price-table tr.section-header td { background: #f9f9f9; font-weight: 800; padding-top: 8px; }
+    .quot-price-table tr.total-row td { font-weight: 800; font-size: 12px; background: #f0f4ff; border-top: 2px solid #667eea; }
+    .quot-price-table tr.grand-total td { font-weight: 900; font-size: 13px; background: #222; color: white; }
+
+    /* Description box (full width) */
+    .quot-desc {
+      margin-top: 10px;
+      border: 1px solid #bbb;
+    }
+    .quot-desc-title {
+      background: #f5f5f5; padding: 5px 10px; font-weight: 800;
+      font-size: 11px; border-bottom: 1px solid #bbb; text-transform: uppercase;
+    }
+    .quot-desc-body { padding: 8px 10px; font-size: 10px; color: #444; line-height: 1.6; }
+
+    /* Footer */
+    .quot-footer-note {
+      text-align: center; font-size: 11px; font-weight: 700;
+      margin: 12px 0 8px; border-top: 1px solid #ccc; padding-top: 8px;
+    }
+    .quot-terms { font-size: 9px; color: #555; line-height: 1.5; }
+    .quot-terms strong { color: #222; font-size: 10px; }
+    .quot-terms ol { margin: 4px 0 0; padding-left: 16px; }
+    .quot-terms li { margin-bottom: 2px; }
+    .quot-company-footer {
+      text-align: center; font-size: 9px; color: #777; margin-top: 8px;
+      border-top: 1px solid #ccc; padding-top: 5px;
+    }
+
+    /* ══════════════════════════════════
+       PRINT MEDIA
+    ══════════════════════════════════ */
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white; margin: 0; padding: 0; }
+      .page-container { max-width: none; margin: 0; padding: 0; }
+      #quotPreviewWrapper { display: block !important; margin: 0; border: none; }
+      #quotPreviewBox { border: none; border-radius: 0; }
+      #quotContent { transform: none !important; width: auto; }
+      .quot-wrap { padding: 10mm 12mm; max-width: none; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-container">
+
+  <!-- Header (no-print) -->
+  <div class="page-header no-print">
+    <button class="btn-back" onclick="goBack()">←</button>
+    <h1>📄 Generate Quotation</h1>
+  </div>
+
+  <div id="statusMessage" class="message no-print"></div>
+
+  <!-- ══ FORM SECTION ══ -->
+  <div id="formSection">
+
+    <!-- Customer Details -->
+    <div class="section-card no-print">
+      <div class="section-card-title">👤 Customer Details</div>
+      <div class="section-card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Customer Name *</label>
+            <input type="text" id="custName" class="form-input" placeholder="Full name">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mobile *</label>
+            <input type="tel" id="custMobile" class="form-input" placeholder="10-digit number" maxlength="10">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input type="email" id="custEmail" class="form-input" placeholder="Optional">
+          </div>
+          <div class="form-group">
+            <label class="form-label">District</label>
+            <input type="text" id="custDistrict" class="form-input" placeholder="e.g. Yavatmal">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input type="text" id="custAddress" class="form-input" placeholder="Street / Village">
+        </div>
+      </div>
+    </div>
+
+    <!-- Vehicle Details -->
+    <div class="section-card no-print">
+      <div class="section-card-title">🏍️ Vehicle Details</div>
+      <div class="section-card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Model *</label>
+            <select id="modelSelect" class="form-select" onchange="onModelChange()">
+              <option value="">-- Select Model --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Variant *</label>
+            <select id="variantSelect" class="form-select" onchange="onVariantChange()" disabled>
+              <option value="">-- Select Variant --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Color</label>
+            <input type="text" id="vehicleColor" class="form-input" placeholder="e.g. Pearl White">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Quantity</label>
+            <input type="number" id="quantity" class="form-input" value="1" min="1" max="10" oninput="recalculate()">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Accessories -->
+    <div class="section-card no-print" id="accessoriesCard" style="display:none;">
+      <div class="section-card-title">🧩 Accessories <span style="font-weight:400;text-transform:none;font-size:12px;color:#888;">(check to include)</span></div>
+      <div class="section-card-body">
+        <div class="acc-grid" id="accGrid"></div>
+        <div class="summary-bar" id="summaryBar" style="display:none;">
+          <div class="summary-row"><span class="lbl">Ex-Showroom</span><span class="val" id="sumExShowroom">₹0</span></div>
+          <div class="summary-row"><span class="lbl">Insurance</span><span class="val" id="sumInsurance">₹0</span></div>
+          <div class="summary-row"><span class="lbl">Registration & Road Tax</span><span class="val" id="sumRto">₹0</span></div>
+          <div class="summary-row"><span class="lbl">PDI / Service Charge</span><span class="val" id="sumPdi">₹0</span></div>
+          <div class="summary-row"><span class="lbl">Accessories</span><span class="val" id="sumAcc">₹0</span></div>
+          <div class="summary-row total"><span class="lbl">Total (×<span id="sumQty">1</span>)</span><span class="val" id="sumTotal">₹0</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generate button -->
+    <div class="no-print" style="margin: 14px;">
+      <button class="btn-generate" id="btnGenerate" onclick="generateQuotation()" disabled>
+        📄 Generate Quotation
+      </button>
+    </div>
+
+  </div><!-- /formSection -->
+
+  <!-- ══ PRINT PREVIEW ══ -->
+  <div id="quotPreviewWrapper">
+    <div class="no-print preview-label">📋 Quotation Preview — scroll down or print</div>
+    <div id="quotPreviewBox">
+      <div id="quotContent"></div>
+    </div>
+    <div class="no-print" style="margin-top:10px;">
+      <button class="btn-print" onclick="window.print()">🖨️ Print / Save as PDF</button>
+      <button class="btn-edit-quot" onclick="editQuotation()">✏️ Edit Quotation</button>
+    </div>
+  </div>
+
+</div><!-- /page-container -->
+
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/api.js"></script>
+<script src="js/crm-quote.js?v=1"></script>
+</body>
+</html>

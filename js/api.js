@@ -461,6 +461,22 @@ const API = {
   },
 
   /**
+   * Get next sequential quotation number
+   */
+  async getNextQuotationNumber() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getNextQuotationNumber', { sessionId });
+  },
+
+  /**
+   * Save a quotation record
+   */
+  async saveCRMQuotation(data) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('saveCRMQuotation', { sessionId, data: JSON.stringify(data) });
+  },
+
+  /**
    * Add note to lead
    */
   async addLeadNote(leadId, note) {

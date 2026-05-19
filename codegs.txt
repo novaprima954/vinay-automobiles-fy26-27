@@ -145,6 +145,21 @@ function handleRequest(e) {
       case 'convertLeadToSale':
         result = convertLeadToSale(params.sessionId, params.leadId);
         break;
+      case 'logCRMInteraction':
+        result = logCRMInteraction(params.sessionId, params.leadId, params.mode, params.notes);
+        break;
+      case 'getCRMInteractions':
+        result = getCRMInteractions(params.sessionId, params.leadId);
+        break;
+      case 'getCRMAnalytics':
+        result = getCRMAnalytics(params.sessionId);
+        break;
+      case 'getNextQuotationNumber':
+        result = getNextQuotationNumber(params.sessionId);
+        break;
+      case 'saveCRMQuotation':
+        result = saveCRMQuotation(params.sessionId, JSON.parse(params.data));
+        break;
       case 'getSalesDashboard':
         result = getSalesDashboard(params.sessionId, params.dateFilter);
         break;
@@ -1864,23 +1879,28 @@ function getCRMDashboard(sessionId) {
     let converted = 0;
     let totalLeads = 0;
     let urgentFollowUps = [];
-    
+    let overdueCount = 0;
+    let overdueLeads = [];
+    let weekFollowUps = 0;
+    let weekFollowUpLeads = [];
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+    const nextWeek = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+
     // Count leads (skip header)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const status = row[7]; // Column H: Status
       const assignedTo = row[8]; // Column I: Assigned To
       const followUpDate = row[12]; // Column M: Next Follow-up Date
-      
+
       // Available leads (no status, not assigned)
       if (!status || status === '') {
         available++;
         continue;
       }
-      
+
       // Admin sees all, sales sees only their own
       if (user.role === 'admin' || assignedTo === user.name) {
         totalLeads++;
@@ -1888,13 +1908,15 @@ function getCRMDashboard(sessionId) {
         if (status === 'New') myNew++;
         if (status === 'Hot Lead') myHot++;
         if (status === 'Converted') converted++;
-        
-        // Check for urgent follow-ups (today)
-        if (followUpDate) {
+
+        // Check follow-up dates
+        if (followUpDate && status !== 'Converted' && status !== 'Lost') {
           const followUp = new Date(followUpDate);
           followUp.setHours(0, 0, 0, 0);
-          
-          if (followUp.getTime() === today.getTime()) {
+          const followUpTime = followUp.getTime();
+
+          // Today's follow-ups (urgent)
+          if (followUpTime === today.getTime()) {
             myFollowUp++;
             urgentFollowUps.push({
               name: row[1],
@@ -1903,10 +1925,42 @@ function getCRMDashboard(sessionId) {
               leadId: row[0]
             });
           }
+
+          // Overdue (past follow-up date)
+          if (followUpTime < today.getTime()) {
+            overdueCount++;
+            overdueLeads.push({
+              name: row[1],
+              mobile: row[2],
+              model: row[5],
+              leadId: row[0],
+              followUpDate: formatDate(followUpDate),
+              daysOverdue: Math.floor((today.getTime() - followUpTime) / (24 * 60 * 60 * 1000)),
+              status: status,
+              assignedTo: assignedTo
+            });
+          }
+
+          // This week's follow-ups (today through next 7 days)
+          if (followUpTime >= today.getTime() && followUpTime <= nextWeek.getTime()) {
+            weekFollowUps++;
+            weekFollowUpLeads.push({
+              name: row[1],
+              mobile: row[2],
+              model: row[5],
+              leadId: row[0],
+              followUpDate: formatDate(followUpDate),
+              status: status,
+              assignedTo: assignedTo
+            });
+          }
         }
       }
     }
-    
+
+    // Sort overdue by most overdue first
+    overdueLeads.sort(function(a, b) { return b.daysOverdue - a.daysOverdue; });
+
     return {
       success: true,
       dashboard: {
@@ -1916,7 +1970,11 @@ function getCRMDashboard(sessionId) {
         available: available,
         converted: converted,
         totalLeads: totalLeads,
-        urgentFollowUps: urgentFollowUps
+        urgentFollowUps: urgentFollowUps,
+        overdueCount: overdueCount,
+        overdueLeads: overdueLeads,
+        weekFollowUps: weekFollowUps,
+        weekFollowUpLeads: weekFollowUpLeads
       }
     };
     
@@ -2010,28 +2068,50 @@ function getMyLeads(sessionId) {
     const sheet = getSheet('CRM_Leads');
     const data = sheet.getDataRange().getValues();
     const leads = [];
-    
+
+    const todayMs = new Date().setHours(0, 0, 0, 0);
+
     // Get my leads (skip header)
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       const assignedTo = row[8];
       const status = row[7];
-      
+
       // Only show leads assigned to this user
       if (assignedTo === user.name && status) {
+        const followUpDate = row[12];
+        const updatedDate = row[15];
+
+        // Calculate aging (days since last update)
+        let agingDays = 0;
+        if (updatedDate) {
+          agingDays = Math.floor((new Date() - new Date(updatedDate)) / (24 * 60 * 60 * 1000));
+        }
+
+        // Check overdue
+        let isOverdue = false;
+        if (followUpDate && status !== 'Converted' && status !== 'Lost') {
+          const followUpMs = new Date(followUpDate).setHours(0, 0, 0, 0);
+          isOverdue = followUpMs < todayMs;
+        }
+
         leads.push({
           leadId: row[0],
           customerName: row[1],
           mobileNo: row[2],
           model: row[5],
+          source: row[6] || '',
           status: status,
-          followUpDate: formatDate(row[12]),
+          followUpDate: formatDate(followUpDate),
           lastContactDate: formatDate(row[11]),
-          notes: row[10]
+          notes: row[10],
+          lostReason: row[16] || '',
+          agingDays: agingDays,
+          isOverdue: isOverdue
         });
       }
     }
-    
+
     return {
       success: true,
       leads: leads
@@ -2280,7 +2360,8 @@ function getLeadDetails(sessionId, leadId) {
             lastContactDate: formatDate(row[11]),
             followUpDate: formatDate(row[12]),
             createdDate: formatDate(row[13]),
-            createdBy: row[14]
+            createdBy: row[14],
+            lostReason: row[16] || ''
           }
         };
       }
@@ -2336,7 +2417,8 @@ function updateLead(sessionId, leadId, data) {
         if (data.expectedDate) sheet.getRange(targetRow, 10).setValue(data.expectedDate);
         if (data.notes !== undefined) sheet.getRange(targetRow, 11).setValue(data.notes);
         if (data.followUpDate) sheet.getRange(targetRow, 13).setValue(data.followUpDate);
-        
+        if (data.lostReason !== undefined) sheet.getRange(targetRow, 17).setValue(data.lostReason);
+
         // Update last contact and updated date
         sheet.getRange(targetRow, 12).setValue(new Date()); // Last Contact
         sheet.getRange(targetRow, 16).setValue(new Date()); // Updated Date
@@ -2462,6 +2544,220 @@ function convertLeadToSale(sessionId, leadId) {
       success: false,
       message: 'Error converting lead: ' + error.toString()
     };
+  }
+}
+
+/**
+ * Log a CRM interaction (call, WhatsApp, visit, etc.)
+ */
+function logCRMInteraction(sessionId, leadId, mode, notes) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const user = validation.user;
+    const sheet = getSheet('CRM_Interactions');
+
+    // Add header row if sheet is empty
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['InteractionId', 'LeadId', 'Timestamp', 'ExecutiveName', 'Mode', 'Notes']);
+    }
+
+    const timestamp = new Date();
+    const interactionId = 'INT' + timestamp.getTime();
+
+    sheet.appendRow([
+      interactionId,
+      leadId,
+      timestamp,
+      user.name,
+      mode || 'Call',
+      notes || ''
+    ]);
+
+    // Update LastContactDate and UpdatedDate on the lead
+    const leadsSheet = getSheet('CRM_Leads');
+    const data = leadsSheet.getDataRange().getValues();
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][0] === leadId) {
+        leadsSheet.getRange(i + 1, 12).setValue(timestamp); // Last Contact
+        leadsSheet.getRange(i + 1, 16).setValue(timestamp); // Updated Date
+        break;
+      }
+    }
+
+    SpreadsheetApp.flush();
+    return { success: true, message: 'Interaction logged' };
+
+  } catch (error) {
+    Logger.log('Error in logCRMInteraction: ' + error.toString());
+    return { success: false, message: 'Error logging interaction: ' + error.toString() };
+  }
+}
+
+/**
+ * Get all interactions for a lead
+ */
+function getCRMInteractions(sessionId, leadId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const sheet = getSheet('CRM_Interactions');
+    if (sheet.getLastRow() <= 1) {
+      return { success: true, interactions: [] };
+    }
+
+    const data = sheet.getDataRange().getValues();
+    const interactions = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (String(row[1]) === String(leadId)) {
+        interactions.push({
+          interactionId: row[0],
+          timestamp: Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm'),
+          executiveName: row[3],
+          mode: row[4],
+          notes: row[5]
+        });
+      }
+    }
+
+    interactions.reverse(); // Newest first
+    return { success: true, interactions: interactions };
+
+  } catch (error) {
+    Logger.log('Error in getCRMInteractions: ' + error.toString());
+    return { success: false, message: 'Error loading interactions: ' + error.toString() };
+  }
+}
+
+/**
+ * Get CRM Analytics — source conversion + executive performance (admin only)
+ */
+function getCRMAnalytics(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const user = validation.user;
+    if (user.role !== 'admin') {
+      return { success: false, message: 'Access denied. Admin only.' };
+    }
+
+    const sheet = getSheet('CRM_Leads');
+    const data = sheet.getDataRange().getValues();
+
+    const sourceStats = {};
+    const execStats = {};
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const source = row[6] || 'Unknown';
+      const status = row[7] || '';
+      const assignedTo = row[8] || '';
+
+      // Source stats (all leads including unassigned)
+      if (!sourceStats[source]) sourceStats[source] = { total: 0, converted: 0, lost: 0, active: 0 };
+      sourceStats[source].total++;
+      if (status === 'Converted') sourceStats[source].converted++;
+      else if (status === 'Lost') sourceStats[source].lost++;
+      else if (status) sourceStats[source].active++;
+
+      // Exec stats (assigned leads only)
+      if (assignedTo && status) {
+        if (!execStats[assignedTo]) execStats[assignedTo] = { total: 0, converted: 0, lost: 0, active: 0, hotLeads: 0 };
+        execStats[assignedTo].total++;
+        if (status === 'Converted') execStats[assignedTo].converted++;
+        else if (status === 'Lost') execStats[assignedTo].lost++;
+        else if (status === 'Hot Lead') execStats[assignedTo].hotLeads++;
+        else execStats[assignedTo].active++;
+      }
+    }
+
+    var sourceArray = Object.keys(sourceStats).map(function(src) {
+      var s = sourceStats[src];
+      return { source: src, total: s.total, converted: s.converted, lost: s.lost, active: s.active,
+               convRate: s.total > 0 ? Math.round((s.converted / s.total) * 100) : 0 };
+    }).sort(function(a, b) { return b.total - a.total; });
+
+    var execArray = Object.keys(execStats).map(function(exec) {
+      var e = execStats[exec];
+      return { executive: exec, total: e.total, converted: e.converted, lost: e.lost,
+               active: e.active, hotLeads: e.hotLeads,
+               convRate: e.total > 0 ? Math.round((e.converted / e.total) * 100) : 0 };
+    }).sort(function(a, b) { return b.converted - a.converted; });
+
+    return { success: true, analytics: { sourceStats: sourceArray, execStats: execArray } };
+
+  } catch (error) {
+    Logger.log('Error in getCRMAnalytics: ' + error.toString());
+    return { success: false, message: 'Error loading analytics: ' + error.toString() };
+  }
+}
+
+/**
+ * Get next sequential quotation number
+ */
+function getNextQuotationNumber(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const sheet = getSheet('CRM_Quotations');
+
+    // Add header if sheet is new
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
+    }
+
+    // Sequential number based on row count (rows after header = quote count)
+    const nextNum = sheet.getLastRow(); // header = row 1, first quote = row 2 = num 1
+    const num = String(nextNum).padStart(4, '0');
+    const dateStr = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MMM-yyyy');
+    const quotNo = 'VA/' + dateStr + '/' + num;
+
+    return { success: true, quotNo: quotNo };
+
+  } catch (error) {
+    Logger.log('Error in getNextQuotationNumber: ' + error.toString());
+    return { success: false, message: 'Error generating quotation number: ' + error.toString() };
+  }
+}
+
+/**
+ * Save a generated quotation record
+ */
+function saveCRMQuotation(sessionId, data) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const user = validation.user;
+    const sheet = getSheet('CRM_Quotations');
+
+    if (sheet.getLastRow() === 0) {
+      sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
+    }
+
+    sheet.appendRow([
+      data.quotNo || '',
+      new Date(),
+      data.leadId || '',
+      data.customerName || '',
+      data.model || '',
+      data.variant || '',
+      data.total || 0,
+      user.name
+    ]);
+
+    SpreadsheetApp.flush();
+    return { success: true };
+
+  } catch (error) {
+    Logger.log('Error in saveCRMQuotation: ' + error.toString());
+    return { success: false, message: 'Error saving quotation: ' + error.toString() };
   }
 }
 
