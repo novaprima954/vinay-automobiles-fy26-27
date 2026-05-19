@@ -337,13 +337,14 @@ async function generateQuotation() {
       const crmNote     = document.getElementById('crmNote').value.trim();
       try {
         const addRes = await API.addLead({
-          customerName: custName,
-          mobileNo:     mobile,
-          address:      [address, district].filter(Boolean).join(', '),
+          customerName:    custName,
+          mobileNo:        mobile,
+          address:         [address, district].filter(Boolean).join(', '),
           interestedModel: model,
-          status:       crmStatus,
-          leadSource:   crmSource,
-          nextFollowupDate: crmFollowUp
+          status:          crmStatus,
+          leadSource:      crmSource,
+          nextFollowupDate: crmFollowUp,
+          assignedTo:      currentUser ? currentUser.name : ''
         });
         if (addRes.success) {
           leadId = addRes.leadId;
@@ -419,7 +420,7 @@ function buildQuotationHTML(d) {
         <div class="quot-box-body">
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
-          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Mandatory Accessories:</strong> ${getMandatoryAccDescription(d.model)}</div>` : ''}
+          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Standard Accessories:</strong> ${getMandatoryAccDescription(d.model)}</div>` : ''}
           ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}</div>` : ''}
         </div>
       </div>
@@ -433,9 +434,9 @@ function buildQuotationHTML(d) {
             <thead><tr><th>Type</th><th>Amount (Rs.)</th></tr></thead>
             <tbody>
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
-              ${d.insurance > 0 ? `<tr><td>Insurance (1st yr Comp. + 4 Yrs TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
+              ${d.insurance > 0 ? `<tr><td>Insurance (1Y PA, 1Y OD, 5Y TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
-              ${mandAcc > 0 ? `<tr><td>Mandatory Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
+              ${mandAcc > 0 ? `<tr><td>Standard Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>A. Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `

@@ -284,17 +284,13 @@ async function loadMyLeads() {
 }
 
 function updateStatusCounts(leads) {
-  const counts = { all: leads.length, 'Hot Lead': 0, 'New': 0, 'Interested': 0,
-                   'Negotiating': 0, 'Contacted': 0, 'Cold Lead': 0, 'Lost': 0 };
+  const counts = { all: leads.length, 'Hot': 0, 'Contacted': 0, 'Interested': 0, 'Lost': 0 };
   leads.forEach(function(l) { if (counts[l.status] !== undefined) counts[l.status]++; });
 
   document.getElementById('cnt_all').textContent        = counts['all'];
-  document.getElementById('cnt_hot').textContent        = counts['Hot Lead'];
-  document.getElementById('cnt_new').textContent        = counts['New'];
-  document.getElementById('cnt_interested').textContent = counts['Interested'];
-  document.getElementById('cnt_negotiating').textContent= counts['Negotiating'];
+  document.getElementById('cnt_hot').textContent        = counts['Hot'];
   document.getElementById('cnt_contacted').textContent  = counts['Contacted'];
-  document.getElementById('cnt_cold').textContent       = counts['Cold Lead'];
+  document.getElementById('cnt_interested').textContent = counts['Interested'];
   document.getElementById('cnt_lost').textContent       = counts['Lost'];
   // Also update Lost count in Follow-ups tab
   document.getElementById('fc_lost').textContent        = counts['Lost'];
@@ -342,21 +338,19 @@ function createMyLeadCard(lead) {
 
   // Status class
   const statusClassMap = {
-    'Hot Lead': 'hot', 'New': 'new', 'Lost': 'lost', 'Converted': 'converted'
+    'Hot': 'hot', 'Lost': 'lost', 'Converted': 'converted'
   };
   const statusClass = statusClassMap[lead.status] || '';
   card.className = 'lead-card ' + statusClass;
 
   // Status pill
   const pillClassMap = {
-    'Hot Lead': 'pill-hot', 'New': 'pill-new', 'Interested': 'pill-interested',
-    'Negotiating': 'pill-negotiating', 'Contacted': 'pill-contacted',
-    'Cold Lead': 'pill-cold', 'Lost': 'pill-lost', 'Converted': 'pill-converted'
+    'Hot': 'pill-hot', 'Interested': 'pill-interested',
+    'Contacted': 'pill-contacted', 'Lost': 'pill-lost', 'Converted': 'pill-converted'
   };
-  const pillClass = pillClassMap[lead.status] || 'pill-new';
+  const pillClass = pillClassMap[lead.status] || 'pill-contacted';
   const statusEmojiMap = {
-    'Hot Lead': '🔥', 'New': '🆕', 'Interested': '👀', 'Negotiating': '💬',
-    'Contacted': '📞', 'Cold Lead': '❄️', 'Lost': '❌', 'Converted': '✅'
+    'Hot': '🔥', 'Interested': '👀', 'Contacted': '📞', 'Lost': '❌', 'Converted': '✅'
   };
   const statusEmoji = statusEmojiMap[lead.status] || '📊';
 
@@ -665,10 +659,9 @@ function renderSearchResults(leads, quotation) {
 
   leads.forEach(function(lead) {
     const statusColors = {
-      'Hot Lead': '#fff3e0::#e65100', 'New': '#e3f2fd::#1565c0',
-      'Interested': '#e8f5e9::#2e7d32', 'Negotiating': '#f3e5f5::#6a1b9a',
-      'Contacted': '#fce4ec::#880e4f', 'Cold Lead': '#eceff1::#546e7a',
-      'Lost': '#ffebee::#c62828', 'Converted': '#e8f5e9::#2e7d32'
+      'Hot': '#fff3e0::#e65100', 'Interested': '#e8f5e9::#2e7d32',
+      'Contacted': '#fce4ec::#880e4f', 'Lost': '#ffebee::#c62828',
+      'Converted': '#e8f5e9::#2e7d32'
     };
     const [bg, fg] = (statusColors[lead.status] || '#f5f5f5::#333').split('::');
 

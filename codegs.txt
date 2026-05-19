@@ -1920,7 +1920,7 @@ function getCRMDashboard(sessionId) {
         totalLeads++;
 
         if (status === 'New') myNew++;
-        if (status === 'Hot Lead') myHot++;
+        if (status === 'Hot') myHot++;
         if (status === 'Converted') converted++;
 
         // Check follow-up dates
@@ -2225,22 +2225,22 @@ function addLead(sessionId, data) {
     const now = new Date();
     
     const rowData = [
-      leadId,                           // A: Lead ID
-      data.customerName || '',          // B: Customer Name
-      data.mobileNo || '',              // C: Mobile No
-      data.email || '',                 // D: Email
-      data.address || '',               // E: Address
-      data.model || '',                 // F: Interested Model
-      data.source || '',                // G: Lead Source
-      '',                               // H: Status (blank for available)
-      '',                               // I: Assigned To (blank for available)
-      data.expectedDate || '',          // J: Expected Purchase Date
-      data.notes || '',                 // K: Notes
-      '',                               // L: Last Contact Date
-      '',                               // M: Next Follow-up Date
-      now,                              // N: Created Date
-      user.name,                        // O: Created By
-      now                               // P: Updated Date
+      leadId,                                       // A: Lead ID
+      data.customerName || '',                      // B: Customer Name
+      data.mobileNo || '',                          // C: Mobile No
+      data.email || '',                             // D: Email
+      data.address || '',                           // E: Address
+      data.interestedModel || data.model || '',     // F: Interested Model
+      data.leadSource || data.source || '',         // G: Lead Source
+      data.status || '',                            // H: Status
+      data.assignedTo || '',                        // I: Assigned To
+      data.expectedDate || '',                      // J: Expected Purchase Date
+      data.notes || '',                             // K: Notes
+      '',                                           // L: Last Contact Date
+      data.nextFollowupDate || '',                  // M: Next Follow-up Date
+      now,                                          // N: Created Date
+      user.name,                                    // O: Created By
+      now                                           // P: Updated Date
     ];
     
     sheet.appendRow(rowData);
@@ -2692,7 +2692,7 @@ function getCRMAnalytics(sessionId) {
         execStats[assignedTo].total++;
         if (status === 'Converted') execStats[assignedTo].converted++;
         else if (status === 'Lost') execStats[assignedTo].lost++;
-        else if (status === 'Hot Lead') execStats[assignedTo].hotLeads++;
+        else if (status === 'Hot') execStats[assignedTo].hotLeads++;
         else execStats[assignedTo].active++;
 
         // Check overdue (past follow-up date, not Converted/Lost)
@@ -2784,25 +2784,15 @@ function findLeadByMobile(sessionId, mobile) {
 }
 
 /**
- * Get random quotation number VA/XXXXXX (6-digit random)
+ * Get random quotation number VA/XXXX (4-digit random)
  */
 function getNextQuotationNumber(sessionId) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) return validation;
 
-    const sheet = getSheet('CRM_Quotations');
-
-    // Add header if sheet is new
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
-    }
-
-    // Random 4-digit number
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const quotNo = 'VA/' + randomNum;
-
-    return { success: true, quotNo: quotNo };
+    return { success: true, quotNo: 'VA/' + randomNum };
 
   } catch (error) {
     Logger.log('Error in getNextQuotationNumber: ' + error.toString());
@@ -2818,25 +2808,21 @@ function saveCRMQuotation(sessionId, data) {
     const validation = validateSession(sessionId);
     if (!validation.success) return validation;
 
-    const user = validation.user;
-    const sheet = getSheet('CRM_Quotations');
-
-    if (sheet.getLastRow() === 0) {
-      sheet.appendRow(['QuotNo', 'Date', 'LeadId', 'CustomerName', 'Model', 'Variant', 'Total', 'GeneratedBy']);
+    // Store quotation data in CRM_Leads row (columns R=18, S=19, T=20)
+    if (data.leadId) {
+      const sheet = getSheet('CRM_Leads');
+      const allData = sheet.getDataRange().getValues();
+      for (let i = 1; i < allData.length; i++) {
+        if (allData[i][0] === data.leadId) {
+          sheet.getRange(i + 1, 18).setValue(data.quotNo || '');
+          sheet.getRange(i + 1, 19).setValue(new Date());
+          sheet.getRange(i + 1, 20).setValue(data.total || 0);
+          break;
+        }
+      }
+      SpreadsheetApp.flush();
     }
 
-    sheet.appendRow([
-      data.quotNo || '',
-      new Date(),
-      data.leadId || '',
-      data.customerName || '',
-      data.model || '',
-      data.variant || '',
-      data.total || 0,
-      user.name
-    ]);
-
-    SpreadsheetApp.flush();
     return { success: true };
 
   } catch (error) {
@@ -2880,32 +2866,16 @@ function searchCRMLeads(sessionId, query) {
       }
     }
 
-    // Also search quotations (by quotNo or customer name)
+    // Also search by quotation number stored in CRM_Leads column R (index 17)
     let quotResult = null;
-    try {
-      const quotSheet = getSheet('CRM_Quotations');
-      if (quotSheet.getLastRow() > 1) {
-        const quotData = quotSheet.getDataRange().getValues();
-        for (let i = 1; i < quotData.length; i++) {
-          const row = quotData[i];
-          const quotNo = String(row[0] || '').toLowerCase();
-          const qCust  = String(row[3] || '').toLowerCase();
-          if (quotNo.includes(q) || qCust.includes(q)) {
-            quotResult = {
-              quotNo:       row[0],
-              date:         row[1] ? Utilities.formatDate(new Date(row[1]), 'Asia/Kolkata', 'dd-MMM-yyyy') : '',
-              leadId:       row[2],
-              customerName: row[3],
-              model:        row[4],
-              variant:      row[5],
-              total:        row[6],
-              generatedBy:  row[7]
-            };
-            break;
-          }
-        }
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const quotNo = String(row[17] || '').toLowerCase();
+      if (quotNo && quotNo.includes(q)) {
+        quotResult = { quotNo: row[17], leadId: row[0], customerName: row[1], model: row[5] };
+        break;
       }
-    } catch(qe) {}
+    }
 
     return { success: true, leads: results, quotation: quotResult };
 
@@ -3729,7 +3699,7 @@ function getAdminDashboard(sessionId, dateFilter) {
     for (let i = 1; i < crmData.length; i++) {
       const status = crmData[i][7];
       if (status === 'New') newLeads++;
-      if (status === 'Hot Lead') hotLeads++;
+      if (status === 'Hot') hotLeads++;
       if (status === 'Converted') convertedLeads++;
     }
     

@@ -85,10 +85,11 @@ function displayLeadDetails(lead) {
   displayStatusBanner(lead.status);
 
   // Convert button
-  document.getElementById('btnConvert').style.display = lead.status === 'Hot Lead' ? 'block' : 'none';
+  document.getElementById('btnConvert').style.display = lead.status === 'Hot' ? 'block' : 'none';
 
-  // Clear update note field on reload
-  document.getElementById('notes').value = '';
+  // Reset note fields on reload
+  document.getElementById('noteType').value = '';
+  document.getElementById('noteOtherGroup').style.display = 'none';
 }
 
 function displayAging(lead) {
@@ -131,13 +132,11 @@ function displayStatusBanner(status) {
   if (!status) { banner.style.display = 'none'; return; }
 
   const classMap = {
-    'Hot Lead': 'hot', 'New': 'new', 'Interested': 'interested',
-    'Negotiating': 'negotiating', 'Contacted': 'contacted',
-    'Cold Lead': 'cold', 'Lost': 'lost', 'Converted': 'converted'
+    'Hot': 'hot', 'Interested': 'interested',
+    'Contacted': 'contacted', 'Lost': 'lost', 'Converted': 'converted'
   };
   const emojiMap = {
-    'Hot Lead': '🔥', 'New': '🆕', 'Interested': '👀', 'Negotiating': '💬',
-    'Contacted': '📞', 'Cold Lead': '❄️', 'Lost': '❌', 'Converted': '✅'
+    'Hot': '🔥', 'Interested': '👀', 'Contacted': '📞', 'Lost': '❌', 'Converted': '✅'
   };
 
   banner.className = 'status-banner ' + (classMap[status] || '');
@@ -157,10 +156,14 @@ function onStatusChange() {
 
   lostGroup.style.display = (status === 'Lost') ? 'block' : 'none';
 
-  // Follow-up date is not required for Cold Lead or Lost
   if (followUpReq) {
-    followUpReq.style.display = (status === 'Cold Lead' || status === 'Lost') ? 'none' : 'inline';
+    followUpReq.style.display = (status === 'Lost') ? 'none' : 'inline';
   }
+}
+
+function onNoteTypeChange() {
+  const val = document.getElementById('noteType').value;
+  document.getElementById('noteOtherGroup').style.display = (val === 'Other') ? 'block' : 'none';
 }
 
 // ── UPDATE FORM ────────────────────────────
@@ -170,7 +173,8 @@ async function handleUpdate(e) {
 
   const status     = document.getElementById('status').value;
   const followUpDate = document.getElementById('followUpDate').value;
-  const updateNote = document.getElementById('notes').value.trim();
+  const noteType   = document.getElementById('noteType').value;
+  const noteOther  = (document.getElementById('noteOther').value || '').trim();
 
   // Validate lost reason if Lost
   if (status === 'Lost' && !document.getElementById('lostReason').value) {
@@ -178,19 +182,26 @@ async function handleUpdate(e) {
     return;
   }
 
-  // Follow-up date mandatory for all except Cold Lead and Lost
-  if (status !== 'Cold Lead' && status !== 'Lost' && !followUpDate) {
+  // Follow-up date mandatory for all except Lost
+  if (status !== 'Lost' && !followUpDate) {
     showMessage('Next follow-up date is required for this status', 'error');
     document.getElementById('followUpDate').focus();
     return;
   }
 
-  // Update note is always mandatory
-  if (!updateNote) {
-    showMessage('Please enter an update note before saving', 'error');
-    document.getElementById('notes').focus();
+  // Note dropdown mandatory
+  if (!noteType) {
+    showMessage('Please select an update note', 'error');
+    document.getElementById('noteType').focus();
     return;
   }
+  if (noteType === 'Other' && !noteOther) {
+    showMessage('Please describe the interaction', 'error');
+    document.getElementById('noteOther').focus();
+    return;
+  }
+
+  const updateNote = noteType === 'Other' ? noteOther : noteType;
 
   const data = {
     status:       status,

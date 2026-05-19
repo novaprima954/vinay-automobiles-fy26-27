@@ -524,12 +524,9 @@
   <div id="myLeadsTab" class="tab-content">
     <div class="filter-row" id="statusFilterRow">
       <div class="filter-chip active" data-status="all" onclick="filterMyLeads('all', this)">All <span class="chip-count" id="cnt_all">0</span></div>
-      <div class="filter-chip" data-status="Hot Lead" onclick="filterMyLeads('Hot Lead', this)">🔥 Hot <span class="chip-count" id="cnt_hot">0</span></div>
-      <div class="filter-chip" data-status="New" onclick="filterMyLeads('New', this)">🆕 New <span class="chip-count" id="cnt_new">0</span></div>
-      <div class="filter-chip" data-status="Interested" onclick="filterMyLeads('Interested', this)">👀 Interested <span class="chip-count" id="cnt_interested">0</span></div>
-      <div class="filter-chip" data-status="Negotiating" onclick="filterMyLeads('Negotiating', this)">💬 Nego. <span class="chip-count" id="cnt_negotiating">0</span></div>
+      <div class="filter-chip" data-status="Hot" onclick="filterMyLeads('Hot', this)">🔥 Hot <span class="chip-count" id="cnt_hot">0</span></div>
       <div class="filter-chip" data-status="Contacted" onclick="filterMyLeads('Contacted', this)">📞 Contacted <span class="chip-count" id="cnt_contacted">0</span></div>
-      <div class="filter-chip" data-status="Cold Lead" onclick="filterMyLeads('Cold Lead', this)">❄️ Cold <span class="chip-count" id="cnt_cold">0</span></div>
+      <div class="filter-chip" data-status="Interested" onclick="filterMyLeads('Interested', this)">👀 Interested <span class="chip-count" id="cnt_interested">0</span></div>
       <div class="filter-chip" data-status="Lost" onclick="filterMyLeads('Lost', this)">❌ Lost <span class="chip-count" id="cnt_lost">0</span></div>
     </div>
     <div class="loading" id="myLeadsLoading" style="padding-top:30px; display:none;">

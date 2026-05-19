@@ -303,12 +303,9 @@
           <label class="form-label">Status</label>
           <select id="status" class="form-select" onchange="onStatusChange()">
             <option value="">-- Select --</option>
-            <option value="New">🆕 New</option>
             <option value="Contacted">📞 Contacted</option>
+            <option value="Hot">🔥 Hot</option>
             <option value="Interested">👀 Interested</option>
-            <option value="Negotiating">💬 Negotiating</option>
-            <option value="Hot Lead">🔥 Hot Lead</option>
-            <option value="Cold Lead">❄️ Cold Lead</option>
             <option value="Lost">❌ Lost</option>
           </select>
         </div>
@@ -339,7 +336,19 @@
 
         <div class="form-group">
           <label class="form-label">Update Note <span style="color:red;">*</span></label>
-          <textarea id="notes" class="form-textarea" placeholder="What happened? What was discussed? (required)"></textarea>
+          <select id="noteType" class="form-select" onchange="onNoteTypeChange()">
+            <option value="">-- Select outcome --</option>
+            <option value="Customer will visit showroom">Customer will visit showroom</option>
+            <option value="Already purchased">Already purchased</option>
+            <option value="Call not received">Call not received</option>
+            <option value="Enquiry not created">Enquiry not created</option>
+            <option value="Lost">Lost</option>
+            <option value="Wrong No">Wrong No</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="form-group" id="noteOtherGroup" style="display:none;">
+          <textarea id="noteOther" class="form-textarea" placeholder="Describe the interaction... (required)"></textarea>
         </div>
 
         <button type="submit" class="btn-update" id="btnUpdate">💾 Save Changes</button>
