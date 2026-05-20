@@ -13,6 +13,7 @@ let activeIssueType = 'issue';
 let currentFieldTab = 'Category';
 let issueSkuRowCount = 0;
 let otcSkuRowCount = 0;
+let adSkuRowCount = 0;
 let returnSkuRowCount = 0;
 let currentBooking = null;
 let bookingSearchResults = [];
@@ -49,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   // Set today's date on date fields
   const today = new Date().toISOString().split('T')[0];
-  ['siDate', 'otcDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo'].forEach(id => {
+  ['siDate', 'otcDate', 'adDate', 'issueDeliveryDate', 'returnDate', 'histFrom', 'histTo'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = today;
   });
@@ -158,7 +159,7 @@ function populateLocationDropdowns() {
   const locOptions = invLocations.map(l =>
     `<option value="${l.locationId}">${l.name}</option>`
   ).join('');
-  ['siLocation', 'trFrom', 'trTo', 'otcLocation', 'returnToLocation',
+  ['siLocation', 'trFrom', 'trTo', 'otcLocation', 'adLocation', 'returnToLocation',
    'dashLocationFilter', 'histLocation'].forEach(id => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -183,6 +184,7 @@ function showTab(name) {
   if (name === 'history') loadHistory();
   if (name === 'masters') renderMasters();
   if (name === 'dashboard') renderDashboard();
+  if (name === 'adacc') { document.getElementById('adaccTab').classList.add('active'); loadADAccessories(); }
 }
 
 // ==========================================
@@ -370,9 +372,12 @@ function setIssueType(type) {
   activeIssueType = type;
   document.getElementById('toggleIssue').classList.toggle('active', type === 'issue');
   document.getElementById('toggleOtc').classList.toggle('active', type === 'otc');
+  document.getElementById('toggleAd').classList.toggle('active', type === 'ad');
   document.getElementById('issueBookingForm').style.display = type === 'issue' ? '' : 'none';
   document.getElementById('otcSaleForm').style.display = type === 'otc' ? '' : 'none';
+  document.getElementById('adSaleForm').style.display = type === 'ad' ? '' : 'none';
   if (type === 'otc' && document.getElementById('otcSkuList').children.length === 0) addOtcSkuRow();
+  if (type === 'ad' && document.getElementById('adSkuList').children.length === 0) addAdSkuRow();
 }
 
 function onIssueSearchTypeChange() {
@@ -661,6 +666,76 @@ async function submitOtcSale() {
     addOtcSkuRow();
   } else {
     showMessage(res.message || 'OTC sale failed', 'error');
+  }
+}
+
+// ==========================================
+// AD SALE
+// ==========================================
+
+function addAdSkuRow() {
+  const id = ++adSkuRowCount;
+  const dlId  = 'inv-sku-dl-ad-'  + id;
+  const valId = 'inv-sku-val-ad-' + id;
+  const row = document.createElement('div');
+  row.className = 'sku-issue-item';
+  row.id = 'ad-row-' + id;
+  row.innerHTML = `
+    <div>
+      <label>Accessory</label>
+      <input type="text" list="${dlId}" placeholder="Search SKU…"
+        style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px; box-sizing:border-box;"
+        oninput="resolveSkuFromSearch(this,'${dlId}','${valId}')">
+      <datalist id="${dlId}">${buildSkuDatalistOptions()}</datalist>
+      <input type="hidden" id="${valId}" data-role="sku">
+    </div>
+    <div>
+      <label>Qty</label>
+      <input type="number" min="1" value="1" style="width:100%; padding:8px; border:2px solid #ddd; border-radius:6px; font-size:13px;">
+    </div>
+    <div></div>
+    <button class="btn-remove-sku" onclick="document.getElementById('ad-row-${id}').remove()">✕</button>
+  `;
+  document.getElementById('adSkuList').appendChild(row);
+}
+
+async function submitAdSale() {
+  const adName    = document.getElementById('adName').value.trim();
+  const invoiceNo = document.getElementById('adInvoiceNo').value.trim();
+  const amount    = document.getElementById('adAmount').value;
+  const locationId = document.getElementById('adLocation').value;
+  const items     = collectSkuRows('adSkuList');
+
+  if (!adName || !locationId || items.length === 0) {
+    showMessage('Select AD Name, Location, and add at least one item', 'error'); return;
+  }
+
+  showLoading(true);
+  const res = await API.inventoryCall('invAdSale', {
+    sessionId: invSessionId,
+    adName,
+    busyInvoiceNo: invoiceNo,
+    saleAmount: amount,
+    date: document.getElementById('adDate').value,
+    locationId,
+    items: JSON.stringify(items),
+    remarks: document.getElementById('adRemarks').value
+  });
+  showLoading(false);
+
+  if (res.success) {
+    showMessage('AD sale recorded', 'success');
+    await loadStock();
+    renderDashboard();
+    document.getElementById('adName').value = '';
+    ['adInvoiceNo', 'adAmount', 'adRemarks'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('adSkuList').innerHTML = '';
+    adSkuRowCount = 0;
+    addAdSkuRow();
+  } else {
+    showMessage(res.message || 'AD sale failed', 'error');
   }
 }
 
@@ -1017,3 +1092,95 @@ function goBack() {
 }
 
 function onSkuChange(prefix) { /* placeholder for future use */ }
+
+// ==========================================
+// AD ACCESSORIES CALCULATOR
+// ==========================================
+
+async function loadADAccessories() {
+  const monthEl = document.getElementById('adaccMonth');
+  const content = document.getElementById('adaccContent');
+
+  const monthVal = monthEl.value; // e.g. "2026-05"
+  const dateFilter = monthVal ? 'month:' + monthVal : 'all';
+
+  content.innerHTML = '<div class="loading" style="padding:30px; text-align:center;"><div class="spinner"></div><div style="margin-top:8px; color:#666;">Loading...</div></div>';
+
+  try {
+    const res = await API.inventoryCall('getADAccessoryStats', { sessionId: invSessionId, dateFilter });
+    if (!res.success) {
+      content.innerHTML = '<div style="padding:20px; color:#dc3545;">' + (res.message || 'Error loading data') + '</div>';
+      return;
+    }
+    renderADAccessories(res.stats, monthVal);
+  } catch(e) {
+    content.innerHTML = '<div style="padding:20px; color:#dc3545;">Error: ' + e.message + '</div>';
+  }
+}
+
+function renderADAccessories(stats, monthVal) {
+  const content = document.getElementById('adaccContent');
+  if (!stats || stats.length === 0) {
+    content.innerHTML = '<div style="padding:40px; text-align:center; color:#999; font-size:14px;">No AD sale data found for this period.</div>';
+    return;
+  }
+
+  let html = '';
+  stats.forEach(function(ad) {
+    html += `
+      <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:20px; overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-weight:700; font-size:15px;">🏪 ${escHtml(ad.adName)}</span>
+          <span style="font-size:13px; opacity:0.9;">${ad.totalVehicles} vehicle${ad.totalVehicles !== 1 ? 's' : ''} sold</span>
+        </div>`;
+
+    ad.models.forEach(function(m) {
+      html += `
+        <div style="padding:14px 18px; border-bottom:1px solid #f0f0f0;">
+          <div style="font-weight:700; font-size:13px; color:#333; margin-bottom:10px;">
+            🚗 ${escHtml(m.model)}
+            <span style="font-weight:400; color:#666; font-size:12px; margin-left:8px;">${m.vehiclesSold} sold</span>
+          </div>`;
+
+      if (m.accessories.length === 0) {
+        html += '<div style="color:#aaa; font-size:12px; padding-left:8px;">No accessories recorded</div>';
+      } else {
+        html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12px;">';
+        html += '<thead><tr style="background:#f8f9ff;">'
+          + '<th style="padding:7px 10px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Accessory</th>'
+          + '<th style="padding:7px 10px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Qty</th>'
+          + '<th style="padding:7px 10px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Attachment %</th>'
+          + '</tr></thead><tbody>';
+
+        m.accessories.forEach(function(acc) {
+          const pctDisplay = acc.pct !== null ? acc.pct + '%' : '—';
+          const pctColor = acc.pct === null ? '#aaa' : acc.pct >= 80 ? '#28a745' : acc.pct >= 50 ? '#fd7e14' : '#dc3545';
+          const barWidth = acc.pct !== null ? Math.min(acc.pct, 100) : 0;
+          html += `<tr style="border-bottom:1px solid #f5f5f5;">
+            <td style="padding:7px 10px; color:#333;">${escHtml(acc.name)}</td>
+            <td style="padding:7px 10px; text-align:center; font-weight:600;">${acc.qty}</td>
+            <td style="padding:7px 10px; text-align:center;">
+              <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
+                <div style="width:60px; height:6px; background:#eee; border-radius:3px; overflow:hidden;">
+                  <div style="width:${barWidth}%; height:100%; background:${pctColor}; border-radius:3px;"></div>
+                </div>
+                <span style="font-weight:700; color:${pctColor}; min-width:36px;">${pctDisplay}</span>
+              </div>
+            </td>
+          </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+      }
+      html += '</div>';
+    });
+
+    html += '</div>';
+  });
+
+  content.innerHTML = html;
+}
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
