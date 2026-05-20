@@ -266,6 +266,7 @@
         <button class="inv-tab" onclick="showTab('returns')">↩ Returns</button>
         <button class="inv-tab" onclick="showTab('history')">📋 History</button>
         <button class="inv-tab" onclick="showTab('reports')">📈 Reports</button>
+        <button class="inv-tab" id="adaccTab" onclick="showTab('adacc')">📋 AD Accessories</button>
         <button class="inv-tab" id="mastersTab" onclick="showTab('masters')" style="display:none;">⚙️ Masters</button>
       </div>
 
@@ -707,6 +708,24 @@
             </tbody>
             <tfoot id="reportTfoot"></tfoot>
           </table>
+        </div>
+      </div>
+
+      <!-- ===== AD ACCESSORIES CALCULATOR ===== -->
+      <div id="panel-adacc" class="inv-panel">
+        <h3>📋 AD Accessories Calculator</h3>
+        <div class="filter-row">
+          <div class="form-group">
+            <label>Month</label>
+            <input type="month" id="adaccMonth" onchange="loadADAccessories()">
+          </div>
+          <div class="form-group">
+            <label>&nbsp;</label>
+            <button class="btn-secondary" onclick="loadADAccessories()">🔄 Refresh</button>
+          </div>
+        </div>
+        <div id="adaccContent">
+          <div style="padding:40px; text-align:center; color:#999; font-size:14px;">Select a month and click Refresh to load data.</div>
         </div>
       </div>
 
