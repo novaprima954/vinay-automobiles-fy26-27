@@ -16,35 +16,45 @@ const API = {
       const isTooLarge = JSON.stringify(params).length > 1000;
       
       const usePost = hasBase64 || hasData || hasArrayParam || isTooLarge;
-      
+      // Use JSON body when payload has pdfBase64 (too large for form-encoding)
+      const useJsonBody = !!params.pdfBase64;
+
       let response;
-      
+
       if (usePost) {
         // POST request for large data
         console.log('API Call (POST):', action, Object.keys(params));
-        console.log('POST reason:', { hasBase64, hasData, hasArrayParam, isTooLarge });
-        
-        const formData = new URLSearchParams();
-        formData.append('action', action);
-        
-        for (const [key, value] of Object.entries(params)) {
-          if (value !== null && value !== undefined) {
-            if (typeof value === 'object') {
-              formData.append(key, JSON.stringify(value));
-            } else {
-              formData.append(key, value);
+        console.log('POST reason:', { hasBase64, hasData, hasArrayParam, isTooLarge, useJsonBody });
+
+        if (useJsonBody) {
+          // Send as JSON body — handles large base64 payloads
+          response = await fetch(CONFIG.API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action, ...params }),
+            redirect: 'follow'
+          });
+        } else {
+          const formData = new URLSearchParams();
+          formData.append('action', action);
+
+          for (const [key, value] of Object.entries(params)) {
+            if (value !== null && value !== undefined) {
+              if (typeof value === 'object') {
+                formData.append(key, JSON.stringify(value));
+              } else {
+                formData.append(key, value);
+              }
             }
           }
+
+          response = await fetch(CONFIG.API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData.toString(),
+            redirect: 'follow'
+          });
         }
-        
-        response = await fetch(CONFIG.API_ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: formData.toString(),
-          redirect: 'follow'
-        });
         
       } else {
         // GET request for small data
