@@ -107,6 +107,12 @@
       color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
       cursor: pointer;
     }
+    .btn-wa {
+      width: 100%; padding: 13px; background: linear-gradient(135deg, #25D366, #128C7E);
+      color: white; border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+      cursor: pointer; margin-top: 8px;
+    }
+    .btn-wa:disabled { opacity: 0.6; cursor: not-allowed; }
     .btn-edit-quot {
       width: 100%; padding: 11px; background: #f0f0f0; color: #444;
       border: none; border-radius: 10px; font-size: 14px; font-weight: 700; cursor: pointer; margin-top: 8px;
@@ -438,6 +444,7 @@
         <button class="btn-save-pdf" onclick="savePDF()">💾 Save PDF</button>
         <button class="btn-print" onclick="window.print()">🖨️ Print PDF</button>
       </div>
+      <button class="btn-wa" id="btnSendWA" onclick="sendWhatsApp()">📲 Send on WhatsApp</button>
       <button id="btnOpenLead" style="display:none;width:100%;padding:13px;background:linear-gradient(135deg,#4CAF50,#388E3C);
         color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;"
         onclick="window.location.href='crm-detail.html?leadId='+leadId">

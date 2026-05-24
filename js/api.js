@@ -507,6 +507,17 @@ const API = {
     const sessionId = SessionManager.getSessionId();
     return await this.call('convertLeadToSale', { sessionId, leadId });
   },
+
+  /**
+   * Send quotation PDF via WhatsApp (AiSensy)
+   * Uploads PDF to Google Drive and sends via AiSensy API
+   */
+  async sendQuotationWhatsApp(pdfBase64, fileName, customerName, customerPhone, quotNo) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('sendQuotationWhatsApp', {
+      sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo
+    });
+  },
   
   /**
    * Get Dashboard Data

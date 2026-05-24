@@ -374,6 +374,26 @@ function editQuotation() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+async function _renderQuotPDF() {
+  // Shared PDF rendering — returns { pdf, custName, fileName }
+  const el = document.getElementById('quotContent');
+  const canvas = await html2canvas(el, { scale: 2, useCORS: true, logging: false, scrollY: 0 });
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const pdfW = 210, pdfH = 297;
+  const imgH = (canvas.height / canvas.width) * pdfW;
+  if (imgH <= pdfH) {
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW, imgH);
+  } else {
+    const scale = pdfH / imgH;
+    pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW * scale, pdfH);
+  }
+  const custName = (document.getElementById('custName').value || 'Customer')
+    .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
+  const fileName = 'Quotation_' + (lastQuotNo || custName) + '_' + custName + '.pdf';
+  return { pdf, custName, fileName };
+}
+
 async function savePDF() {
   if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
     window.print();
@@ -385,33 +405,8 @@ async function savePDF() {
   btn.textContent = '⏳ Generating...';
 
   try {
-    const el = document.getElementById('quotContent');
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      scrollY: 0
-    });
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-
-    const pdfW = 210;
-    const pdfH = 297;
-    const imgW = pdfW;
-    const imgH = (canvas.height / canvas.width) * pdfW;
-
-    // If content fits, place as-is; otherwise scale to page height
-    if (imgH <= pdfH) {
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW, imgH);
-    } else {
-      const scale = pdfH / imgH;
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, imgW * scale, pdfH);
-    }
-
-    const custName = (document.getElementById('custName').value || 'Customer')
-      .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-    pdf.save('Quotation_' + (lastQuotNo || custName) + '_' + custName + '.pdf');
+    const { pdf, fileName } = await _renderQuotPDF();
+    pdf.save(fileName);
 
   } catch (e) {
     showMessage('PDF generation failed, opening print dialog', 'error');
@@ -419,6 +414,46 @@ async function savePDF() {
   } finally {
     btn.disabled = false;
     btn.textContent = '💾 Save PDF';
+  }
+}
+
+async function sendWhatsApp() {
+  if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
+    showMessage('PDF library not loaded. Please refresh the page.', 'error');
+    return;
+  }
+
+  const phone = (document.getElementById('custMobile').value || '').replace(/\D/g, '');
+  if (!phone || phone.length < 10) {
+    showMessage('Customer mobile number is required to send on WhatsApp', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSendWA');
+  btn.disabled = true;
+  btn.textContent = '⏳ Sending...';
+
+  try {
+    // Generate PDF and convert to base64
+    const { pdf, fileName } = await _renderQuotPDF();
+    const base64 = pdf.output('datauristring').split(',')[1];
+
+    const customerName = document.getElementById('custName').value || 'Customer';
+
+    showMessage('📤 Uploading and sending...', 'info');
+
+    const response = await API.sendQuotationWhatsApp(base64, fileName, customerName, phone, lastQuotNo);
+
+    if (response.success) {
+      showMessage('✅ Quotation sent on WhatsApp successfully!', 'success');
+    } else {
+      showMessage('❌ ' + (response.message || 'Failed to send WhatsApp'), 'error');
+    }
+  } catch (e) {
+    showMessage('Error sending WhatsApp: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '📲 Send on WhatsApp';
   }
 }
 
