@@ -27,10 +27,11 @@ const API = {
         console.log('POST reason:', { hasBase64, hasData, hasArrayParam, isTooLarge, useJsonBody });
 
         if (useJsonBody) {
-          // Send as JSON body — handles large base64 payloads
+          // Send as text/plain with JSON body — avoids CORS preflight (application/json triggers OPTIONS)
+          // GAS reads this from e.postData.contents
           response = await fetch(CONFIG.API_ENDPOINT, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'text/plain' },
             body: JSON.stringify({ action, ...params }),
             redirect: 'follow'
           });
