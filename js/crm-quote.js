@@ -276,21 +276,25 @@ function recalculate() {
   const mandAcc    = Number(priceDetails.mandAccessories) || 0;
   const productTotal = exShowroom + insurance + rto + pdi + mandAcc;
   const discount   = Math.max(0, Number(document.getElementById('discount').value) || 0);
+  const financed   = document.getElementById('isFinanced') && document.getElementById('isFinanced').checked;
+  const financeCharge = financed ? 500 : 0;
 
   let accTotal = 0;
   document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
     accTotal += Number(cb.dataset.price) || 0;
   });
 
-  const grandTotal = Math.max(0, productTotal + accTotal - discount);
+  const grandTotal = Math.max(0, productTotal + accTotal + financeCharge - discount);
   document.getElementById('sumExShowroom').textContent = '₹' + fmt(exShowroom);
   document.getElementById('sumInsurance').textContent  = '₹' + fmt(insurance);
   document.getElementById('sumRto').textContent        = '₹' + fmt(rto);
   document.getElementById('sumPdi').textContent        = '₹' + fmt(pdi);
   const mandEl = document.getElementById('sumMandAcc');
   if (mandEl) { mandEl.textContent = '₹' + fmt(mandAcc); mandEl.closest('.summary-row').style.display = mandAcc > 0 ? 'flex' : 'none'; }
-  document.getElementById('sumAcc').textContent        = '₹' + fmt(accTotal);
-  document.getElementById('sumTotal').textContent      = '₹' + fmt(grandTotal);
+  document.getElementById('sumAcc').textContent = '₹' + fmt(accTotal);
+  const finEl = document.getElementById('sumFinance');
+  if (finEl) { finEl.style.display = financed ? '' : 'none'; }
+  document.getElementById('sumTotal').textContent = '₹' + fmt(grandTotal);
 }
 
 // ── GENERATE ────────────────────────────────
@@ -309,13 +313,15 @@ async function generateQuotation() {
   btn.disabled = true; btn.textContent = 'Generating...';
 
   try {
-    const qnRes  = await API.getNextQuotationNumber();
-    const quotNo = qnRes.success ? qnRes.quotNo : 'VA/' + fmtDateStr(new Date()) + '/0001';
+    // Random 4-digit quotation number
+    const quotNo = 'QT' + Math.floor(1000 + Math.random() * 9000);
 
     const color    = document.getElementById('vehicleColor').value.trim() || '-';
     const address  = document.getElementById('custAddress').value.trim();
     const district = document.getElementById('custDistrict').value.trim();
     const discount = Math.max(0, Number(document.getElementById('discount').value) || 0);
+    const financed = document.getElementById('isFinanced') && document.getElementById('isFinanced').checked;
+    const financeCharge = financed ? 500 : 0;
     const execName = currentUser ? currentUser.name : '';
 
     const exShowroom   = Number(priceDetails.exShowroom) || 0;
@@ -331,14 +337,14 @@ async function generateQuotation() {
       if (acc) selectedAcc.push({ label: acc.label, price: Number(cb.dataset.price) });
     });
     const accTotal   = selectedAcc.reduce(function(s, a) { return s + a.price; }, 0);
-    const grandTotal = Math.max(0, productTotal + accTotal - discount);
+    const grandTotal = Math.max(0, productTotal + accTotal + financeCharge - discount);
 
     lastQuotNo = quotNo;
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, address, district,
       model, variant, color, execName,
       exShowroom, insurance, rto, pdi, mandAcc, productTotal,
-      selectedAcc, accTotal, discount, grandTotal
+      selectedAcc, accTotal, financeCharge, discount, grandTotal
     });
 
     document.getElementById('quotContent').innerHTML = html;
@@ -515,7 +521,7 @@ function buildQuotationHTML(d) {
         <div class="quot-box-body">
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
-          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;font-weight:700;color:#222;"><strong>Standard Accessories:</strong> ${getMandatoryAccDescription(d.model)}</div>` : ''}
+          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:8px;padding:6px 10px;background:#fffde7;border:1.5px solid #f9a825;border-radius:5px;font-size:11px;font-weight:800;color:#333;">⭐ Standard Accessories: ${getMandatoryAccDescription(d.model)}</div>` : ''}
           ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}</div>` : ''}
         </div>
       </div>
@@ -531,7 +537,7 @@ function buildQuotationHTML(d) {
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
               ${d.insurance > 0 ? `<tr><td>Insurance (1Y PA, 1Y OD, 5Y TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
-              ${mandAcc > 0 ? `<tr><td>Standard Accessories</td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
+              ${mandAcc > 0 ? `<tr style="background:#fffde7;"><td style="font-weight:800;font-size:12px;">⭐ Standard Accessories<br><span style="font-weight:600;font-size:10px;color:#555;">${getMandatoryAccDescription(d.model)}</span></td><td style="font-weight:800;font-size:12px;">₹ ${fmt(mandAcc)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
@@ -539,6 +545,7 @@ function buildQuotationHTML(d) {
                 ${accRows}
                 <tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : ''}
+              ${d.financeCharge > 0 ? `<tr style="background:#f3e5f5;"><td style="font-weight:700;">🏦 Finance Charge</td><td style="font-weight:700;">₹ ${fmt(d.financeCharge)}</td></tr>` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
               <tr class="grand-total"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>

@@ -166,13 +166,23 @@ function followupCardHtml(lead, type) {
     ? `<span class="followup-date-badge today">Today</span>`
     : `<span class="followup-date-badge week">${lead.followUpDate || ''}</span>`;
 
+  const meta = [lead.model, lead.source, lead.assignedTo].filter(Boolean).map(esc).join(' · ');
+
   return `<div class="followup-card ${type}" onclick="openLead('${lead.leadId}')">
     <div class="followup-info">
       <div class="followup-name">${esc(lead.customerName)}</div>
-      <div class="followup-meta">${esc(lead.model || '')}${lead.assignedTo ? ' · ' + esc(lead.assignedTo) : ''}</div>
+      <div class="followup-meta">${meta}</div>
     </div>
     ${badge}
   </div>`;
+}
+
+function findCachedLead(leadId) {
+  for (const l of myLeadsAll)         if (l.leadId === leadId) return l;
+  for (const l of poolLeadsCache)     if (l.leadId === leadId) return l;
+  for (const arr of [followupData.overdue, followupData.today, followupData.week])
+    for (const l of arr)              if (l.leadId === leadId) return l;
+  return null;
 }
 
 // ── POOL LEADS ─────────────────────────────
@@ -462,20 +472,95 @@ function adminLeadCardHtml(lead) {
   </div>`;
 }
 
-function loadAnalytics() { loadAdmin(); }
+async function loadAnalytics() {
+  const container = document.getElementById('analyticsContent');
+  const btn = document.getElementById('analyticsRefreshBtn');
+  container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading analytics...</div></div>';
+  if (btn) btn.disabled = true;
+
+  try {
+    const r = await API.getCRMAnalytics();
+    if (btn) btn.disabled = false;
+    if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
+
+    const a = r.analytics;
+    let html = '';
+
+    if (a.bySource && a.bySource.length > 0) {
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">📲 By Source</div>
+        <table class="analytics-table">
+          <thead><tr><th>Source</th><th>Total</th><th>Conv</th><th>Conv%</th></tr></thead>
+          <tbody>${a.bySource.map(s => `<tr>
+            <td>${esc(s.source)}</td><td>${s.total}</td><td>${s.converted}</td>
+            <td><span class="conv-rate">${s.convRate}%</span>
+              <div class="conv-bar"><div class="conv-bar-fill" style="width:${s.convRate}%"></div></div>
+            </td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    if (a.byExecutive && a.byExecutive.length > 0) {
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">👥 By Executive</div>
+        <table class="analytics-table">
+          <thead><tr><th>Executive</th><th>Total</th><th>Conv</th><th>Overdue</th><th>Conv%</th></tr></thead>
+          <tbody>${a.byExecutive.map(e => `<tr>
+            <td>${esc(e.executive)}</td><td>${e.total}</td><td>${e.converted}</td>
+            <td>${e.overdue > 0 ? `<span style="color:#ef5350;font-weight:700;">${e.overdue}</span>` : e.overdue}</td>
+            <td><span class="conv-rate">${e.convRate}%</span></td></tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`;
+    }
+
+    if (a.lostReasons && a.lostReasons.length > 0) {
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">❌ Lost Reasons</div>
+        ${a.lostReasons.map(r => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:14px;">
+          <span>${esc(r.reason)}</span>
+          <span style="font-weight:700;color:#ef5350;">${r.count}</span>
+        </div>`).join('')}
+      </div>`;
+    }
+
+    container.innerHTML = html || '<div style="padding:20px;color:#aaa;text-align:center;">No analytics data yet</div>';
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    container.innerHTML = errorHtml('Error loading analytics');
+  }
+}
 
 // ── LEAD DETAIL ────────────────────────────
 
 async function openLead(leadId) {
   openSheet('detailSheet');
-  document.getElementById('detailSheetBody').innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading...</div></div>`;
+
+  // Show cached basic info instantly while we fetch the full record
+  const cached = findCachedLead(leadId);
+  if (cached) {
+    document.getElementById('detailSheetBody').innerHTML = `
+      <div class="lead-detail-header">
+        <button class="sheet-close" style="float:right;" onclick="closeSheet('detailSheet')">✕</button>
+        <div class="lead-detail-name">${esc(cached.customerName)}</div>
+        <div class="lead-detail-meta">
+          <span class="status-pill ${pillClass(cached.status)}">${esc(cached.status || 'Pool')}</span>
+        </div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-row"><span class="detail-label">Mobile</span><span class="detail-value">${esc(cached.mobileNo || '')}</span></div>
+        <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${esc(cached.model || '')}</span></div>
+        <div class="detail-row"><span class="detail-label">Source</span><span class="detail-value">${esc(cached.source || '')}</span></div>
+      </div>
+      <div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading interactions...</div></div>`;
+  } else {
+    document.getElementById('detailSheetBody').innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading...</div></div>`;
+  }
 
   try {
     const r = await API.getLeadDetails(leadId);
-    if (!r.success) {
-      document.getElementById('detailSheetBody').innerHTML = errorHtml(r.message);
-      return;
-    }
+    if (!r.success) { document.getElementById('detailSheetBody').innerHTML = errorHtml(r.message); return; }
     renderLeadDetail(r.lead);
   } catch(e) {
     document.getElementById('detailSheetBody').innerHTML = errorHtml('Error loading lead');
@@ -495,9 +580,14 @@ function renderLeadDetail(lead) {
   `).join('') || '<div style="color:#aaa;font-size:13px;padding:8px 0;">No interactions yet</div>';
 
   const quotations = (lead.quotations || []).map(q => `
-    <div class="quotation-item">
-      <div class="quotation-no">${esc(q.quotNo)}</div>
-      <div class="quotation-meta">${esc(q.model)} · ₹${Number(q.totalAmount||0).toLocaleString('en-IN')} · ${esc(q.createdDate)}</div>
+    <div class="quotation-item" style="display:flex;align-items:center;gap:10px;">
+      <div style="flex:1;">
+        <div class="quotation-no">${esc(q.quotNo)}</div>
+        <div class="quotation-meta">${esc(q.model)} · ₹${Number(q.totalAmount||0).toLocaleString('en-IN')} · ${esc(q.createdDate)}</div>
+      </div>
+      <a href="crm-quote.html?leadId=${lead.leadId}" style="font-size:12px;font-weight:700;color:#667eea;text-decoration:none;white-space:nowrap;padding:4px 10px;border:1.5px solid #667eea;border-radius:8px;">
+        🔁 Reprint
+      </a>
     </div>
   `).join('') || '<div style="color:#aaa;font-size:13px;padding:8px 0;">No quotations yet</div>';
 
@@ -726,18 +816,42 @@ async function doSearch(q) {
   document.getElementById('searchResults').innerHTML = '<div class="search-empty">Searching...</div>';
   try {
     const r = await API.searchCRMLeads(q);
-    if (!r.success || !r.leads || r.leads.length === 0) {
-      document.getElementById('searchResults').innerHTML = '<div class="search-empty">No leads found</div>';
+    if (!r.success) { document.getElementById('searchResults').innerHTML = '<div class="search-empty">Error searching</div>'; return; }
+
+    const leads = r.leads || [];
+    const quotMatches = r.quotationMatches || [];
+
+    if (leads.length === 0 && quotMatches.length === 0) {
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">No results found</div>';
       return;
     }
-    document.getElementById('searchResults').innerHTML = r.leads.map(l => `
-      <div class="search-result-item" onclick="closeSearchModal();openLead('${l.leadId}')">
-        <div class="search-result-name">${esc(l.customerName)}</div>
-        <div class="search-result-meta">📱 ${esc(l.mobileNo)} · 🚗 ${esc(l.model)}</div>
-        <span class="status-pill ${pillClass(l.status)}" style="display:inline-block;margin-top:4px;">${esc(l.status || 'Pool')}</span>
-        ${l.assignedTo ? `<span style="font-size:11px;color:#aaa;margin-left:6px;">· ${esc(l.assignedTo)}</span>` : ''}
-      </div>
-    `).join('');
+
+    let html = '';
+
+    if (quotMatches.length > 0) {
+      html += `<div style="padding:6px 16px;font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;">Quotations</div>`;
+      html += quotMatches.map(q => `
+        <div class="search-result-item" onclick="closeSearchModal();openLead('${q.leadId}')">
+          <div style="display:flex;align-items:center;gap:8px;">
+            <span style="font-size:11px;font-weight:800;padding:2px 8px;border-radius:8px;background:#f0f4ff;color:#667eea;">📄 ${esc(q.quotNo)}</span>
+            <span class="search-result-name" style="font-size:14px;">${esc(q.customerName)}</span>
+          </div>
+          <div class="search-result-meta">🚗 ${esc(q.model)} · ₹${Number(q.totalAmount||0).toLocaleString('en-IN')} · ${esc(q.createdDate)}</div>
+        </div>`).join('');
+    }
+
+    if (leads.length > 0) {
+      if (quotMatches.length > 0) html += `<div style="padding:6px 16px;font-size:11px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;">Leads</div>`;
+      html += leads.map(l => `
+        <div class="search-result-item" onclick="closeSearchModal();openLead('${l.leadId}')">
+          <div class="search-result-name">${esc(l.customerName)}</div>
+          <div class="search-result-meta">📱 ${esc(l.mobileNo)} · 🚗 ${esc(l.model)}</div>
+          <span class="status-pill ${pillClass(l.status)}" style="display:inline-block;margin-top:4px;">${esc(l.status || 'Pool')}</span>
+          ${l.assignedTo ? `<span style="font-size:11px;color:#aaa;margin-left:6px;">· ${esc(l.assignedTo)}</span>` : ''}
+        </div>`).join('');
+    }
+
+    document.getElementById('searchResults').innerHTML = html;
   } catch(e) {
     document.getElementById('searchResults').innerHTML = '<div class="search-empty">Error searching</div>';
   }
