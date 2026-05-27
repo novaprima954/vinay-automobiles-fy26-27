@@ -85,18 +85,24 @@ async function handleSubmit(e) {
     
     if (response.success) {
       showMessage('✅ Lead added successfully!', 'success');
-      
+
       // Reset form
       document.getElementById('addLeadForm').reset();
       selectedSource = '';
       document.querySelectorAll('.source-option').forEach(opt => {
         opt.classList.remove('selected');
       });
-      
+
       // Redirect back to CRM after 1.5 seconds
       setTimeout(() => {
         window.location.href = 'crm.html';
       }, 1500);
+    } else if (response.isDuplicate) {
+      const el = response.existingLead;
+      showMessage(
+        `⚠️ Duplicate! "${el.customerName}" already exists (${el.status}, assigned to ${el.assignedTo})`,
+        'error'
+      );
     } else {
       showMessage(response.message || 'Error adding lead', 'error');
     }

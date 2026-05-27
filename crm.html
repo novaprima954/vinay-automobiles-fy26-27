@@ -10,418 +10,299 @@
   <link rel="stylesheet" href="css/common.css">
   <style>
     body { padding: 0; margin: 0; background: #f0f2f5; }
-
     .crm-container { max-width: 100%; margin: 0; padding-bottom: 75px; }
 
-    /* ── Header ── */
+    /* Header */
     .crm-header {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 14px 18px 12px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
+      color: white; padding: 14px 18px 12px;
+      position: sticky; top: 0; z-index: 100;
       box-shadow: 0 2px 12px rgba(0,0,0,0.2);
     }
     .header-top { display: flex; justify-content: space-between; align-items: center; }
     .header-title { font-size: 20px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
     .header-user-pill {
-      background: rgba(255,255,255,0.2);
-      padding: 5px 12px;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
+      background: rgba(255,255,255,0.2); padding: 5px 12px;
+      border-radius: 20px; font-size: 13px; font-weight: 600;
     }
 
-    /* ── Dashboard stat cards ── */
+    /* Dashboard stat cards */
     .dashboard-cards {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      padding: 16px 16px 0;
+      display: grid; grid-template-columns: repeat(2,1fr);
+      gap: 12px; padding: 16px 16px 0;
     }
     .stat-card {
-      background: white;
-      border-radius: 14px;
-      padding: 18px 16px;
-      text-align: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
-      cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
-      position: relative;
-      overflow: hidden;
+      background: white; border-radius: 14px; padding: 18px 16px;
+      text-align: center; box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      cursor: pointer; transition: transform 0.15s;
+      position: relative; overflow: hidden;
     }
     .stat-card:active { transform: scale(0.96); }
-    .stat-card::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 4px;
-    }
-    .stat-card.overdue::before { background: #ef5350; }
-    .stat-card.hot::before    { background: #FF7043; }
-    .stat-card.available::before { background: #42A5F5; }
-    .stat-card.converted::before { background: #66BB6A; }
-    .stat-card-icon { font-size: 30px; margin-bottom: 8px; }
+    .stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; }
+    .stat-card.overdue::before  { background: #ef5350; }
+    .stat-card.urgent::before   { background: #FF7043; }
+    .stat-card.available::before{ background: #42A5F5; }
+    .stat-card.converted::before{ background: #66BB6A; }
+    .stat-card-icon { font-size: 28px; margin-bottom: 6px; }
     .stat-card-label { font-size: 11px; color: #888; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-    .stat-card-count { font-size: 34px; font-weight: 800; color: #222; line-height: 1; }
+    .stat-card-count { font-size: 32px; font-weight: 800; color: #222; line-height: 1; }
     .stat-card.overdue .stat-card-count { color: #ef5350; }
     .stat-card-sub { font-size: 11px; color: #aaa; margin-top: 4px; }
 
-    /* ── Section header ── */
+    /* Section header */
     .section-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      display: flex; align-items: center; justify-content: space-between;
       padding: 16px 16px 8px;
     }
-    .section-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #333;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
+    .section-title { font-size: 14px; font-weight: 800; color: #333; text-transform: uppercase; letter-spacing: 0.5px; }
     .section-badge {
-      background: #667eea;
-      color: white;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 10px;
+      background: #667eea; color: white;
+      font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
     }
-    .section-badge.red { background: #ef5350; }
+    .section-badge.red    { background: #ef5350; }
     .section-badge.orange { background: #FF7043; }
 
-    /* ── Follow-up cards ── */
+    /* Follow-up cards */
     .followup-card {
-      background: white;
-      border-radius: 12px;
-      margin: 0 16px 10px;
-      padding: 14px 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      background: white; border-radius: 12px; margin: 0 16px 10px;
+      padding: 14px 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      display: flex; align-items: center; gap: 12px; cursor: pointer;
     }
-    .followup-card.overdue { border-left: 4px solid #ef5350; }
-    .followup-card.today   { border-left: 4px solid #FF7043; }
-    .followup-card.week    { border-left: 4px solid #42A5F5; }
-    .followup-card.lost    { border-left: 4px solid #bbb; opacity: 0.85; }
+    .followup-card:active { background: #f8f8ff; }
+    .followup-card.overdue{ border-left: 4px solid #ef5350; }
+    .followup-card.today  { border-left: 4px solid #FF7043; }
+    .followup-card.week   { border-left: 4px solid #42A5F5; }
     .followup-info { flex: 1; min-width: 0; }
     .followup-name { font-weight: 700; color: #222; font-size: 15px; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .followup-meta { font-size: 12px; color: #777; }
-    .followup-date-badge {
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 8px;
-      white-space: nowrap;
-    }
+    .followup-date-badge { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; white-space: nowrap; }
     .followup-date-badge.overdue { background: #ffebee; color: #ef5350; }
     .followup-date-badge.today   { background: #fff3e0; color: #FF7043; }
     .followup-date-badge.week    { background: #e3f2fd; color: #1976D2; }
-    .btn-open {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      border: none;
-      padding: 8px 14px;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
 
-    /* ── Filter tabs (My Leads) ── */
+    /* Filter tabs */
     .filter-row {
-      padding: 10px 16px 6px;
-      display: flex;
-      gap: 8px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
+      padding: 10px 16px 6px; display: flex; gap: 8px;
+      overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
     }
     .filter-row::-webkit-scrollbar { display: none; }
     .filter-chip {
-      flex-shrink: 0;
-      padding: 7px 14px;
-      border: 2px solid #e0e0e0;
-      background: white;
-      border-radius: 20px;
-      font-size: 13px;
-      font-weight: 600;
-      color: #666;
-      cursor: pointer;
-      white-space: nowrap;
-      display: flex;
-      align-items: center;
-      gap: 5px;
+      flex-shrink: 0; padding: 7px 14px;
+      border: 2px solid #e0e0e0; background: white;
+      border-radius: 20px; font-size: 13px; font-weight: 600; color: #666;
+      cursor: pointer; white-space: nowrap; display: flex; align-items: center; gap: 5px;
       transition: all 0.2s;
     }
     .filter-chip.active { background: #667eea; color: white; border-color: #667eea; }
     .filter-chip .chip-count {
-      background: rgba(0,0,0,0.15);
-      border-radius: 10px;
-      padding: 1px 6px;
-      font-size: 11px;
+      background: rgba(0,0,0,0.15); border-radius: 10px;
+      padding: 1px 6px; font-size: 11px;
     }
     .filter-chip.active .chip-count { background: rgba(255,255,255,0.3); }
 
-    /* ── Lead card ── */
+    /* Lead card */
     .lead-card {
-      background: white;
-      border-radius: 12px;
-      padding: 14px 16px;
-      margin: 0 16px 10px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      border-left: 4px solid #667eea;
-      transition: box-shadow 0.2s;
+      background: white; border-radius: 12px; padding: 14px 16px;
+      margin: 0 16px 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 4px solid #667eea; transition: box-shadow 0.2s;
     }
-    .lead-card.hot     { border-left-color: #FF7043; }
-    .lead-card.new     { border-left-color: #42A5F5; }
-    .lead-card.lost    { border-left-color: #bbb; opacity: 0.8; }
-    .lead-card.converted { border-left-color: #66BB6A; }
+    .lead-card.overdue-left  { border-left-color: #ef5350; }
+    .lead-card.st-new        { border-left-color: #42A5F5; }
+    .lead-card.st-contacted  { border-left-color: #29B6F6; }
+    .lead-card.st-interested { border-left-color: #66BB6A; }
+    .lead-card.st-lost       { border-left-color: #bbb; opacity: 0.8; }
+    .lead-card.st-converted  { border-left-color: #66BB6A; }
 
-    .lead-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+    .lead-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
     .lead-name { font-size: 16px; font-weight: 700; color: #222; }
     .lead-badges { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
 
-    .status-pill {
-      font-size: 10px;
-      padding: 3px 8px;
-      border-radius: 10px;
-      font-weight: 700;
-      white-space: nowrap;
-    }
-    .pill-hot       { background: #FFF3E0; color: #E65100; }
-    .pill-new       { background: #E3F2FD; color: #1565C0; }
-    .pill-interested{ background: #E8F5E9; color: #2E7D32; }
-    .pill-negotiating{ background: #F3E5F5; color: #6A1B9A; }
-    .pill-contacted { background: #E0F2F1; color: #00695C; }
-    .pill-cold      { background: #ECEFF1; color: #546E7A; }
-    .pill-lost      { background: #FFEBEE; color: #B71C1C; }
-    .pill-converted { background: #E8F5E9; color: #1B5E20; }
+    .status-pill { font-size: 10px; padding: 3px 8px; border-radius: 10px; font-weight: 700; white-space: nowrap; }
+    .pill-new        { background: #E3F2FD; color: #1565C0; }
+    .pill-contacted  { background: #E0F7FA; color: #00695C; }
+    .pill-interested { background: #E8F5E9; color: #2E7D32; }
+    .pill-converted  { background: #E8F5E9; color: #1B5E20; }
+    .pill-lost       { background: #FFEBEE; color: #B71C1C; }
+    .pill-pool       { background: #F3E5F5; color: #6A1B9A; }
 
-    .overdue-badge {
-      background: #ffebee;
-      color: #ef5350;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 7px;
-      border-radius: 8px;
-    }
-    .aging-badge {
-      font-size: 10px;
-      font-weight: 600;
-      padding: 3px 7px;
-      border-radius: 8px;
-      background: #f5f5f5;
-      color: #888;
-    }
-    .aging-badge.warn { background: #fff8e1; color: #F57F17; }
+    .overdue-badge { background: #ffebee; color: #ef5350; font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 8px; }
+    .aging-badge { font-size: 10px; font-weight: 600; padding: 3px 7px; border-radius: 8px; background: #f5f5f5; color: #888; }
+    .aging-badge.warn   { background: #fff8e1; color: #F57F17; }
     .aging-badge.danger { background: #ffebee; color: #ef5350; }
+    .social-badge { font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 8px; background: #fce4ec; color: #c2185b; }
 
     .lead-info { font-size: 13px; color: #666; margin-bottom: 10px; display: flex; flex-direction: column; gap: 3px; }
     .lead-info-row { display: flex; align-items: center; gap: 5px; }
 
     .lead-actions { display: flex; gap: 8px; }
     .btn-act {
-      flex: 1;
-      padding: 9px 8px;
-      border: none;
-      border-radius: 8px;
-      font-weight: 700;
-      font-size: 13px;
-      cursor: pointer;
-      text-align: center;
+      flex: 1; padding: 9px 8px; border: none; border-radius: 8px;
+      font-weight: 700; font-size: 13px; cursor: pointer; text-align: center;
       transition: opacity 0.2s;
     }
     .btn-act:active { opacity: 0.8; }
-    .btn-call-act   { background: linear-gradient(135deg, #4CAF50, #388E3C); color: white; }
-    .btn-wa-act     { background: linear-gradient(135deg, #25D366, #128C7E); color: white; }
-    .btn-edit-act   { background: #f0f0f0; color: #444; }
-    .btn-claim-act  { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .btn-call-act  { background: linear-gradient(135deg,#4CAF50,#388E3C); color: white; }
+    .btn-log-act   { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
+    .btn-edit-act  { background: #f0f0f0; color: #444; }
+    .btn-claim-act { background: linear-gradient(135deg,#667eea,#764ba2); color: white; }
+    .btn-quot-act  { background: linear-gradient(135deg,#FF9800,#E65100); color: white; }
 
-    /* ── Reports (admin) ── */
+    /* Analytics tables */
     .analytics-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .analytics-table th {
-      background: #f5f5f5;
-      padding: 10px 8px;
-      text-align: left;
-      font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.4px;
-      color: #666;
-      border-bottom: 2px solid #e0e0e0;
+      background: #f5f5f5; padding: 10px 8px; text-align: left;
+      font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px;
+      color: #666; border-bottom: 2px solid #e0e0e0;
     }
     .analytics-table td { padding: 10px 8px; border-bottom: 1px solid #f0f0f0; color: #333; vertical-align: middle; }
     .analytics-table tr:last-child td { border-bottom: none; }
     .conv-bar { height: 6px; background: #e0e0e0; border-radius: 3px; margin-top: 4px; }
-    .conv-bar-fill { height: 100%; background: linear-gradient(90deg, #667eea, #764ba2); border-radius: 3px; }
-    .conv-rate { font-weight: 700; color: #667eea; }
-
+    .conv-bar-fill { height: 100%; background: linear-gradient(90deg,#667eea,#764ba2); border-radius: 3px; }
     .analytics-card {
-      background: white;
-      border-radius: 12px;
-      margin: 0 16px 12px;
-      padding: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
-      overflow: hidden;
+      background: white; border-radius: 12px; margin: 0 16px 12px;
+      padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); overflow: hidden;
     }
-    .analytics-card-title {
-      font-size: 14px;
-      font-weight: 800;
-      color: #333;
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
+    .analytics-card-title { font-size: 14px; font-weight: 800; color: #333; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
 
-    /* ── Tab content ── */
+    /* Tab content */
     .tab-content { display: none; padding-top: 4px; }
     .tab-content.active { display: block; }
 
-    /* ── Empty state ── */
-    .empty-state {
-      text-align: center;
-      padding: 50px 20px;
-      color: #bbb;
-    }
+    /* Empty state */
+    .empty-state { text-align: center; padding: 50px 20px; color: #bbb; }
     .empty-icon { font-size: 50px; margin-bottom: 12px; }
     .empty-title { font-size: 15px; font-weight: 600; color: #999; margin-bottom: 6px; }
     .empty-sub { font-size: 13px; }
 
-    /* ── Loading ── */
+    /* Loading */
     .loading { text-align: center; padding: 40px 20px; color: #999; }
-    .spinner {
-      display: inline-block; width: 36px; height: 36px;
-      border: 4px solid #e0e0e0; border-top-color: #667eea;
-      border-radius: 50%; animation: spin 0.8s linear infinite;
-      margin-bottom: 10px;
-    }
+    .spinner { display: inline-block; width: 36px; height: 36px; border: 4px solid #e0e0e0; border-top-color: #667eea; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* ── Messages ── */
-    .message {
-      padding: 12px 18px; margin: 12px 16px; border-radius: 10px;
-      font-weight: 600; font-size: 14px; text-align: center; display: none;
-    }
+    /* Messages */
+    .message { padding: 12px 18px; margin: 12px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; text-align: center; display: none; }
     .message.success { background: #d4edda; color: #155724; }
     .message.error   { background: #f8d7da; color: #721c24; }
 
-    /* ── Bottom nav ── */
+    /* Bottom nav */
     .bottom-nav {
       position: fixed; bottom: 0; left: 0; right: 0;
-      background: white;
-      box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
-      display: flex;
-      padding: 8px 0 10px;
-      z-index: 100;
+      background: white; box-shadow: 0 -2px 12px rgba(0,0,0,0.1);
+      display: flex; padding: 8px 0 10px; z-index: 100;
     }
-    .nav-item {
-      flex: 1; text-align: center; cursor: pointer;
-      border: none; background: none; padding: 4px 2px;
-      transition: all 0.2s;
-    }
+    .nav-item { flex: 1; text-align: center; cursor: pointer; border: none; background: none; padding: 4px 2px; transition: all 0.2s; }
     .nav-item.active { color: #667eea; }
-    .nav-icon { font-size: 22px; margin-bottom: 2px; position: relative; display: inline-block; }
+    .nav-icon { font-size: 20px; margin-bottom: 2px; position: relative; display: inline-block; }
     .nav-label { font-size: 10px; font-weight: 700; color: #999; display: block; }
     .nav-item.active .nav-label { color: #667eea; }
-    .nav-badge {
-      position: absolute; top: -4px; right: -8px;
-      background: #ef5350; color: white;
-      font-size: 9px; font-weight: 700;
-      min-width: 16px; height: 16px; line-height: 16px;
-      border-radius: 8px; padding: 0 3px; text-align: center;
-    }
+    .nav-badge { position: absolute; top: -4px; right: -8px; background: #ef5350; color: white; font-size: 9px; font-weight: 700; min-width: 16px; height: 16px; line-height: 16px; border-radius: 8px; padding: 0 3px; text-align: center; }
 
-    /* ── FAB ── */
-    .fab {
-      position: fixed; bottom: 78px; right: 18px;
-      width: 56px; height: 56px;
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white; border: none; border-radius: 50%;
-      font-size: 26px;
-      box-shadow: 0 4px 14px rgba(102,126,234,0.45);
-      cursor: pointer; z-index: 90;
-      display: flex; align-items: center; justify-content: center;
-    }
+    /* FAB */
+    .fab { position: fixed; bottom: 78px; right: 18px; width: 56px; height: 56px; background: linear-gradient(135deg,#667eea,#764ba2); color: white; border: none; border-radius: 50%; font-size: 26px; box-shadow: 0 4px 14px rgba(102,126,234,0.45); cursor: pointer; z-index: 90; display: flex; align-items: center; justify-content: center; }
     .fab:active { transform: scale(0.92); }
 
-    /* ── Search FAB ── */
-    .fab-search {
-      position: fixed; bottom: 78px; right: 84px;
-      width: 50px; height: 50px;
-      background: white; color: #667eea;
-      border: 2px solid #667eea;
-      border-radius: 50%;
-      font-size: 22px;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.15);
-      cursor: pointer; z-index: 90;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .fab-search:active { transform: scale(0.92); }
+    /* Search FAB */
+    .fab-search { position: fixed; bottom: 78px; right: 84px; width: 50px; height: 50px; background: white; color: #667eea; border: 2px solid #667eea; border-radius: 50%; font-size: 22px; box-shadow: 0 3px 10px rgba(0,0,0,0.15); cursor: pointer; z-index: 90; display: flex; align-items: center; justify-content: center; }
 
-    /* ── Search Modal ── */
+    /* ── Bottom Sheet (overlay) ── */
+    .sheet-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 300; display: none; align-items: flex-end;
+    }
+    .sheet-overlay.open { display: flex; }
+    .sheet {
+      background: white; border-radius: 20px 20px 0 0;
+      width: 100%; max-height: 90vh; overflow-y: auto;
+      padding: 0 0 20px; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+    }
+    .sheet-handle { width: 40px; height: 4px; background: #ddd; border-radius: 2px; margin: 12px auto 4px; }
+    .sheet-title { font-size: 17px; font-weight: 800; color: #222; padding: 10px 18px 14px; border-bottom: 1px solid #f0f0f0; }
+    .sheet-body { padding: 16px 18px; }
+    .sheet-close { float: right; background: none; border: none; font-size: 20px; color: #999; cursor: pointer; padding: 0; }
+
+    /* Log sheet */
+    .log-note-type-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    .note-type-btn {
+      padding: 13px 16px; border-radius: 10px; border: 2px solid #e0e0e0;
+      background: white; font-size: 15px; font-weight: 600; color: #333;
+      cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px;
+      transition: all 0.15s;
+    }
+    .note-type-btn:active { background: #f0f4ff; }
+    .note-type-btn.selected { border-color: #667eea; background: #f0f4ff; color: #667eea; }
+
+    .log-followup-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
+    .log-followup-row label { font-size: 13px; font-weight: 700; color: #555; }
+    .log-followup-row input { padding: 10px 14px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; outline: none; }
+    .log-followup-row input:focus { border-color: #667eea; }
+
+    .log-note-textarea { width: 100%; padding: 12px 14px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; outline: none; resize: none; font-family: inherit; box-sizing: border-box; }
+    .log-note-textarea:focus { border-color: #667eea; }
+
+    .btn-primary {
+      width: 100%; padding: 14px; background: linear-gradient(135deg,#667eea,#764ba2);
+      color: white; border: none; border-radius: 12px; font-size: 16px;
+      font-weight: 700; cursor: pointer; margin-top: 6px;
+    }
+    .btn-primary:active { opacity: 0.85; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    /* Lead detail sheet */
+    .lead-detail-header { padding: 14px 18px; border-bottom: 1px solid #f0f0f0; }
+    .lead-detail-name { font-size: 20px; font-weight: 800; color: #222; margin-bottom: 4px; }
+    .lead-detail-meta { font-size: 13px; color: #777; }
+    .detail-section { padding: 14px 18px 0; }
+    .detail-section-title { font-size: 12px; font-weight: 800; color: #aaa; text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 10px; }
+    .detail-row { display: flex; gap: 8px; margin-bottom: 8px; font-size: 14px; }
+    .detail-label { color: #999; min-width: 90px; flex-shrink: 0; }
+    .detail-value { color: #222; font-weight: 600; flex: 1; }
+
+    .interaction-item { padding: 10px 0; border-bottom: 1px solid #f5f5f5; }
+    .interaction-item:last-child { border-bottom: none; }
+    .interaction-type { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: #f0f4ff; color: #667eea; margin-bottom: 4px; }
+    .interaction-note { font-size: 13px; color: #333; margin-bottom: 3px; }
+    .interaction-meta { font-size: 11px; color: #aaa; }
+
+    .quotation-item { padding: 10px 12px; background: #f9f9ff; border-radius: 10px; border: 1px solid #e8e8f5; margin-bottom: 8px; }
+    .quotation-no { font-size: 13px; font-weight: 800; color: #667eea; }
+    .quotation-meta { font-size: 12px; color: #777; margin-top: 3px; }
+
+    /* Lost reason dialog */
+    .lost-textarea { width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 14px; outline: none; font-family: inherit; box-sizing: border-box; resize: none; margin-top: 8px; }
+    .lost-textarea:focus { border-color: #ef5350; }
+
+    /* Admin assign */
+    .assign-select { width: 100%; padding: 11px 14px; border: 2px solid #e0e0e0; border-radius: 10px; font-size: 15px; margin-bottom: 12px; }
+
+    /* Duplicate warning */
+    .dup-warning { background: #fff3e0; border: 2px solid #FF9800; border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; }
+    .dup-warning-title { font-size: 13px; font-weight: 800; color: #E65100; margin-bottom: 4px; }
+    .dup-warning-info { font-size: 13px; color: #555; }
+
+    /* Status update row */
+    .status-update-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+    .status-btn { padding: 8px 14px; border-radius: 20px; border: 2px solid #e0e0e0; background: white; font-size: 13px; font-weight: 600; color: #666; cursor: pointer; }
+    .status-btn.active { border-color: #667eea; background: #667eea; color: white; }
+
+    /* Search modal */
     .search-overlay {
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.5);
-      z-index: 200;
-      display: none;
-      flex-direction: column;
+      position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+      z-index: 400; display: none; flex-direction: column;
     }
     .search-overlay.open { display: flex; }
-    .search-modal {
-      background: white;
-      border-radius: 20px 20px 0 0;
-      margin-top: auto;
-      max-height: 88vh;
-      display: flex; flex-direction: column;
-      overflow: hidden;
-    }
-    .search-modal-header {
-      padding: 16px 16px 12px;
-      border-bottom: 1px solid #eee;
-      display: flex; gap: 10px; align-items: center;
-    }
-    .search-modal-input {
-      flex: 1; padding: 11px 14px;
-      border: 2px solid #667eea; border-radius: 10px;
-      font-size: 15px; outline: none;
-    }
-    .search-modal-close {
-      background: #f0f0f0; border: none; border-radius: 50%;
-      width: 38px; height: 38px; font-size: 18px; cursor: pointer;
-      flex-shrink: 0;
-    }
-    .search-results {
-      overflow-y: auto; flex: 1; padding: 8px 0;
-    }
-    .search-result-item {
-      padding: 12px 16px; border-bottom: 1px solid #f5f5f5;
-      cursor: pointer; transition: background 0.1s;
-    }
+    .search-modal { background: white; border-radius: 20px 20px 0 0; margin-top: auto; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; }
+    .search-modal-header { padding: 16px 16px 12px; border-bottom: 1px solid #eee; display: flex; gap: 10px; align-items: center; }
+    .search-modal-input { flex: 1; padding: 11px 14px; border: 2px solid #667eea; border-radius: 10px; font-size: 15px; outline: none; }
+    .search-modal-close { background: #f0f0f0; border: none; border-radius: 50%; width: 38px; height: 38px; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+    .search-results { overflow-y: auto; flex: 1; padding: 8px 0; }
+    .search-result-item { padding: 12px 16px; border-bottom: 1px solid #f5f5f5; cursor: pointer; }
     .search-result-item:active { background: #f0f4ff; }
     .search-result-name { font-size: 15px; font-weight: 700; color: #222; }
     .search-result-meta { font-size: 12px; color: #888; margin-top: 2px; }
-    .search-result-status {
-      display: inline-block; font-size: 11px; font-weight: 700;
-      padding: 2px 8px; border-radius: 12px; margin-top: 4px;
-      background: #e3f2fd; color: #1565c0;
-    }
-    .search-quot-card {
-      margin: 10px 16px; padding: 12px 14px;
-      background: #f0f4ff; border: 2px solid #667eea; border-radius: 10px;
-    }
-    .search-quot-title { font-size: 12px; font-weight: 800; color: #667eea; margin-bottom: 6px; text-transform: uppercase; }
-    .search-quot-row { font-size: 13px; color: #333; margin-bottom: 3px; }
     .search-empty { text-align: center; padding: 40px 20px; color: #aaa; font-size: 14px; }
 
     @media (min-width: 600px) {
-      .dashboard-cards { grid-template-columns: repeat(4, 1fr); }
+      .dashboard-cards { grid-template-columns: repeat(4,1fr); }
       .crm-container { max-width: 640px; margin: 0 auto; }
     }
   </style>
@@ -448,15 +329,15 @@
         <div class="stat-card-count" id="overdueCount">0</div>
         <div class="stat-card-sub">follow-ups missed</div>
       </div>
-      <div class="stat-card hot" onclick="switchTab('followups')">
+      <div class="stat-card urgent" onclick="switchTab('followups')">
         <div class="stat-card-icon">🔔</div>
-        <div class="stat-card-label">Due This Week</div>
+        <div class="stat-card-label">This Week</div>
         <div class="stat-card-count" id="weekCount">0</div>
         <div class="stat-card-sub">incl. today</div>
       </div>
-      <div class="stat-card available" onclick="switchTab('available')">
+      <div class="stat-card available" onclick="switchTab('pool')">
         <div class="stat-card-icon">📦</div>
-        <div class="stat-card-label">Available</div>
+        <div class="stat-card-label">Pool</div>
         <div class="stat-card-count" id="availableCount">0</div>
         <div class="stat-card-sub">unclaimed</div>
       </div>
@@ -464,30 +345,30 @@
         <div class="stat-card-icon">✅</div>
         <div class="stat-card-label">Converted</div>
         <div class="stat-card-count" id="convertedCount">0</div>
-        <div class="stat-card-sub">this year</div>
+        <div class="stat-card-sub">total</div>
       </div>
     </div>
 
-    <!-- Today's urgent follow-ups -->
+    <!-- Today's urgent follow-ups preview -->
     <div id="urgentSection" style="display:none; margin-top:8px;">
       <div class="section-header">
-        <div class="section-title">🔥 Today's Follow-ups</div>
+        <div class="section-title">🔥 Due Today</div>
         <div class="section-badge orange" id="todayBadge">0</div>
       </div>
       <div id="urgentList"></div>
     </div>
 
     <!-- Quick actions -->
-    <div style="padding: 12px 16px 0; display:flex; gap:10px;">
+    <div style="padding:12px 16px 0;display:flex;gap:10px;">
       <a href="crm-quote.html" style="flex:1;display:flex;align-items:center;justify-content:center;gap:8px;background:white;border-radius:10px;padding:12px;box-shadow:0 2px 8px rgba(0,0,0,0.07);text-decoration:none;color:#667eea;font-weight:700;font-size:14px;border:2px solid #e8e8f0;">
         📄 New Quotation
       </a>
     </div>
 
-    <!-- Analytics section (all users) — lazy loaded -->
-    <div id="analyticsSection" style="margin-top:8px;">
+    <!-- Admin analytics (lazy) -->
+    <div id="adminAnalyticsSection" style="margin-top:8px;display:none;">
       <div class="section-header">
-        <div class="section-title" id="analyticsTitle">📊 Analytics</div>
+        <div class="section-title">📊 Analytics</div>
         <button onclick="loadAnalytics()" style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;" id="analyticsRefreshBtn">Refresh</button>
       </div>
       <div id="analyticsContent">
@@ -502,58 +383,151 @@
 
   <!-- ═══ FOLLOW-UPS TAB ═══ -->
   <div id="followupsTab" class="tab-content">
-    <div class="filter-row" id="followupFilterRow">
-      <div class="filter-chip active" onclick="setFollowupFilter('overdue', this)">⚠️ Overdue <span class="chip-count" id="fc_overdue">0</span></div>
-      <div class="filter-chip" onclick="setFollowupFilter('today', this)">🔥 Today <span class="chip-count" id="fc_today">0</span></div>
-      <div class="filter-chip" onclick="setFollowupFilter('week', this)">📅 This Week <span class="chip-count" id="fc_week">0</span></div>
-      <div class="filter-chip" onclick="setFollowupFilter('lost', this)">❌ Lost <span class="chip-count" id="fc_lost">0</span></div>
+    <div class="filter-row">
+      <div class="filter-chip active" onclick="setFollowupFilter('overdue',this)">⚠️ Overdue <span class="chip-count" id="fc_overdue">0</span></div>
+      <div class="filter-chip" onclick="setFollowupFilter('today',this)">🔥 Today <span class="chip-count" id="fc_today">0</span></div>
+      <div class="filter-chip" onclick="setFollowupFilter('week',this)">📅 Week <span class="chip-count" id="fc_week">0</span></div>
     </div>
     <div id="followupsList"></div>
   </div>
 
-  <!-- ═══ AVAILABLE LEADS TAB ═══ -->
-  <div id="availableTab" class="tab-content">
-    <div class="loading" id="availableLoading" style="padding-top:30px;">
-      <div class="spinner"></div>
-      <div>Loading available leads...</div>
+  <!-- ═══ POOL TAB (social media leads) ═══ -->
+  <div id="poolTab" class="tab-content">
+    <div style="padding:10px 16px 0;font-size:13px;color:#888;">
+      Social media leads waiting to be claimed
     </div>
-    <div id="availableLeads"></div>
+    <div class="loading" id="poolLoading" style="padding-top:30px;display:none;">
+      <div class="spinner"></div><div>Loading pool leads...</div>
+    </div>
+    <div id="poolLeads" style="margin-top:8px;"></div>
   </div>
 
   <!-- ═══ MY LEADS TAB ═══ -->
   <div id="myLeadsTab" class="tab-content">
-    <div class="filter-row" id="statusFilterRow">
-      <div class="filter-chip active" data-status="all" onclick="filterMyLeads('all', this)">All <span class="chip-count" id="cnt_all">0</span></div>
-      <div class="filter-chip" data-status="Hot" onclick="filterMyLeads('Hot', this)">🔥 Hot <span class="chip-count" id="cnt_hot">0</span></div>
-      <div class="filter-chip" data-status="Contacted" onclick="filterMyLeads('Contacted', this)">📞 Contacted <span class="chip-count" id="cnt_contacted">0</span></div>
-      <div class="filter-chip" data-status="Interested" onclick="filterMyLeads('Interested', this)">👀 Interested <span class="chip-count" id="cnt_interested">0</span></div>
-      <div class="filter-chip" data-status="Lost" onclick="filterMyLeads('Lost', this)">❌ Lost <span class="chip-count" id="cnt_lost">0</span></div>
+    <div class="filter-row" id="myLeadsSourceFilter">
+      <div class="filter-chip active" data-ftype="all" onclick="setMyLeadsFilter('all',this)">All <span class="chip-count" id="cnt_all">0</span></div>
+      <div class="filter-chip" data-ftype="mine" onclick="setMyLeadsFilter('mine',this)">👤 My Added <span class="chip-count" id="cnt_mine">0</span></div>
+      <div class="filter-chip" data-ftype="social" onclick="setMyLeadsFilter('social',this)">📱 Social <span class="chip-count" id="cnt_social">0</span></div>
     </div>
-    <div class="loading" id="myLeadsLoading" style="padding-top:30px; display:none;">
-      <div class="spinner"></div>
-      <div>Loading your leads...</div>
+    <div class="filter-row" id="myLeadsStatusFilter">
+      <div class="filter-chip active" data-st="all" onclick="filterMyLeadsByStatus('all',this)">All</div>
+      <div class="filter-chip" data-st="New" onclick="filterMyLeadsByStatus('New',this)">New</div>
+      <div class="filter-chip" data-st="Contacted" onclick="filterMyLeadsByStatus('Contacted',this)">Contacted</div>
+      <div class="filter-chip" data-st="Interested" onclick="filterMyLeadsByStatus('Interested',this)">Interested</div>
+      <div class="filter-chip" data-st="Lost" onclick="filterMyLeadsByStatus('Lost',this)">Lost</div>
+    </div>
+    <div class="loading" id="myLeadsLoading" style="padding-top:30px;display:none;">
+      <div class="spinner"></div><div>Loading your leads...</div>
     </div>
     <div id="myLeads"></div>
+  </div>
+
+  <!-- ═══ ADMIN TAB (admin only) ═══ -->
+  <div id="adminTab" class="tab-content">
+    <div class="loading" id="adminLoading" style="padding-top:30px;display:none;">
+      <div class="spinner"></div><div>Loading...</div>
+    </div>
+    <div id="adminContent"></div>
   </div>
 
   <!-- Search FAB -->
   <button class="fab-search" onclick="openSearchModal()" title="Search leads">🔍</button>
 
-  <!-- FAB Add Lead / Quote -->
-  <button class="fab" onclick="addNewLead()">➕</button>
+  <!-- FAB Add Lead -->
+  <button class="fab" onclick="goToAddLead()">➕</button>
 
   <!-- Search Modal -->
   <div class="search-overlay" id="searchOverlay" onclick="handleSearchOverlayClick(event)">
     <div class="search-modal" id="searchModal">
       <div class="search-modal-header">
         <input type="text" id="searchInput" class="search-modal-input"
-          placeholder="Name, mobile, or quotation no..."
-          oninput="onSearchInput()"
-          onkeydown="if(event.key==='Enter') doSearch()">
+          placeholder="Name or mobile number..."
+          oninput="onSearchInput()" autocomplete="off">
         <button class="search-modal-close" onclick="closeSearchModal()">✕</button>
       </div>
       <div class="search-results" id="searchResults">
-        <div class="search-empty">🔍 Type to search customers or quotation numbers</div>
+        <div class="search-empty">🔍 Type to search</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LOG INTERACTION SHEET ═══ -->
+  <div class="sheet-overlay" id="logSheet" onclick="handleSheetOverlayClick(event,'logSheet')">
+    <div class="sheet" id="logSheetContent">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">
+        Log Interaction
+        <button class="sheet-close" onclick="closeSheet('logSheet')">✕</button>
+      </div>
+      <div class="sheet-body">
+        <input type="hidden" id="logLeadId">
+
+        <div class="log-note-type-list">
+          <button class="note-type-btn" onclick="selectNoteType(this,'Called - Answered')">📞 Called — Answered</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Called - No Answer')">📵 Called — No Answer</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Will Visit Showroom')">🏪 Will Visit Showroom</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'WhatsApp Sent')">💬 WhatsApp Sent</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Lost')">❌ Lost</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Other')">📝 Other</button>
+        </div>
+
+        <!-- Shown only for Lost -->
+        <div id="lostReasonSection" style="display:none; margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Lost Reason *</label>
+          <textarea id="lostReasonText" class="lost-textarea" rows="3" placeholder="Why was this lead lost?"></textarea>
+        </div>
+
+        <!-- Shown only for Other -->
+        <div id="otherNoteSection" style="display:none; margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Note</label>
+          <textarea id="otherNoteText" class="log-note-textarea" rows="3" placeholder="Add a note..."></textarea>
+        </div>
+
+        <div class="log-followup-row" id="followupDateRow">
+          <label>Next Follow-up Date</label>
+          <input type="date" id="logFollowUpDate">
+        </div>
+
+        <!-- Status change (shown after type selected) -->
+        <div id="statusChangeRow" style="display:none; margin-bottom:14px;">
+          <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:8px;">Update Status</label>
+          <div class="status-update-row" id="statusBtns">
+            <button class="status-btn" data-st="New" onclick="selectStatus(this)">New</button>
+            <button class="status-btn" data-st="Contacted" onclick="selectStatus(this)">Contacted</button>
+            <button class="status-btn" data-st="Interested" onclick="selectStatus(this)">Interested</button>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="logSubmitBtn" onclick="submitLog()" disabled>Save Log</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ LEAD DETAIL SHEET ═══ -->
+  <div class="sheet-overlay" id="detailSheet" onclick="handleSheetOverlayClick(event,'detailSheet')">
+    <div class="sheet" id="detailSheetContent">
+      <div class="sheet-handle"></div>
+      <div id="detailSheetBody">
+        <div class="loading"><div class="spinner"></div><div>Loading...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ASSIGN LEAD SHEET (admin) ═══ -->
+  <div class="sheet-overlay" id="assignSheet" onclick="handleSheetOverlayClick(event,'assignSheet')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">
+        Assign Lead
+        <button class="sheet-close" onclick="closeSheet('assignSheet')">✕</button>
+      </div>
+      <div class="sheet-body">
+        <input type="hidden" id="assignLeadId">
+        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:8px;">Assign to Executive</label>
+        <select id="assignSelect" class="assign-select">
+          <option value="">-- Select --</option>
+        </select>
+        <button class="btn-primary" onclick="submitAssign()">Assign</button>
       </div>
     </div>
   </div>
@@ -568,13 +542,17 @@
       <div class="nav-icon">🔔<span class="nav-badge" id="overdueNavBadge" style="display:none;">0</span></div>
       <div class="nav-label">Follow-ups</div>
     </button>
-    <button class="nav-item" onclick="switchTab('available')" id="navAvailable">
+    <button class="nav-item" onclick="switchTab('pool')" id="navPool">
       <div class="nav-icon">📦</div>
-      <div class="nav-label">Available</div>
+      <div class="nav-label">Pool</div>
     </button>
     <button class="nav-item" onclick="switchTab('myLeads')" id="navMyLeads">
       <div class="nav-icon">📋</div>
       <div class="nav-label">My Leads</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('admin')" id="navAdmin" style="display:none;">
+      <div class="nav-icon">👑</div>
+      <div class="nav-label">Admin</div>
     </button>
     <button class="nav-item" onclick="goBack()">
       <div class="nav-icon">←</div>
@@ -587,6 +565,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
-<script src="js/crm.js?v=3"></script>
+<script src="js/crm.js?v=5"></script>
 </body>
 </html>

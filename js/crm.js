@@ -1,13 +1,19 @@
 // ==========================================
-// CRM PAGE LOGIC  v2
+// CRM SPA  v5
 // ==========================================
 
 let currentUser = null;
 let dashboardData = null;
-let myLeadsCache = [];
-let availableLeadsCache = [];
+let myLeadsAll = [];       // full list from server
+let myLeadsFiltered = [];  // after source filter
+let currentMyLeadsSourceFilter = 'all';
+let currentMyLeadsStatusFilter = 'all';
+let poolLeadsCache = [];
 let currentFollowupFilter = 'overdue';
-let currentStatusFilter = 'all';
+let followupData = { overdue: [], today: [], week: [] };
+let selectedNoteType = '';
+let selectedStatusChange = '';
+let allExecutives = [];   // for admin assign
 
 document.addEventListener('DOMContentLoaded', async function() {
   const session = SessionManager.getSession();
@@ -16,36 +22,70 @@ document.addEventListener('DOMContentLoaded', async function() {
   currentUser = session.user;
   document.getElementById('currentUser').textContent = currentUser.name;
 
+  // Show admin tab if admin
+  if (currentUser.role === 'admin') {
+    document.getElementById('navAdmin').style.display = '';
+    document.getElementById('adminAnalyticsSection').style.display = '';
+  }
+
   await loadDashboard();
 });
+
+// ── TAB SWITCHING ──────────────────────────
+
+function switchTab(tab) {
+  // Hide all
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+  const tabMap = {
+    dashboard: ['dashboardTab', 'navDashboard'],
+    followups:  ['followupsTab', 'navFollowups'],
+    pool:       ['poolTab',      'navPool'],
+    myLeads:    ['myLeadsTab',   'navMyLeads'],
+    admin:      ['adminTab',     'navAdmin'],
+  };
+
+  const [contentId, navId] = tabMap[tab] || tabMap.dashboard;
+  document.getElementById(contentId).classList.add('active');
+  const navEl = document.getElementById(navId);
+  if (navEl) navEl.classList.add('active');
+
+  // Lazy loads
+  if (tab === 'followups' && dashboardData) renderFollowups(currentFollowupFilter);
+  if (tab === 'pool') loadPool();
+  if (tab === 'myLeads') loadMyLeads();
+  if (tab === 'admin' && currentUser.role === 'admin') loadAdmin();
+
+  window.scrollTo(0, 0);
+}
 
 // ── DASHBOARD ──────────────────────────────
 
 async function loadDashboard() {
-  // Show cached data instantly if fresh (< 90s)
   try {
-    const cached = localStorage.getItem('crm_dash_v3');
+    const cached = localStorage.getItem('crm_dash_v5');
     if (cached) {
       const { data, ts } = JSON.parse(cached);
       if (Date.now() - ts < 90000) {
         dashboardData = data;
         displayDashboard(data);
-        _bgRefreshDashboard(); // refresh in background
+        _bgRefreshDashboard();
         return;
       }
     }
-  } catch(ce) {}
+  } catch(e) {}
 
   try {
     const response = await API.getCRMDashboard();
     if (response.success) {
       dashboardData = response.dashboard;
-      try { localStorage.setItem('crm_dash_v3', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(se) {}
+      try { localStorage.setItem('crm_dash_v5', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(e) {}
       displayDashboard(dashboardData);
     } else {
-      showMessage(response.message, 'error');
+      showMessage(response.message || 'Error loading dashboard', 'error');
     }
-  } catch (error) {
+  } catch(e) {
     showMessage('Error loading dashboard', 'error');
   }
 }
@@ -55,551 +95,617 @@ async function _bgRefreshDashboard() {
     const response = await API.getCRMDashboard();
     if (response.success) {
       dashboardData = response.dashboard;
-      try { localStorage.setItem('crm_dash_v3', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(se) {}
+      try { localStorage.setItem('crm_dash_v5', JSON.stringify({ data: dashboardData, ts: Date.now() })); } catch(e) {}
       displayDashboard(dashboardData);
     }
   } catch(e) {}
 }
 
 function displayDashboard(data) {
-  document.getElementById('overdueCount').textContent  = data.overdueCount  || 0;
-  document.getElementById('weekCount').textContent     = data.weekFollowUps || 0;
-  document.getElementById('availableCount').textContent = data.available    || 0;
-  document.getElementById('convertedCount').textContent = data.converted    || 0;
+  document.getElementById('overdueCount').textContent = data.overdueCount || 0;
+  document.getElementById('weekCount').textContent = (data.urgentCount || 0) + (data.weekFollowUps || 0);
+  document.getElementById('availableCount').textContent = data.available || 0;
+  document.getElementById('convertedCount').textContent = data.converted || 0;
 
-  // Follow-up filter counts
-  document.getElementById('fc_overdue').textContent = data.overdueCount   || 0;
-  document.getElementById('fc_today').textContent   = (data.urgentFollowUps || []).length;
-  document.getElementById('fc_week').textContent    = data.weekFollowUps  || 0;
-  // Lost count shown once myLeads loads; set placeholder
-  document.getElementById('fc_lost').textContent    = '...';
-
-  // Overdue badge on nav icon
-  const overdueNavBadge = document.getElementById('overdueNavBadge');
-  if ((data.overdueCount || 0) > 0) {
-    overdueNavBadge.textContent = data.overdueCount > 9 ? '9+' : data.overdueCount;
-    overdueNavBadge.style.display = 'block';
+  // Overdue badge on nav
+  const badge = document.getElementById('overdueNavBadge');
+  if (data.overdueCount > 0) {
+    badge.textContent = data.overdueCount > 99 ? '99+' : data.overdueCount;
+    badge.style.display = '';
   } else {
-    overdueNavBadge.style.display = 'none';
+    badge.style.display = 'none';
   }
 
-  // Today's urgent follow-ups section
+  // Today's urgent
   const urgentSection = document.getElementById('urgentSection');
   const urgentList = document.getElementById('urgentList');
-  if (data.urgentFollowUps && data.urgentFollowUps.length > 0) {
-    document.getElementById('todayBadge').textContent = data.urgentFollowUps.length;
-    urgentSection.style.display = 'block';
-    urgentList.innerHTML = '';
-    data.urgentFollowUps.forEach(function(lead) {
-      urgentList.appendChild(makeFollowupCard(lead, 'today'));
-    });
+  const urgent = data.urgentFollowUps || [];
+  if (urgent.length > 0) {
+    document.getElementById('todayBadge').textContent = urgent.length;
+    urgentList.innerHTML = urgent.map(l => followupCardHtml(l, 'today')).join('');
+    urgentSection.style.display = '';
   } else {
     urgentSection.style.display = 'none';
   }
 
+  // Sync followup data from dashboard
+  followupData.overdue = data.overdueLeads || [];
+  followupData.today   = data.urgentFollowUps || [];
+  followupData.week    = data.weekFollowUpLeads || [];
+
+  document.getElementById('fc_overdue').textContent = followupData.overdue.length;
+  document.getElementById('fc_today').textContent   = followupData.today.length;
+  document.getElementById('fc_week').textContent    = followupData.week.length;
 }
 
-// ── FOLLOW-UPS TAB ─────────────────────────
+// ── FOLLOW-UPS ─────────────────────────────
 
 function setFollowupFilter(filter, el) {
   currentFollowupFilter = filter;
-  document.querySelectorAll('#followupFilterRow .filter-chip').forEach(function(c) { c.classList.remove('active'); });
+  document.querySelectorAll('#followupsTab .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
-  renderFollowupsList();
+  renderFollowups(filter);
 }
 
-function renderFollowupsList() {
-  if (!dashboardData) return;
-  const container = document.getElementById('followupsList');
-  container.innerHTML = '';
-
-  let leads = [];
-  let type = 'week';
-
-  if (currentFollowupFilter === 'overdue') {
-    // Filter: exclude Lost, and if not admin, show only current user's leads
-    const isAdmin = currentUser && (currentUser.role === 'admin' || currentUser.role === 'manager');
-    leads = (dashboardData.overdueLeads || []).filter(function(l) {
-      if (l.status === 'Lost') return false;
-      if (!isAdmin && l.assignedTo && l.assignedTo !== currentUser.name) return false;
-      return true;
-    });
-    type = 'overdue';
-  } else if (currentFollowupFilter === 'today') {
-    leads = dashboardData.urgentFollowUps || [];
-    type = 'today';
-  } else if (currentFollowupFilter === 'week') {
-    leads = (dashboardData.weekFollowUpLeads || []).filter(function(l) { return l.status !== 'Lost'; });
-    type = 'week';
-  } else if (currentFollowupFilter === 'lost') {
-    // Pull from myLeadsCache — load if needed
-    if (myLeadsCache.length === 0) {
-      container.innerHTML = '<div class="loading" style="padding-top:30px;"><div class="spinner"></div><div>Loading lost leads...</div></div>';
-      loadMyLeads().then(function() {
-        // After load, re-render
-        renderFollowupsList();
-      });
-      return;
-    }
-    leads = myLeadsCache.filter(function(l) { return l.status === 'Lost'; });
-    type = 'lost';
-  }
+function renderFollowups(filter) {
+  const list = document.getElementById('followupsList');
+  const leads = followupData[filter] || [];
 
   if (leads.length === 0) {
-    const msgs = {
-      overdue: ['✅', 'No overdue follow-ups!', 'Great work — all follow-ups are on track.'],
-      today:   ['🔔', 'No follow-ups today', 'Enjoy the free day!'],
-      week:    ['📅', 'No follow-ups this week', 'Check back later.'],
-      lost:    ['😔', 'No lost leads', 'Great conversion rate!']
-    };
-    const m = msgs[type] || msgs['week'];
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">${m[0]}</div>
-        <div class="empty-title">${m[1]}</div>
-        <div class="empty-sub">${m[2]}</div>
-      </div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">All clear!</div><div class="empty-sub">No ${filter} follow-ups</div></div>`;
     return;
   }
 
-  leads.forEach(function(lead) {
-    container.appendChild(makeFollowupCard(lead, type));
-  });
+  list.innerHTML = leads.map(l => followupCardHtml(l, filter)).join('');
 }
 
-function makeFollowupCard(lead, type) {
-  const div = document.createElement('div');
-  div.className = 'followup-card ' + (type === 'lost' ? 'lost' : type);
+function followupCardHtml(lead, type) {
+  const badge = type === 'overdue'
+    ? `<span class="followup-date-badge overdue">${lead.daysOverdue || 0}d overdue</span>`
+    : type === 'today'
+    ? `<span class="followup-date-badge today">Today</span>`
+    : `<span class="followup-date-badge week">${lead.followUpDate || ''}</span>`;
 
-  let dateBadgeHtml = '';
-  if (type === 'overdue') {
-    dateBadgeHtml = `<div class="followup-date-badge overdue">⚠️ ${lead.daysOverdue}d overdue</div>`;
-  } else if (type === 'today') {
-    dateBadgeHtml = `<div class="followup-date-badge today">🔥 Today</div>`;
-  } else if (type === 'lost') {
-    const reason = lead.lostReason ? ' · ' + lead.lostReason : '';
-    dateBadgeHtml = `<div class="followup-date-badge" style="background:#ffebee;color:#ef5350;">❌ Lost${reason}</div>`;
-  } else {
-    dateBadgeHtml = `<div class="followup-date-badge week">📅 ${lead.followUpDate || ''}</div>`;
-  }
-
-  const assignedInfo = lead.assignedTo ? '👤 ' + lead.assignedTo + ' · ' : '';
-  const mobile = lead.mobile || lead.mobileNo || '-';
-  const name   = lead.name   || lead.customerName || '-';
-
-  div.innerHTML = `
+  return `<div class="followup-card ${type}" onclick="openLead('${lead.leadId}')">
     <div class="followup-info">
-      <div class="followup-name">${name}</div>
-      <div class="followup-meta">${assignedInfo}🏍️ ${lead.model || '-'} · 📱 ${mobile}</div>
-      ${dateBadgeHtml}
+      <div class="followup-name">${esc(lead.customerName)}</div>
+      <div class="followup-meta">${esc(lead.model || '')}${lead.assignedTo ? ' · ' + esc(lead.assignedTo) : ''}</div>
     </div>
-    <button class="btn-open" onclick="viewLeadDetails('${lead.leadId}')">Open →</button>
-  `;
-  return div;
+    ${badge}
+  </div>`;
 }
 
-// ── AVAILABLE LEADS TAB ────────────────────
+// ── POOL LEADS ─────────────────────────────
 
-async function loadAvailableLeads() {
-  const container = document.getElementById('availableLeads');
-  const loading = document.getElementById('availableLoading');
-
-  if (availableLeadsCache.length === 0) loading.style.display = 'block';
+async function loadPool() {
+  const container = document.getElementById('poolLeads');
+  const loading = document.getElementById('poolLoading');
+  loading.style.display = '';
   container.innerHTML = '';
 
   try {
     const response = await API.getAvailableLeads();
     loading.style.display = 'none';
+    if (!response.success) { container.innerHTML = errorHtml(response.message); return; }
 
-    if (response.success && response.leads.length > 0) {
-      availableLeadsCache = response.leads;
-      response.leads.forEach(function(lead) {
-        container.appendChild(createAvailableLeadCard(lead));
-      });
-    } else {
-      container.innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📦</div>
-          <div class="empty-title">No available leads</div>
-          <div class="empty-sub">All leads are currently assigned</div>
-        </div>`;
-    }
-  } catch (error) {
+    poolLeadsCache = response.leads || [];
+    renderPool();
+  } catch(e) {
     loading.style.display = 'none';
-    showMessage('Error loading available leads', 'error');
+    container.innerHTML = errorHtml('Error loading pool leads');
   }
 }
 
-function createAvailableLeadCard(lead) {
-  const card = document.createElement('div');
-  card.className = 'lead-card';
-  card.innerHTML = `
-    <div class="lead-top">
-      <div class="lead-name">${lead.customerName}</div>
-      <div class="lead-badges">
-        <span class="status-pill" style="background:#e3f2fd;color:#1565c0;">📦 Available</span>
+function renderPool() {
+  const container = document.getElementById('poolLeads');
+  if (poolLeadsCache.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📦</div><div class="empty-title">Pool is empty</div><div class="empty-sub">All social media leads have been claimed</div></div>`;
+    return;
+  }
+
+  container.innerHTML = poolLeadsCache.map(l => `
+    <div class="lead-card" style="border-left-color:#9C27B0;">
+      <div class="lead-top">
+        <div class="lead-name">${esc(l.customerName)}</div>
+        <div class="lead-badges">
+          <span class="status-pill pill-pool">Pool</span>
+          ${agingBadgeHtml(l.agingDays)}
+        </div>
+      </div>
+      <div class="lead-info">
+        <div class="lead-info-row">📱 ${esc(l.mobileNo)}</div>
+        <div class="lead-info-row">🚗 ${esc(l.model)}</div>
+        <div class="lead-info-row"><span class="social-badge">📲 ${esc(l.source)}</span></div>
+        <div class="lead-info-row" style="color:#aaa;font-size:12px;">Added by ${esc(l.createdBy || '')} · ${esc(l.createdDate || '')}</div>
+      </div>
+      <div class="lead-actions">
+        <button class="btn-act btn-claim-act" onclick="claimLead('${l.leadId}','${esc(l.customerName)}')">
+          Claim Lead
+        </button>
+        <button class="btn-act btn-edit-act" onclick="openLead('${l.leadId}')">Details</button>
       </div>
     </div>
-    <div class="lead-info">
-      <div class="lead-info-row">🏍️ ${lead.model || '-'}</div>
-      <div class="lead-info-row">📱 ${lead.mobileNo}</div>
-      <div class="lead-info-row">📅 Added ${lead.createdDate || '-'}${lead.createdBy ? ' by ' + lead.createdBy : ''}</div>
-    </div>
-    <div class="lead-actions">
-      <button class="btn-act btn-call-act" onclick="callAndClaimLead('${lead.leadId}','${lead.mobileNo}')">📞 CALL</button>
-      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}','${escHtml(lead.model||'')}')">💬 WhatsApp</button>
-    </div>
-  `;
-  return card;
+  `).join('');
 }
 
-// ── MY LEADS TAB ───────────────────────────
+async function claimLead(leadId, name) {
+  if (!confirm(`Claim lead for ${name}?`)) return;
+  try {
+    const r = await API.claimLead(leadId);
+    if (r.success) {
+      showMessage('Lead claimed — check My Leads', 'success');
+      loadPool();
+      _bgRefreshDashboard();
+    } else {
+      showMessage(r.message || 'Error claiming lead', 'error');
+    }
+  } catch(e) {
+    showMessage('Error claiming lead', 'error');
+  }
+}
+
+// ── MY LEADS ───────────────────────────────
 
 async function loadMyLeads() {
   const loading = document.getElementById('myLeadsLoading');
-  document.getElementById('myLeads').innerHTML = '';
-
-  if (myLeadsCache.length === 0) loading.style.display = 'block';
+  loading.style.display = '';
 
   try {
     const response = await API.getMyLeads();
     loading.style.display = 'none';
+    if (!response.success) { document.getElementById('myLeads').innerHTML = errorHtml(response.message); return; }
 
-    if (response.success && response.leads.length > 0) {
-      myLeadsCache = response.leads;
-      updateStatusCounts(myLeadsCache);
-      renderMyLeads();
-    } else {
-      document.getElementById('myLeads').innerHTML = `
-        <div class="empty-state">
-          <div class="empty-icon">📋</div>
-          <div class="empty-title">No leads assigned</div>
-          <div class="empty-sub">Claim available leads to get started</div>
-        </div>`;
-    }
-  } catch (error) {
+    myLeadsAll = response.leads || [];
+    updateMyLeadsCounts();
+    applyMyLeadsFilters();
+  } catch(e) {
     loading.style.display = 'none';
-    showMessage('Error loading leads', 'error');
+    document.getElementById('myLeads').innerHTML = errorHtml('Error loading leads');
   }
 }
 
-function updateStatusCounts(leads) {
-  const counts = { all: leads.length, 'Hot': 0, 'Contacted': 0, 'Interested': 0, 'Lost': 0 };
-  leads.forEach(function(l) { if (counts[l.status] !== undefined) counts[l.status]++; });
-
-  document.getElementById('cnt_all').textContent        = counts['all'];
-  document.getElementById('cnt_hot').textContent        = counts['Hot'];
-  document.getElementById('cnt_contacted').textContent  = counts['Contacted'];
-  document.getElementById('cnt_interested').textContent = counts['Interested'];
-  document.getElementById('cnt_lost').textContent       = counts['Lost'];
-  // Also update Lost count in Follow-ups tab
-  document.getElementById('fc_lost').textContent        = counts['Lost'];
+function updateMyLeadsCounts() {
+  const social = myLeadsAll.filter(l => l.isSocial).length;
+  const mine   = myLeadsAll.filter(l => !l.isSocial).length;
+  document.getElementById('cnt_all').textContent    = myLeadsAll.length;
+  document.getElementById('cnt_mine').textContent   = mine;
+  document.getElementById('cnt_social').textContent = social;
 }
 
-function filterMyLeads(status, el) {
-  currentStatusFilter = status;
-  document.querySelectorAll('#statusFilterRow .filter-chip').forEach(function(c) { c.classList.remove('active'); });
+function setMyLeadsFilter(ftype, el) {
+  currentMyLeadsSourceFilter = ftype;
+  document.querySelectorAll('#myLeadsSourceFilter .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
+  applyMyLeadsFilters();
+}
+
+function filterMyLeadsByStatus(st, el) {
+  currentMyLeadsStatusFilter = st;
+  document.querySelectorAll('#myLeadsStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyMyLeadsFilters();
+}
+
+function applyMyLeadsFilters() {
+  let leads = myLeadsAll;
+
+  if (currentMyLeadsSourceFilter === 'social') leads = leads.filter(l => l.isSocial);
+  else if (currentMyLeadsSourceFilter === 'mine') leads = leads.filter(l => !l.isSocial);
+
+  if (currentMyLeadsStatusFilter !== 'all') {
+    leads = leads.filter(l => l.status === currentMyLeadsStatusFilter);
+  }
+
+  myLeadsFiltered = leads;
   renderMyLeads();
 }
 
 function renderMyLeads() {
   const container = document.getElementById('myLeads');
-  container.innerHTML = '';
-
-  const filtered = currentStatusFilter === 'all'
-    ? myLeadsCache
-    : myLeadsCache.filter(function(l) { return l.status === currentStatusFilter; });
-
-  if (filtered.length === 0) {
-    container.innerHTML = `
-      <div class="empty-state">
-        <div class="empty-icon">🔍</div>
-        <div class="empty-title">No ${currentStatusFilter === 'all' ? '' : currentStatusFilter} leads</div>
-        <div class="empty-sub">Try a different filter</div>
-      </div>`;
+  if (myLeadsFiltered.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No leads</div><div class="empty-sub">No leads match the current filter</div></div>`;
     return;
   }
 
-  // Sort: overdue first, then by agingDays desc
-  filtered.sort(function(a, b) {
-    if (a.isOverdue && !b.isOverdue) return -1;
-    if (!a.isOverdue && b.isOverdue) return 1;
-    return (b.agingDays || 0) - (a.agingDays || 0);
-  });
-
-  filtered.forEach(function(lead) {
-    container.appendChild(createMyLeadCard(lead));
-  });
+  container.innerHTML = myLeadsFiltered.map(l => leadCardHtml(l)).join('');
 }
 
-function createMyLeadCard(lead) {
-  const card = document.createElement('div');
+function leadCardHtml(lead) {
+  const stClass = statusClass(lead.status);
+  const overdueClass = lead.isOverdue ? ' overdue-left' : '';
+  const overdueBadge = lead.isOverdue ? `<span class="overdue-badge">⚠️ ${lead.daysOverdue}d overdue</span>` : '';
+  const socialBadge = lead.isSocial ? `<span class="social-badge">📲 ${esc(lead.source)}</span>` : '';
 
-  // Status class
-  const statusClassMap = {
-    'Hot': 'hot', 'Lost': 'lost', 'Converted': 'converted'
-  };
-  const statusClass = statusClassMap[lead.status] || '';
-  card.className = 'lead-card ' + statusClass;
-
-  // Status pill
-  const pillClassMap = {
-    'Hot': 'pill-hot', 'Interested': 'pill-interested',
-    'Contacted': 'pill-contacted', 'Lost': 'pill-lost', 'Converted': 'pill-converted'
-  };
-  const pillClass = pillClassMap[lead.status] || 'pill-contacted';
-  const statusEmojiMap = {
-    'Hot': '🔥', 'Interested': '👀', 'Contacted': '📞', 'Lost': '❌', 'Converted': '✅'
-  };
-  const statusEmoji = statusEmojiMap[lead.status] || '📊';
-
-  // Aging badge
-  let agingHtml = '';
-  if (lead.agingDays !== undefined && lead.status !== 'Converted' && lead.status !== 'Lost') {
-    const agingClass = lead.agingDays >= 14 ? 'danger' : lead.agingDays >= 7 ? 'warn' : '';
-    agingHtml = `<span class="aging-badge ${agingClass}">${lead.agingDays}d</span>`;
-  }
-
-  // Overdue badge
-  const overdueHtml = lead.isOverdue
-    ? `<span class="overdue-badge">⚠️ Overdue</span>`
-    : '';
-
-  // Follow-up info
-  const followUpHtml = lead.followUpDate
-    ? `<div class="lead-info-row">📅 Follow-up: <strong>${lead.followUpDate}</strong></div>`
-    : '';
-
-  card.innerHTML = `
+  return `<div class="lead-card ${stClass}${overdueClass}">
     <div class="lead-top">
-      <div class="lead-name">${escHtml(lead.customerName)}</div>
+      <div class="lead-name">${esc(lead.customerName)}</div>
       <div class="lead-badges">
-        ${overdueHtml}
-        ${agingHtml}
-        <span class="status-pill ${pillClass}">${statusEmoji} ${lead.status}</span>
+        <span class="status-pill ${pillClass(lead.status)}">${esc(lead.status)}</span>
+        ${overdueBadge}
+        ${agingBadgeHtml(lead.agingDays)}
       </div>
     </div>
     <div class="lead-info">
-      <div class="lead-info-row">🏍️ ${lead.model || '-'}</div>
-      <div class="lead-info-row">📱 ${lead.mobileNo}</div>
-      ${followUpHtml}
+      <div class="lead-info-row">📱 ${esc(lead.mobileNo)}</div>
+      <div class="lead-info-row">🚗 ${esc(lead.model)}</div>
+      ${lead.followUpDate ? `<div class="lead-info-row">📅 Follow-up: ${esc(lead.followUpDate)}</div>` : ''}
+      ${socialBadge ? `<div class="lead-info-row">${socialBadge}</div>` : ''}
+      ${lead.assignedTo && currentUser.role === 'admin' ? `<div class="lead-info-row" style="color:#888;font-size:12px;">👤 ${esc(lead.assignedTo)}</div>` : ''}
     </div>
     <div class="lead-actions">
-      <button class="btn-act btn-call-act" onclick="callLead('${lead.mobileNo}')">📞</button>
-      <button class="btn-act btn-wa-act" onclick="openWhatsApp('${lead.mobileNo}','${escHtml(lead.customerName)}','${escHtml(lead.model||'')}')">💬</button>
-      <button class="btn-act btn-edit-act" style="flex:2;" onclick="viewLeadDetails('${lead.leadId}')">✏️ Open</button>
+      <button class="btn-act btn-call-act" onclick="callLead('${esc(lead.mobileNo)}')">📞 Call</button>
+      <button class="btn-act btn-log-act" onclick="openLogSheet('${lead.leadId}')">📝 Log</button>
+      <button class="btn-act btn-edit-act" onclick="openLead('${lead.leadId}')">Details</button>
     </div>
-  `;
-  return card;
+  </div>`;
 }
 
-// ── ANALYTICS (admin) ──────────────────────
+// ── ADMIN TAB ──────────────────────────────
 
-async function loadAnalytics() {
-  const container = document.getElementById('analyticsContent');
-  const titleEl   = document.getElementById('analyticsSection').querySelector('.section-title');
-  container.innerHTML = '<div class="loading" style="padding:16px;"><div class="spinner"></div><div>Loading...</div></div>';
+async function loadAdmin() {
+  const container = document.getElementById('adminContent');
+  const loading = document.getElementById('adminLoading');
+  loading.style.display = '';
+  container.innerHTML = '';
 
   try {
-    const response = await API.getCRMAnalytics();
-    if (!response.success) {
-      container.innerHTML = `<div style="padding:16px;color:#999;">${response.message}</div>`;
+    const [leadsResp, analyticsResp] = await Promise.all([
+      API.getAllLeads(),
+      API.getCRMAnalytics()
+    ]);
+
+    loading.style.display = 'none';
+
+    // Build executive list for assign
+    if (leadsResp.success) {
+      const execSet = new Set();
+      (leadsResp.leads || []).forEach(l => { if (l.assignedTo) execSet.add(l.assignedTo); });
+      allExecutives = Array.from(execSet);
+    }
+
+    let html = '';
+
+    // All Leads table (collapsed by status)
+    if (leadsResp.success) {
+      const leads = leadsResp.leads || [];
+      const statusOrder = ['New','Contacted','Interested','Converted','Lost',''];
+      const grouped = {};
+      statusOrder.forEach(s => grouped[s] = []);
+      leads.forEach(l => {
+        const st = l.status || '';
+        if (grouped[st]) grouped[st].push(l);
+        else grouped[''].push(l);
+      });
+
+      html += `<div style="padding:12px 16px 8px;font-size:14px;font-weight:800;color:#333;">All Leads (${leads.length})</div>`;
+      statusOrder.forEach(st => {
+        const group = grouped[st] || [];
+        if (group.length === 0) return;
+        const label = st || 'Pool';
+        html += `<div style="padding:6px 16px;font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;">${label} (${group.length})</div>`;
+        html += group.map(l => adminLeadCardHtml(l)).join('');
+      });
+    }
+
+    // Analytics
+    if (analyticsResp.success) {
+      const a = analyticsResp.analytics;
+
+      if (a.bySource && a.bySource.length > 0) {
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">📲 By Source</div>
+          <table class="analytics-table">
+            <thead><tr><th>Source</th><th>Total</th><th>Conv</th><th>Conv%</th></tr></thead>
+            <tbody>${a.bySource.map(s => `<tr>
+              <td>${esc(s.source)}</td>
+              <td>${s.total}</td>
+              <td>${s.converted}</td>
+              <td><span class="conv-rate">${s.convRate}%</span>
+                <div class="conv-bar"><div class="conv-bar-fill" style="width:${s.convRate}%"></div></div>
+              </td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      }
+
+      if (a.byExecutive && a.byExecutive.length > 0) {
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">👥 By Executive</div>
+          <table class="analytics-table">
+            <thead><tr><th>Executive</th><th>Total</th><th>Conv</th><th>Overdue</th><th>Conv%</th></tr></thead>
+            <tbody>${a.byExecutive.map(e => `<tr>
+              <td>${esc(e.executive)}</td>
+              <td>${e.total}</td>
+              <td>${e.converted}</td>
+              <td>${e.overdue > 0 ? `<span style="color:#ef5350;font-weight:700;">${e.overdue}</span>` : e.overdue}</td>
+              <td><span class="conv-rate">${e.convRate}%</span></td></tr>`).join('')}
+            </tbody>
+          </table>
+        </div>`;
+      }
+
+      if (a.lostReasons && a.lostReasons.length > 0) {
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">❌ Lost Reasons</div>
+          ${a.lostReasons.map(r => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:14px;">
+            <span>${esc(r.reason)}</span>
+            <span style="font-weight:700;color:#ef5350;">${r.count}</span>
+          </div>`).join('')}
+        </div>`;
+      }
+    }
+
+    container.innerHTML = html;
+  } catch(e) {
+    loading.style.display = 'none';
+    container.innerHTML = errorHtml('Error loading admin data');
+  }
+}
+
+function adminLeadCardHtml(lead) {
+  return `<div class="lead-card ${statusClass(lead.status)}" style="margin-bottom:8px;">
+    <div class="lead-top">
+      <div class="lead-name">${esc(lead.customerName)}</div>
+      <div class="lead-badges">
+        <span class="status-pill ${pillClass(lead.status)}">${esc(lead.status || 'Pool')}</span>
+        ${lead.isOverdue ? '<span class="overdue-badge">Overdue</span>' : ''}
+      </div>
+    </div>
+    <div class="lead-info">
+      <div class="lead-info-row">📱 ${esc(lead.mobileNo)} &nbsp;🚗 ${esc(lead.model)}</div>
+      <div class="lead-info-row">👤 ${esc(lead.assignedTo || 'Unassigned')} &nbsp;${lead.isSocial ? `<span class="social-badge">📲 ${esc(lead.source)}</span>` : ''}</div>
+    </div>
+    <div class="lead-actions">
+      <button class="btn-act btn-edit-act" onclick="openLead('${lead.leadId}')">Details</button>
+      <button class="btn-act btn-log-act" onclick="openAssignSheet('${lead.leadId}')">Assign</button>
+    </div>
+  </div>`;
+}
+
+function loadAnalytics() { loadAdmin(); }
+
+// ── LEAD DETAIL ────────────────────────────
+
+async function openLead(leadId) {
+  openSheet('detailSheet');
+  document.getElementById('detailSheetBody').innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading...</div></div>`;
+
+  try {
+    const r = await API.getLeadDetails(leadId);
+    if (!r.success) {
+      document.getElementById('detailSheetBody').innerHTML = errorHtml(r.message);
       return;
     }
-
-    const { sourceStats, execStats, lostLeads } = response.analytics;
-    const isAdmin = response.isAdmin;
-    titleEl.textContent = isAdmin ? '📊 Analytics' : '📊 My Performance';
-
-    // Source effectiveness table (no Conv%)
-    let srcRows = '';
-    sourceStats.forEach(function(s) {
-      srcRows += `<tr>
-        <td><strong>${s.source}</strong></td>
-        <td>${s.total}</td>
-        <td style="color:#66BB6A;font-weight:700;">${s.converted}</td>
-        <td style="color:#ef5350;">${s.lost}</td>
-        <td style="color:#1565c0;">${s.active}</td>
-      </tr>`;
-    });
-
-    // Executive performance table (with overdue, no Conv%)
-    let execRows = '';
-    execStats.forEach(function(e) {
-      const isMe = !isAdmin;
-      const overdueColor = e.overdue > 0 ? 'color:#ef5350;font-weight:700;' : 'color:#aaa;';
-      execRows += `<tr style="${isMe ? 'background:#f0f4ff;' : ''}">
-        <td><strong>${e.executive}</strong></td>
-        <td>${e.total}</td>
-        <td style="color:#FF7043;font-weight:600;">${e.hotLeads}</td>
-        <td style="color:#66BB6A;font-weight:700;">${e.converted}</td>
-        <td style="${overdueColor}">${e.overdue > 0 ? '⚠️ ' + e.overdue : '0'}</td>
-      </tr>`;
-    });
-
-    // Lost customer analysis
-    let lostReasonRows = '';
-    let recentLostRows = '';
-    if (lostLeads && lostLeads.length > 0) {
-      const reasonMap = {};
-      lostLeads.forEach(function(l) {
-        const r = l.lostReason || 'No reason given';
-        reasonMap[r] = (reasonMap[r] || 0) + 1;
-      });
-      Object.entries(reasonMap).sort(function(a,b){return b[1]-a[1];}).forEach(function(entry) {
-        lostReasonRows += `<tr><td>${entry[0]}</td><td style="text-align:center;font-weight:700;color:#ef5350;">${entry[1]}</td></tr>`;
-      });
-
-      lostLeads.slice(0, 15).forEach(function(l) {
-        const note = l.lastNote ? `<div style="font-size:11px;color:#888;margin-top:2px;">${escHtml(l.lastNote.substring(0,80))}${l.lastNote.length>80?'...':''}</div>` : '';
-        recentLostRows += `<tr>
-          <td><strong>${escHtml(l.customerName)}</strong>${note}</td>
-          <td style="font-size:12px;">${l.model || '-'}</td>
-          <td style="color:#ef5350;font-size:12px;">${l.lostReason || '-'}</td>
-          ${isAdmin ? `<td style="font-size:12px;">${l.assignedTo || '-'}</td>` : ''}
-        </tr>`;
-      });
-    }
-
-    const execTableTitle = isAdmin ? '👤 Executive Performance' : '👤 My Stats';
-    const lostSection = (lostLeads && lostLeads.length > 0) ? `
-      <div class="analytics-card">
-        <div class="analytics-card-title">📉 Lost Leads Analysis (${lostLeads.length} total)</div>
-        <div style="overflow-x:auto;">
-          <table class="analytics-table" style="margin-bottom:12px;">
-            <thead><tr><th>Reason</th><th style="text-align:center;">Count</th></tr></thead>
-            <tbody>${lostReasonRows}</tbody>
-          </table>
-          <div style="font-size:12px;font-weight:700;color:#555;padding:6px 0 4px;">Recent Lost Leads</div>
-          <table class="analytics-table">
-            <thead><tr><th>Customer</th><th>Model</th><th>Reason</th>${isAdmin ? '<th>Executive</th>' : ''}</tr></thead>
-            <tbody>${recentLostRows}</tbody>
-          </table>
-        </div>
-      </div>` : '';
-
-    container.innerHTML = `
-      <div class="analytics-card">
-        <div class="analytics-card-title">🎯 ${isAdmin ? 'Source Effectiveness' : 'My Leads by Source'}</div>
-        <div style="overflow-x:auto;">
-          <table class="analytics-table">
-            <thead><tr><th>Source</th><th>Total</th><th>✅Won</th><th>❌Lost</th><th>🔵Active</th></tr></thead>
-            <tbody>${srcRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
-          </table>
-        </div>
-      </div>
-      <div class="analytics-card">
-        <div class="analytics-card-title">${execTableTitle}</div>
-        <div style="overflow-x:auto;">
-          <table class="analytics-table">
-            <thead><tr><th>${isAdmin ? 'Executive' : 'Name'}</th><th>Total</th><th>🔥Hot</th><th>✅Won</th><th>⚠️Overdue</th></tr></thead>
-            <tbody>${execRows || '<tr><td colspan="5" style="color:#999;text-align:center;padding:20px;">No data yet</td></tr>'}</tbody>
-          </table>
-        </div>
-      </div>
-      ${lostSection}
-    `;
-  } catch (error) {
-    container.innerHTML = `<div style="padding:16px;color:#999;">Error loading analytics</div>`;
+    renderLeadDetail(r.lead);
+  } catch(e) {
+    document.getElementById('detailSheetBody').innerHTML = errorHtml('Error loading lead');
   }
 }
 
-// ── TAB NAVIGATION ─────────────────────────
+function renderLeadDetail(lead) {
+  const isAdmin = currentUser.role === 'admin';
+  const isOwner = isAdmin || lead.assignedTo === currentUser.name;
 
-function switchTab(tab) {
-  document.querySelectorAll('.tab-content').forEach(function(t) { t.classList.remove('active'); });
-  document.querySelectorAll('.nav-item').forEach(function(n) { n.classList.remove('active'); });
+  const interactions = (lead.interactions || []).map(i => `
+    <div class="interaction-item">
+      <span class="interaction-type">${esc(i.type)}</span>
+      ${i.note ? `<div class="interaction-note">${esc(i.note)}</div>` : ''}
+      <div class="interaction-meta">${esc(i.datetime)} · ${esc(i.by)}</div>
+    </div>
+  `).join('') || '<div style="color:#aaa;font-size:13px;padding:8px 0;">No interactions yet</div>';
 
-  if (tab === 'dashboard') {
-    document.getElementById('dashboardTab').classList.add('active');
-    document.getElementById('navDashboard').classList.add('active');
-  } else if (tab === 'followups') {
-    document.getElementById('followupsTab').classList.add('active');
-    document.getElementById('navFollowups').classList.add('active');
-    renderFollowupsList();
-  } else if (tab === 'available') {
-    document.getElementById('availableTab').classList.add('active');
-    document.getElementById('navAvailable').classList.add('active');
-    loadAvailableLeads();
-  } else if (tab === 'myLeads') {
-    document.getElementById('myLeadsTab').classList.add('active');
-    document.getElementById('navMyLeads').classList.add('active');
-    loadMyLeads();
-  }
+  const quotations = (lead.quotations || []).map(q => `
+    <div class="quotation-item">
+      <div class="quotation-no">${esc(q.quotNo)}</div>
+      <div class="quotation-meta">${esc(q.model)} · ₹${Number(q.totalAmount||0).toLocaleString('en-IN')} · ${esc(q.createdDate)}</div>
+    </div>
+  `).join('') || '<div style="color:#aaa;font-size:13px;padding:8px 0;">No quotations yet</div>';
+
+  const actionBtns = isOwner && lead.status !== 'Converted' && lead.status !== 'Lost' ? `
+    <div style="display:flex;gap:8px;padding:14px 18px;border-top:1px solid #f0f0f0;">
+      <button class="btn-act btn-call-act" style="flex:1;" onclick="callLead('${esc(lead.mobileNo)}')">📞 Call</button>
+      <button class="btn-act btn-log-act" style="flex:1;" onclick="closeSheet('detailSheet');openLogSheet('${lead.leadId}')">📝 Log</button>
+      <a class="btn-act btn-quot-act" href="crm-quote.html?leadId=${lead.leadId}" style="flex:1;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">📄 Quote</a>
+    </div>
+    ${lead.status !== 'Converted' ? `<div style="padding:0 18px 14px;">
+      <button class="btn-act" style="width:100%;background:linear-gradient(135deg,#66BB6A,#388E3C);color:white;padding:11px;" onclick="convertLead('${lead.leadId}','${esc(lead.customerName)}')">✅ Convert to Sale</button>
+    </div>` : ''}
+  ` : '';
+
+  const adminAssign = isAdmin ? `
+    <div style="padding:0 18px 14px;">
+      <button class="btn-act btn-edit-act" style="width:100%;" onclick="openAssignSheet('${lead.leadId}')">👤 Assign to Executive</button>
+    </div>
+  ` : '';
+
+  document.getElementById('detailSheetBody').innerHTML = `
+    <div class="lead-detail-header">
+      <button class="sheet-close" style="float:right;" onclick="closeSheet('detailSheet')">✕</button>
+      <div class="lead-detail-name">${esc(lead.customerName)}</div>
+      <div class="lead-detail-meta">
+        <span class="status-pill ${pillClass(lead.status)}" style="display:inline-block;margin-right:6px;">${esc(lead.status || 'Pool')}</span>
+        ${lead.isSocial ? `<span class="social-badge">📲 ${esc(lead.source)}</span>` : ''}
+        ${lead.isOverdue ? `<span class="overdue-badge" style="display:inline-block;margin-left:4px;">⚠️ ${lead.daysOverdue}d overdue</span>` : ''}
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Contact</div>
+      <div class="detail-row"><span class="detail-label">Mobile</span><span class="detail-value">${esc(lead.mobileNo)}</span></div>
+      ${lead.email ? `<div class="detail-row"><span class="detail-label">Email</span><span class="detail-value">${esc(lead.email)}</span></div>` : ''}
+      ${lead.address ? `<div class="detail-row"><span class="detail-label">Address</span><span class="detail-value">${esc(lead.address)}</span></div>` : ''}
+    </div>
+
+    <div class="detail-section">
+      <div class="detail-section-title">Lead Info</div>
+      <div class="detail-row"><span class="detail-label">Model</span><span class="detail-value">${esc(lead.model)}</span></div>
+      <div class="detail-row"><span class="detail-label">Source</span><span class="detail-value">${esc(lead.source)}</span></div>
+      <div class="detail-row"><span class="detail-label">Assigned</span><span class="detail-value">${esc(lead.assignedTo || 'Pool')}</span></div>
+      ${lead.expectedDate ? `<div class="detail-row"><span class="detail-label">Exp. Date</span><span class="detail-value">${esc(lead.expectedDate)}</span></div>` : ''}
+      ${lead.followUpDate ? `<div class="detail-row"><span class="detail-label">Follow-up</span><span class="detail-value">${esc(lead.followUpDate)}</span></div>` : ''}
+      ${lead.lostReason ? `<div class="detail-row"><span class="detail-label">Lost Reason</span><span class="detail-value" style="color:#ef5350;">${esc(lead.lostReason)}</span></div>` : ''}
+      <div class="detail-row"><span class="detail-label">Created</span><span class="detail-value">${esc(lead.createdDate)} by ${esc(lead.createdBy)}</span></div>
+    </div>
+
+    ${actionBtns}
+    ${adminAssign}
+
+    <div class="detail-section">
+      <div class="detail-section-title">Quotations</div>
+      ${quotations}
+    </div>
+
+    <div class="detail-section" style="padding-bottom:20px;">
+      <div class="detail-section-title">Interaction History</div>
+      ${interactions}
+    </div>
+  `;
 }
 
-// ── ACTIONS ────────────────────────────────
-
-function callLead(mobileNo) {
-  window.location.href = 'tel:' + mobileNo;
-}
-
-function openWhatsApp(mobileNo, customerName, modelName) {
-  const exec  = currentUser ? currentUser.name : 'Team';
-  const model = modelName || '';
-  const clean = String(mobileNo).replace(/\D/g, '');
-  const text  = 'Hi ' + customerName + ', This is ' + exec + '. Thanks for enquiring '
-    + (model ? model + ' at ' : 'at ') + 'Vinay Automobiles. Please let us know if any further help is required.';
-  window.open('https://wa.me/91' + clean + '?text=' + encodeURIComponent(text), '_blank');
-}
-
-async function callAndClaimLead(leadId, mobileNo) {
+async function convertLead(leadId, name) {
+  if (!confirm(`Convert ${name} to sale? This will mark the lead as Converted.`)) return;
   try {
-    showMessage('Claiming lead...', 'success');
-    const response = await API.claimLead(leadId, 'Contacted');
-    if (response.success) {
-      window.location.href = 'tel:' + mobileNo;
-      setTimeout(function() {
-        window.location.href = 'crm-detail.html?leadId=' + leadId;
-      }, 600);
+    const r = await API.convertLeadToSale(leadId);
+    if (r.success) {
+      closeSheet('detailSheet');
+      showMessage('Lead converted to sale!', 'success');
+      _bgRefreshDashboard();
+      loadMyLeads();
     } else {
-      showMessage(response.message, 'error');
+      showMessage(r.message || 'Error', 'error');
     }
-  } catch (error) {
-    showMessage('Error claiming lead', 'error');
+  } catch(e) {
+    showMessage('Error converting lead', 'error');
   }
 }
 
-function viewLeadDetails(leadId) {
-  window.location.href = 'crm-detail.html?leadId=' + leadId;
+// ── LOG INTERACTION SHEET ──────────────────
+
+function openLogSheet(leadId) {
+  document.getElementById('logLeadId').value = leadId;
+  selectedNoteType = '';
+  selectedStatusChange = '';
+
+  document.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('selected'));
+  document.getElementById('lostReasonSection').style.display = 'none';
+  document.getElementById('otherNoteSection').style.display = 'none';
+  document.getElementById('statusChangeRow').style.display = 'none';
+  document.getElementById('followupDateRow').style.display = '';
+  document.getElementById('logFollowUpDate').value = '';
+  document.getElementById('lostReasonText').value = '';
+  document.getElementById('otherNoteText').value = '';
+  document.getElementById('logSubmitBtn').disabled = true;
+
+  document.querySelectorAll('#statusBtns .status-btn').forEach(b => b.classList.remove('active'));
+
+  openSheet('logSheet');
 }
 
-function addNewLead() {
-  window.location.href = 'crm-quote.html';
+function selectNoteType(el, type) {
+  selectedNoteType = type;
+  document.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+
+  document.getElementById('lostReasonSection').style.display  = type === 'Lost' ? '' : 'none';
+  document.getElementById('otherNoteSection').style.display   = type === 'Other' ? '' : 'none';
+  document.getElementById('followupDateRow').style.display    = type === 'Lost' ? 'none' : '';
+  document.getElementById('statusChangeRow').style.display    = (type !== 'Lost' && type !== 'Other') ? '' : 'none';
+
+  document.getElementById('logSubmitBtn').disabled = false;
 }
 
-// ── HELPERS ────────────────────────────────
-
-function escHtml(str) {
-  return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+function selectStatus(el) {
+  selectedStatusChange = el.getAttribute('data-st');
+  document.querySelectorAll('#statusBtns .status-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
 }
 
-function showMessage(text, type) {
-  const el = document.getElementById('statusMessage');
-  el.textContent = text;
-  el.className = 'message ' + type;
-  el.style.display = 'block';
-  if (type === 'success') setTimeout(function() { el.style.display = 'none'; }, 3000);
+async function submitLog() {
+  const leadId = document.getElementById('logLeadId').value;
+  if (!selectedNoteType) { alert('Please select an interaction type'); return; }
+
+  let note = '';
+  if (selectedNoteType === 'Lost') {
+    note = document.getElementById('lostReasonText').value.trim();
+    if (!note) { alert('Please enter a lost reason'); return; }
+  } else if (selectedNoteType === 'Other') {
+    note = document.getElementById('otherNoteText').value.trim();
+  }
+
+  const followUpDate = document.getElementById('logFollowUpDate').value || null;
+
+  // If status selected, update status first
+  const btn = document.getElementById('logSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  try {
+    // Log interaction
+    const r = await API.logCRMInteraction(leadId, selectedNoteType, note, followUpDate);
+    if (!r.success) { showMessage(r.message || 'Error', 'error'); btn.disabled = false; btn.textContent = 'Save Log'; return; }
+
+    // Update status if selected
+    if (selectedStatusChange) {
+      await API.updateLead(leadId, { status: selectedStatusChange, followUpDate: followUpDate || undefined });
+    }
+
+    closeSheet('logSheet');
+    showMessage('Logged successfully', 'success');
+    _bgRefreshDashboard();
+
+    // Refresh current tab
+    if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
+    if (document.getElementById('followupsTab').classList.contains('active')) renderFollowups(currentFollowupFilter);
+  } catch(e) {
+    showMessage('Error saving log', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Save Log';
+  }
 }
 
-function goBack() {
-  window.location.href = 'home.html';
+// ── ADMIN ASSIGN ───────────────────────────
+
+function openAssignSheet(leadId) {
+  document.getElementById('assignLeadId').value = leadId;
+  const select = document.getElementById('assignSelect');
+  select.innerHTML = '<option value="">-- Select Executive --</option>' +
+    allExecutives.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+  openSheet('assignSheet');
 }
 
-// ── SEARCH MODAL ────────────────────────────
+async function submitAssign() {
+  const leadId = document.getElementById('assignLeadId').value;
+  const exec = document.getElementById('assignSelect').value;
+  if (!exec) { alert('Please select an executive'); return; }
 
-let searchDebounceTimer = null;
+  try {
+    const r = await API.assignLead(leadId, exec);
+    if (r.success) {
+      closeSheet('assignSheet');
+      showMessage('Lead assigned to ' + exec, 'success');
+      if (document.getElementById('adminTab').classList.contains('active')) loadAdmin();
+    } else {
+      showMessage(r.message || 'Error', 'error');
+    }
+  } catch(e) {
+    showMessage('Error assigning lead', 'error');
+  }
+}
+
+// ── SEARCH ─────────────────────────────────
+
+let searchTimer = null;
 
 function openSearchModal() {
   document.getElementById('searchOverlay').classList.add('open');
-  setTimeout(function() { document.getElementById('searchInput').focus(); }, 100);
+  setTimeout(() => document.getElementById('searchInput').focus(), 100);
 }
 
 function closeSearchModal() {
   document.getElementById('searchOverlay').classList.remove('open');
   document.getElementById('searchInput').value = '';
-  document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type to search customers or quotation numbers</div>';
+  document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type to search</div>';
 }
 
 function handleSearchOverlayClick(e) {
@@ -607,73 +713,93 @@ function handleSearchOverlayClick(e) {
 }
 
 function onSearchInput() {
-  clearTimeout(searchDebounceTimer);
+  clearTimeout(searchTimer);
   const q = document.getElementById('searchInput').value.trim();
   if (q.length < 2) {
-    document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type to search customers or quotation numbers</div>';
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">🔍 Type at least 2 characters</div>';
     return;
   }
-  searchDebounceTimer = setTimeout(doSearch, 400);
+  searchTimer = setTimeout(() => doSearch(q), 350);
 }
 
-async function doSearch() {
-  const q = document.getElementById('searchInput').value.trim();
-  if (q.length < 2) return;
-
-  const container = document.getElementById('searchResults');
-  container.innerHTML = '<div class="search-empty"><div class="spinner" style="width:24px;height:24px;border-width:3px;margin:0 auto 8px;display:block;"></div>Searching...</div>';
-
+async function doSearch(q) {
+  document.getElementById('searchResults').innerHTML = '<div class="search-empty">Searching...</div>';
   try {
-    const response = await API.searchCRMLeads(q);
-    if (!response.success) {
-      container.innerHTML = '<div class="search-empty">' + response.message + '</div>';
+    const r = await API.searchCRMLeads(q);
+    if (!r.success || !r.leads || r.leads.length === 0) {
+      document.getElementById('searchResults').innerHTML = '<div class="search-empty">No leads found</div>';
       return;
     }
-    renderSearchResults(response.leads || [], response.quotation);
+    document.getElementById('searchResults').innerHTML = r.leads.map(l => `
+      <div class="search-result-item" onclick="closeSearchModal();openLead('${l.leadId}')">
+        <div class="search-result-name">${esc(l.customerName)}</div>
+        <div class="search-result-meta">📱 ${esc(l.mobileNo)} · 🚗 ${esc(l.model)}</div>
+        <span class="status-pill ${pillClass(l.status)}" style="display:inline-block;margin-top:4px;">${esc(l.status || 'Pool')}</span>
+        ${l.assignedTo ? `<span style="font-size:11px;color:#aaa;margin-left:6px;">· ${esc(l.assignedTo)}</span>` : ''}
+      </div>
+    `).join('');
   } catch(e) {
-    container.innerHTML = '<div class="search-empty">Error searching. Try again.</div>';
+    document.getElementById('searchResults').innerHTML = '<div class="search-empty">Error searching</div>';
   }
 }
 
-function renderSearchResults(leads, quotation) {
-  const container = document.getElementById('searchResults');
-  container.innerHTML = '';
+// ── SHEET HELPERS ──────────────────────────
 
-  if (quotation) {
-    const qCard = document.createElement('div');
-    qCard.className = 'search-quot-card';
-    qCard.innerHTML = `
-      <div class="search-quot-title">📄 Quotation Found</div>
-      <div class="search-quot-row"><strong>${quotation.quotNo}</strong> · ${quotation.date}</div>
-      <div class="search-quot-row">👤 ${quotation.customerName} · 🏍️ ${quotation.model} ${quotation.variant || ''}</div>
-      <div class="search-quot-row">💰 ₹${Number(quotation.total||0).toLocaleString('en-IN')} · Generated by ${quotation.generatedBy}</div>
-      ${quotation.leadId ? '<button onclick="viewLeadDetails(\'' + quotation.leadId + '\');closeSearchModal();" style="margin-top:8px;width:100%;padding:8px;background:#667eea;color:white;border:none;border-radius:7px;font-weight:700;cursor:pointer;">Open Lead →</button>' : ''}
-    `;
-    container.appendChild(qCard);
-  }
+function openSheet(id) {
+  document.getElementById(id).classList.add('open');
+}
 
-  if (leads.length === 0 && !quotation) {
-    container.innerHTML = '<div class="search-empty">No results found. Try a different name or mobile.</div>';
-    return;
-  }
+function closeSheet(id) {
+  document.getElementById(id).classList.remove('open');
+}
 
-  leads.forEach(function(lead) {
-    const statusColors = {
-      'Hot': '#fff3e0::#e65100', 'Interested': '#e8f5e9::#2e7d32',
-      'Contacted': '#fce4ec::#880e4f', 'Lost': '#ffebee::#c62828',
-      'Converted': '#e8f5e9::#2e7d32'
-    };
-    const [bg, fg] = (statusColors[lead.status] || '#f5f5f5::#333').split('::');
+function handleSheetOverlayClick(e, id) {
+  if (e.target === document.getElementById(id)) closeSheet(id);
+}
 
-    const item = document.createElement('div');
-    item.className = 'search-result-item';
-    item.onclick = function() { viewLeadDetails(lead.leadId); closeSearchModal(); };
-    item.innerHTML = `
-      <div class="search-result-name">${escHtml(lead.customerName)}</div>
-      <div class="search-result-meta">📱 ${lead.mobileNo || '-'} · 🏍️ ${lead.model || '-'}</div>
-      <span class="search-result-status" style="background:${bg};color:${fg};">${lead.status || 'Available'}</span>
-      ${lead.assignedTo ? '<span style="font-size:11px;color:#aaa;margin-left:6px;">👤 ' + lead.assignedTo + '</span>' : ''}
-    `;
-    container.appendChild(item);
-  });
+// ── UTILITIES ──────────────────────────────
+
+function goToAddLead() {
+  window.location.href = 'crm-add.html';
+}
+
+function goBack() {
+  window.location.href = 'index.html';
+}
+
+function callLead(mobile) {
+  window.location.href = 'tel:' + mobile;
+}
+
+function showMessage(text, type) {
+  const el = document.getElementById('statusMessage');
+  el.textContent = text;
+  el.className = 'message ' + type;
+  el.style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (type === 'success') setTimeout(() => { el.style.display = 'none'; }, 3000);
+}
+
+function statusClass(status) {
+  const m = { New:'st-new', Contacted:'st-contacted', Interested:'st-interested', Lost:'st-lost', Converted:'st-converted' };
+  return m[status] || '';
+}
+
+function pillClass(status) {
+  const m = { New:'pill-new', Contacted:'pill-contacted', Interested:'pill-interested', Lost:'pill-lost', Converted:'pill-converted' };
+  return m[status] || 'pill-pool';
+}
+
+function agingBadgeHtml(days) {
+  if (!days || days <= 3) return '';
+  const cls = days > 14 ? 'danger' : days > 7 ? 'warn' : '';
+  return `<span class="aging-badge ${cls}">${days}d</span>`;
+}
+
+function errorHtml(msg) {
+  return `<div class="empty-state"><div class="empty-icon">⚠️</div><div class="empty-title">Error</div><div class="empty-sub">${esc(msg || 'Something went wrong')}</div></div>`;
+}
+
+function esc(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }

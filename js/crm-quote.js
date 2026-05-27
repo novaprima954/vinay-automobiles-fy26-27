@@ -28,18 +28,31 @@ document.addEventListener('DOMContentLoaded', async function() {
   const urlParams = new URLSearchParams(window.location.search);
   leadId = urlParams.get('leadId');
 
-  // Instant prefill from URL params (passed by lead detail page)
-  if (urlParams.get('name'))    document.getElementById('custName').value    = urlParams.get('name');
-  if (urlParams.get('mobile'))  document.getElementById('custMobile').value  = urlParams.get('mobile');
-  if (urlParams.get('address')) document.getElementById('custAddress').value = urlParams.get('address');
-
   // Show CRM details section only for new customers (no leadId)
   if (!leadId) {
     document.getElementById('crmDetailsSection').style.display = 'block';
   }
 
-  // Store model hint for after models load
-  const modelHint = urlParams.get('model') || '';
+  // Instant prefill from URL params (fallback)
+  let modelHint = urlParams.get('model') || '';
+  if (urlParams.get('name'))    document.getElementById('custName').value    = urlParams.get('name');
+  if (urlParams.get('mobile'))  document.getElementById('custMobile').value  = urlParams.get('mobile');
+  if (urlParams.get('address')) document.getElementById('custAddress').value = urlParams.get('address');
+
+  // If leadId given, fetch lead details to auto-fill
+  if (leadId) {
+    try {
+      const lr = await API.getLeadDetails(leadId);
+      if (lr.success && lr.lead) {
+        const l = lr.lead;
+        document.getElementById('custName').value    = l.customerName || '';
+        document.getElementById('custMobile').value  = l.mobileNo     || '';
+        document.getElementById('custAddress').value = l.address       || '';
+        modelHint = modelHint || l.model || '';
+        document.getElementById('btnOpenLead').style.display = 'block';
+      }
+    } catch(e) {}
+  }
 
   await loadModels(modelHint);
 });
@@ -339,14 +352,11 @@ async function generateQuotation() {
       const crmNote     = document.getElementById('crmNote').value.trim();
       try {
         const addRes = await API.addLead({
-          customerName:    custName,
-          mobileNo:        mobile,
-          address:         [address, district].filter(Boolean).join(', '),
-          interestedModel: model,
-          status:          crmStatus,
-          leadSource:      crmSource,
-          nextFollowupDate: crmFollowUp,
-          assignedTo:      currentUser ? currentUser.name : ''
+          customerName: custName,
+          mobileNo:     mobile,
+          address:      [address, district].filter(Boolean).join(', '),
+          model:        model,
+          source:       crmSource
         });
         if (addRes.success) {
           leadId = addRes.leadId;
@@ -360,7 +370,7 @@ async function generateQuotation() {
     }
 
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
-    API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, total: grandTotal }).catch(function() {});
+    API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, totalAmount: grandTotal }).catch(function() {});
 
   } catch (e) {
     showMessage('Error generating quotation', 'error');

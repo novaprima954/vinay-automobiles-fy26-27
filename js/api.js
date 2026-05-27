@@ -377,9 +377,9 @@ const API = {
   /**
    * Get my leads
    */
-  async getMyLeads() {
+  async getMyLeads(filterType) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getMyLeads', { sessionId });
+    return await this.call('getMyLeads', { sessionId, filterType });
   },
   
   /**
@@ -404,13 +404,9 @@ const API = {
   /**
    * Claim lead
    */
-  async claimLead(leadId, initialStatus) {
+  async claimLead(leadId) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('claimLead', {
-      sessionId,
-      leadId,
-      initialStatus
-    });
+    return await this.call('claimLead', { sessionId, leadId });
   },
   
   /**
@@ -450,9 +446,24 @@ const API = {
   /**
    * Log a CRM interaction (call, WhatsApp, visit, etc.)
    */
-  async logCRMInteraction(leadId, mode, notes) {
+  async logCRMInteraction(leadId, interactionType, note, followUpDate) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('logCRMInteraction', { sessionId, leadId, mode, notes });
+    return await this.call('logCRMInteraction', { sessionId, leadId, interactionType, note, followUpDate });
+  },
+
+  async assignLead(leadId, executiveName) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('assignLead', { sessionId, leadId, executiveName });
+  },
+
+  async getCRMPipeline() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getCRMPipeline', { sessionId });
+  },
+
+  async getLeadQuotations(leadId) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getLeadQuotations', { sessionId, leadId });
   },
 
   /**
