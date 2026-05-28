@@ -6,6 +6,7 @@ let currentUser = null;
 let leadId = null;
 let priceDetails = null;
 let lastQuotNo = '';
+let customAccItems = [];  // { id, label, price }
 
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
@@ -210,6 +211,7 @@ async function onVariantChange() {
   const variant = document.getElementById('variantSelect').value;
   if (!variant) return;
 
+  customAccItems = [];  // reset custom items on variant change
   document.getElementById('accGrid').innerHTML = '<div class="loading"><div class="spinner"></div></div>';
   document.getElementById('accessoriesCard').style.display = 'block';
   document.getElementById('btnGenerate').disabled = true;
@@ -238,26 +240,73 @@ function renderAccessories(details) {
 
   if (available.length === 0) {
     grid.innerHTML = '<div style="color:#aaa;font-size:13px;grid-column:1/-1;">No optional accessories in PriceMaster for this variant.</div>';
-    document.getElementById('summaryBar').style.display = 'block';
-    return;
+  } else {
+    available.forEach(function(acc) {
+      const price = Number(details[acc.key]);
+      const div = document.createElement('div');
+      div.className = 'acc-item checked';
+      div.onclick = function() { toggleAcc(this); };
+      div.innerHTML = `
+        <input type="checkbox" checked data-key="${acc.key}" data-price="${price}" onchange="recalculate()">
+        <div class="acc-item-info">
+          <div class="acc-item-name">${acc.label}</div>
+          <div class="acc-item-price">₹${fmt(price)}</div>
+        </div>
+      `;
+      grid.appendChild(div);
+    });
   }
 
-  available.forEach(function(acc) {
-    const price = Number(details[acc.key]);
-    const div = document.createElement('div');
-    div.className = 'acc-item checked';
-    div.onclick = function() { toggleAcc(this); };
-    div.innerHTML = `
-      <input type="checkbox" checked data-key="${acc.key}" data-price="${price}" onchange="recalculate()">
-      <div class="acc-item-info">
-        <div class="acc-item-name">${acc.label}</div>
-        <div class="acc-item-price">₹${fmt(price)}</div>
-      </div>
-    `;
-    grid.appendChild(div);
-  });
+  // Custom accessories container + Add button
+  const customSection = document.createElement('div');
+  customSection.style.cssText = 'grid-column:1/-1;margin-top:8px;';
+  customSection.innerHTML = `
+    <div id="customAccContainer"></div>
+    <button type="button" onclick="addCustomAccItem()"
+      style="width:100%;padding:10px;background:#f0f4ff;color:#667eea;border:2px dashed #667eea;
+             border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;margin-top:6px;">
+      ➕ Add Custom Product
+    </button>`;
+  grid.appendChild(customSection);
 
   document.getElementById('summaryBar').style.display = 'block';
+}
+
+function addCustomAccItem() {
+  const id = Date.now();
+  customAccItems.push({ id: id, label: '', price: 0 });
+  renderCustomAccRows();
+}
+
+function removeCustomAccItem(id) {
+  customAccItems = customAccItems.filter(function(a) { return a.id !== id; });
+  renderCustomAccRows();
+  recalculate();
+}
+
+function updateCustomAcc(id, field, value) {
+  const item = customAccItems.find(function(a) { return a.id === id; });
+  if (!item) return;
+  if (field === 'price') item.price = Math.max(0, Number(value) || 0);
+  else item.label = value;
+  recalculate();
+}
+
+function renderCustomAccRows() {
+  const container = document.getElementById('customAccContainer');
+  if (!container) return;
+  container.innerHTML = customAccItems.map(function(a) {
+    return '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;background:#f8f9fa;border:2px solid #e0e0e0;border-radius:8px;padding:8px 10px;">' +
+      '<input type="text" class="form-input" style="flex:1;padding:7px 10px;font-size:13px;" ' +
+        'placeholder="Product name" value="' + (a.label || '').replace(/"/g,'&quot;') + '" ' +
+        'oninput="updateCustomAcc(' + a.id + ',\'label\',this.value)">' +
+      '<input type="number" class="form-input" style="width:110px;padding:7px 10px;font-size:13px;text-align:right;" ' +
+        'placeholder="Amount" value="' + (a.price || '') + '" min="0" ' +
+        'oninput="updateCustomAcc(' + a.id + ',\'price\',this.value)">' +
+      '<button type="button" onclick="removeCustomAccItem(' + a.id + ')" ' +
+        'style="background:none;border:none;font-size:20px;cursor:pointer;color:#ef5350;padding:0 4px;flex-shrink:0;">✕</button>' +
+    '</div>';
+  }).join('');
 }
 
 function toggleAcc(el) {
@@ -277,21 +326,22 @@ function recalculate() {
   const productTotal = exShowroom + insurance + rto + pdi + mandAcc;
   const discount   = Math.max(0, Number(document.getElementById('discount').value) || 0);
   const financed   = document.getElementById('isFinanced') && document.getElementById('isFinanced').checked;
-  const financeCharge = financed ? 500 : 0;
+  const hypothecationCharge = financed ? 500 : 0;
 
   let accTotal = 0;
   document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
     accTotal += Number(cb.dataset.price) || 0;
   });
+  const customAccTotal = customAccItems.reduce(function(s, a) { return s + (Number(a.price) || 0); }, 0);
 
-  const grandTotal = Math.max(0, productTotal + accTotal + financeCharge - discount);
+  const grandTotal = Math.max(0, productTotal + accTotal + customAccTotal + hypothecationCharge - discount);
   document.getElementById('sumExShowroom').textContent = '₹' + fmt(exShowroom);
   document.getElementById('sumInsurance').textContent  = '₹' + fmt(insurance);
   document.getElementById('sumRto').textContent        = '₹' + fmt(rto);
   document.getElementById('sumPdi').textContent        = '₹' + fmt(pdi);
   const mandEl = document.getElementById('sumMandAcc');
   if (mandEl) { mandEl.textContent = '₹' + fmt(mandAcc); mandEl.closest('.summary-row').style.display = mandAcc > 0 ? 'flex' : 'none'; }
-  document.getElementById('sumAcc').textContent = '₹' + fmt(accTotal);
+  document.getElementById('sumAcc').textContent = '₹' + fmt(accTotal + customAccTotal);
   const finEl = document.getElementById('sumFinance');
   if (finEl) { finEl.style.display = financed ? '' : 'none'; }
   document.getElementById('sumTotal').textContent = '₹' + fmt(grandTotal);
@@ -321,8 +371,9 @@ async function generateQuotation() {
     const district = document.getElementById('custDistrict').value.trim();
     const discount = Math.max(0, Number(document.getElementById('discount').value) || 0);
     const financed = document.getElementById('isFinanced') && document.getElementById('isFinanced').checked;
-    const financeCharge = financed ? 500 : 0;
-    const execName = currentUser ? currentUser.name : '';
+    const hypothecationCharge = financed ? 500 : 0;
+    const execName   = currentUser ? currentUser.name : '';
+    const execMobile = currentUser ? (currentUser.mobile || currentUser.phone || '') : '';
 
     const exShowroom   = Number(priceDetails.exShowroom) || 0;
     const insurance    = Number(priceDetails.insurance)  || 0;
@@ -336,15 +387,18 @@ async function generateQuotation() {
       const acc = ACC_CONFIG.find(function(a) { return a.key === cb.dataset.key; });
       if (acc) selectedAcc.push({ label: acc.label, price: Number(cb.dataset.price) });
     });
-    const accTotal   = selectedAcc.reduce(function(s, a) { return s + a.price; }, 0);
-    const grandTotal = Math.max(0, productTotal + accTotal + financeCharge - discount);
+    // Include custom accessories (non-empty name + price > 0)
+    const customAcc = customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; });
+    const allAcc    = selectedAcc.concat(customAcc.map(function(a) { return { label: a.label, price: Number(a.price) }; }));
+    const accTotal   = allAcc.reduce(function(s, a) { return s + a.price; }, 0);
+    const grandTotal = Math.max(0, productTotal + accTotal + hypothecationCharge - discount);
 
     lastQuotNo = quotNo;
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, address, district,
-      model, variant, color, execName,
+      model, variant, color, execName, execMobile,
       exShowroom, insurance, rto, pdi, mandAcc, productTotal,
-      selectedAcc, accTotal, financeCharge, discount, grandTotal
+      selectedAcc: allAcc, accTotal, hypothecationCharge, discount, grandTotal
     });
 
     document.getElementById('quotContent').innerHTML = html;
@@ -521,8 +575,8 @@ function buildQuotationHTML(d) {
         <div class="quot-box-body">
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
-          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:8px;padding:6px 10px;background:#fffde7;border:1.5px solid #f9a825;border-radius:5px;font-size:11px;font-weight:800;color:#333;">⭐ Standard Accessories: ${getMandatoryAccDescription(d.model)}</div>` : ''}
-          ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}</div>` : ''}
+          ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:8px;font-size:11px;color:#444;">Standard Accessories: ${getMandatoryAccDescription(d.model)}</div>` : ''}
+          ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}${d.execMobile ? ' · ' + d.execMobile : ''}</div>` : ''}
         </div>
       </div>
     </div>
@@ -537,7 +591,7 @@ function buildQuotationHTML(d) {
               <tr><td>Ex-showroom Price</td><td>₹ ${fmt(d.exShowroom)}</td></tr>
               ${d.insurance > 0 ? `<tr><td>Insurance (1Y PA, 1Y OD, 5Y TP)</td><td>₹ ${fmt(d.insurance)}</td></tr>` : ''}
               ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
-              ${mandAcc > 0 ? `<tr style="background:#fffde7;"><td style="font-weight:800;font-size:12px;">⭐ Standard Accessories<br><span style="font-weight:600;font-size:10px;color:#555;">${getMandatoryAccDescription(d.model)}</span></td><td style="font-weight:800;font-size:12px;">₹ ${fmt(mandAcc)}</td></tr>` : ''}
+              ${mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(d.model)}</span></td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="total-row"><td><strong>Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
@@ -545,7 +599,7 @@ function buildQuotationHTML(d) {
                 ${accRows}
                 <tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : ''}
-              ${d.financeCharge > 0 ? `<tr style="background:#f3e5f5;"><td style="font-weight:700;">🏦 Finance Charge</td><td style="font-weight:700;">₹ ${fmt(d.financeCharge)}</td></tr>` : ''}
+              ${d.hypothecationCharge > 0 ? `<tr><td>Hypothecation Charge</td><td>₹ ${fmt(d.hypothecationCharge)}</td></tr>` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
               <tr class="grand-total"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
@@ -588,10 +642,10 @@ function getVehicleType(model) {
 
 function getMandatoryAccDescription(model) {
   const m = (model || '').toLowerCase();
-  const models = ['jupiter 110', 'jupiter 125', 'ntorq', 'zest', 'orbiter', 'iqube'];
-  if (models.some(function(s) { return m.includes(s); })) return 'Footrest, Side Stand';
-  if (m.includes('jupiter')) return 'Footrest, Side Stand'; // fallback for other Jupiter variants
-  return '';
+  const models = ['jupiter', 'ntorq', 'zest', 'orbiter', 'iqube'];
+  if (models.some(function(s) { return m.includes(s); })) return 'Footrest, Side Stand, Number Plate Bracket, Centre Stand';
+  // Motorcycles get simpler set
+  return 'Footrest, Side Stand, Number Plate Bracket';
 }
 
 function fmt(n) {

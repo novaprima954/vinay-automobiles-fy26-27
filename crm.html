@@ -383,10 +383,15 @@
 
   <!-- ═══ FOLLOW-UPS TAB ═══ -->
   <div id="followupsTab" class="tab-content">
-    <div class="filter-row">
+    <div class="filter-row" id="followupTypeFilter">
       <div class="filter-chip active" onclick="setFollowupFilter('overdue',this)">⚠️ Overdue <span class="chip-count" id="fc_overdue">0</span></div>
       <div class="filter-chip" onclick="setFollowupFilter('today',this)">🔥 Today <span class="chip-count" id="fc_today">0</span></div>
       <div class="filter-chip" onclick="setFollowupFilter('week',this)">📅 Week <span class="chip-count" id="fc_week">0</span></div>
+    </div>
+    <div class="filter-row" id="followupSourceFilter">
+      <div class="filter-chip active" onclick="setFollowupSourceFilter('all',this)">All Leads</div>
+      <div class="filter-chip" onclick="setFollowupSourceFilter('walkin',this)">🚶 Walk-in</div>
+      <div class="filter-chip" onclick="setFollowupSourceFilter('other',this)">📲 Other Sources</div>
     </div>
     <div id="followupsList"></div>
   </div>

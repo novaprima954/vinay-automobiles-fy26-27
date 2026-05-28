@@ -10,6 +10,7 @@ let currentMyLeadsSourceFilter = 'all';
 let currentMyLeadsStatusFilter = 'all';
 let poolLeadsCache = [];
 let currentFollowupFilter = 'overdue';
+let currentFollowupSourceFilter = 'all';  // 'all' | 'walkin' | 'other'
 let followupData = { overdue: [], today: [], week: [] };
 let selectedNoteType = '';
 let selectedStatusChange = '';
@@ -142,14 +143,28 @@ function displayDashboard(data) {
 
 function setFollowupFilter(filter, el) {
   currentFollowupFilter = filter;
-  document.querySelectorAll('#followupsTab .filter-chip').forEach(c => c.classList.remove('active'));
+  document.querySelectorAll('#followupTypeFilter .filter-chip').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   renderFollowups(filter);
 }
 
+function setFollowupSourceFilter(filter, el) {
+  currentFollowupSourceFilter = filter;
+  document.querySelectorAll('#followupSourceFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderFollowups(currentFollowupFilter);
+}
+
 function renderFollowups(filter) {
   const list = document.getElementById('followupsList');
-  const leads = followupData[filter] || [];
+  let leads = followupData[filter] || [];
+
+  // Apply source sub-filter
+  if (currentFollowupSourceFilter === 'walkin') {
+    leads = leads.filter(l => l.source && l.source.toLowerCase().includes('walk'));
+  } else if (currentFollowupSourceFilter === 'other') {
+    leads = leads.filter(l => !l.source || !l.source.toLowerCase().includes('walk'));
+  }
 
   if (leads.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">All clear!</div><div class="empty-sub">No ${filter} follow-ups</div></div>`;
@@ -168,12 +183,20 @@ function followupCardHtml(lead, type) {
 
   const meta = [lead.model, lead.source, lead.assignedTo].filter(Boolean).map(esc).join(' · ');
 
-  return `<div class="followup-card ${type}" onclick="openLead('${lead.leadId}')">
-    <div class="followup-info">
-      <div class="followup-name">${esc(lead.customerName)}</div>
-      <div class="followup-meta">${meta}</div>
+  return `<div class="followup-card ${type}" style="flex-direction:column;gap:8px;cursor:default;">
+    <div style="display:flex;align-items:center;gap:12px;width:100%;" onclick="openLead('${lead.leadId}')" style="cursor:pointer;">
+      <div class="followup-info">
+        <div class="followup-name">${esc(lead.customerName)}</div>
+        <div class="followup-meta">${meta}</div>
+        ${lead.mobileNo ? `<div class="followup-meta">📱 ${esc(lead.mobileNo)}</div>` : ''}
+      </div>
+      ${badge}
     </div>
-    ${badge}
+    <div style="display:flex;gap:8px;width:100%;">
+      <button class="btn-act btn-call-act" style="flex:1;padding:8px;" onclick="callAndLog('${esc(lead.mobileNo || '')}','${lead.leadId}')">📞 Call</button>
+      <button class="btn-act btn-log-act"  style="flex:1;padding:8px;" onclick="openLogSheet('${lead.leadId}')">📝 Log</button>
+      <button class="btn-act btn-edit-act" style="flex:1;padding:8px;" onclick="openLead('${lead.leadId}')">Details</button>
+    </div>
   </div>`;
 }
 
@@ -229,9 +252,7 @@ function renderPool() {
         <div class="lead-info-row" style="color:#aaa;font-size:12px;">Added by ${esc(l.createdBy || '')} · ${esc(l.createdDate || '')}</div>
       </div>
       <div class="lead-actions">
-        <button class="btn-act btn-claim-act" onclick="claimLead('${l.leadId}','${esc(l.customerName)}')">
-          Claim Lead
-        </button>
+        <button class="btn-act btn-call-act" onclick="callPoolLead('${esc(l.mobileNo || '')}','${l.leadId}')">📞 Call</button>
         <button class="btn-act btn-edit-act" onclick="openLead('${l.leadId}')">Details</button>
       </div>
     </div>
@@ -878,11 +899,31 @@ function goToAddLead() {
 }
 
 function goBack() {
-  window.location.href = 'index.html';
+  window.location.href = 'home.html';
 }
 
 function callLead(mobile) {
   window.location.href = 'tel:' + mobile;
+}
+
+// Call + immediately open log sheet (for followup cards)
+function callAndLog(mobile, leadId) {
+  if (mobile) window.location.href = 'tel:' + mobile;
+  openLogSheet(leadId);
+}
+
+// For pool leads: auto-claim then call + log
+async function callPoolLead(mobile, leadId) {
+  if (mobile) window.location.href = 'tel:' + mobile;
+  openLogSheet(leadId);
+  // Silently claim in background
+  try {
+    const r = await API.claimLead(leadId);
+    if (r.success) {
+      showMessage('Lead claimed to you — log your interaction', 'success');
+      setTimeout(() => loadPool(), 1500);
+    }
+  } catch(e) {}
 }
 
 function showMessage(text, type) {
