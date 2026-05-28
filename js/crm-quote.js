@@ -72,29 +72,40 @@ async function searchLead() {
 
   try {
     const response = await API.findLeadByMobile(mobile);
-    if (response.success) {
-      const lead = response.lead;
-      document.getElementById('custName').value    = lead.customerName || '';
-      document.getElementById('custMobile').value  = lead.mobileNo    || '';
-      document.getElementById('custEmail').value   = lead.email       || '';
-      document.getElementById('custAddress').value = lead.address     || '';
-      leadId = lead.leadId;
-
-      // Try to select model
-      if (lead.model) {
-        const matched = setModelValue(lead.model);
-        if (matched) await onModelChange(lead.model);
-      }
-
-      // Collapse search box
-      document.getElementById('searchBox').style.display = 'none';
-      document.getElementById('toggleSearchBtn').textContent = '🔍 Search Existing Lead';
-      showMessage('✅ Lead details filled from ' + lead.customerName + ' (' + (lead.status || 'available') + ')', 'success');
-    } else {
-      showMessage(response.message, 'error');
+    if (!response.success) {
+      showMessage(response.message || 'Search failed', 'error');
+      return;
     }
+    if (!response.found) {
+      showMessage('No existing lead found for this mobile. Fill in details to create a new one.', 'info');
+      document.getElementById('custMobile').value = mobile;
+      return;
+    }
+
+    // Lead found — fill all fields
+    const lead = response.lead;
+    document.getElementById('custName').value    = lead.customerName || '';
+    document.getElementById('custMobile').value  = lead.mobileNo    || mobile;
+    document.getElementById('custEmail').value   = lead.email       || '';
+    document.getElementById('custAddress').value = lead.address     || '';
+    leadId = lead.leadId;
+
+    // Try to select model
+    if (lead.model) {
+      const matched = setModelValue(lead.model);
+      if (matched) await onModelChange(lead.model);
+    }
+
+    // Hide CRM details section (already a CRM lead)
+    document.getElementById('crmDetailsSection').style.display = 'none';
+    document.getElementById('btnOpenLead').style.display = 'block';
+
+    // Collapse search box
+    document.getElementById('searchBox').style.display = 'none';
+    document.getElementById('toggleSearchBtn').textContent = '🔍 Search Existing Lead';
+    showMessage('✅ ' + lead.customerName + ' — ' + (lead.status || 'Pool') + (lead.assignedTo ? ' · ' + lead.assignedTo : ''), 'success');
   } catch (e) {
-    showMessage('Error searching lead', 'error');
+    showMessage('Search error: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = 'Find';
   }
@@ -407,8 +418,6 @@ async function generateQuotation() {
     // Auto-save new lead to CRM if not already a known lead
     if (!leadId) {
       const crmSource   = document.getElementById('crmSource').value;
-      const crmStatus   = document.getElementById('crmStatus').value;
-      const crmFollowUp = document.getElementById('crmFollowUp').value;
       const crmNote     = document.getElementById('crmNote').value.trim();
       try {
         const addRes = await API.addLead({
@@ -425,12 +434,26 @@ async function generateQuotation() {
           }
           document.getElementById('btnOpenLead').style.display = 'block';
           document.getElementById('crmDetailsSection').style.display = 'none';
+        } else if (addRes.isDuplicate && addRes.existingLead) {
+          // Mobile already in CRM — link quotation to existing lead
+          leadId = addRes.existingLead.leadId;
+          document.getElementById('btnOpenLead').style.display = 'block';
+          document.getElementById('crmDetailsSection').style.display = 'none';
+          showMessage('ℹ️ Customer already in CRM — quotation linked to existing lead', 'success');
         }
-      } catch(ce) {}
+      } catch(ce) {
+        console.error('addLead error:', ce);
+      }
     }
 
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
-    API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, totalAmount: grandTotal }).catch(function() {});
+
+    // Save quotation record to CRM
+    try {
+      await API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, totalAmount: grandTotal });
+    } catch(sqe) {
+      console.error('saveCRMQuotation error:', sqe);
+    }
 
   } catch (e) {
     showMessage('Error generating quotation', 'error');
