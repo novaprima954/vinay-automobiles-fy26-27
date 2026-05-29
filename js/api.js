@@ -523,11 +523,11 @@ const API = {
   },
 
   /**
-   * Get today's calls/interactions (admin only)
+   * Get calls/interactions report for a date range (admin only)
    */
-  async getTodaysCalls() {
+  async getCallsReport(fromDate, toDate) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getTodaysCalls', { sessionId });
+    return await this.call('getCallsReport', { sessionId, fromDate, toDate });
   },
 
   /**

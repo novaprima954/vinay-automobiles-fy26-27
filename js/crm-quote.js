@@ -378,6 +378,12 @@ function restoreQuotData(qd) {
     const colEl = document.getElementById('vehicleColor');
     if (colEl) colEl.value = qd.color;
   }
+
+  // 6. Restore follow-up date
+  if (qd.followUpDate) {
+    const fuEl = document.getElementById('quotFollowUpDate');
+    if (fuEl) { fuEl.value = qd.followUpDate; fuEl.style.borderColor = '#e8e8e8'; }
+  }
 }
 
 function toggleAcc(el) {
@@ -430,6 +436,14 @@ async function generateQuotation() {
   if (!mobile || !/^\d{10}$/.test(mobile)) { showMessage('Please enter valid 10-digit mobile', 'error'); return; }
   if (!model || !variant) { showMessage('Please select model and variant', 'error'); return; }
 
+  const followUpDate = document.getElementById('quotFollowUpDate') ? document.getElementById('quotFollowUpDate').value : '';
+  if (!followUpDate) {
+    showMessage('Please set a Follow-up Date before generating the quotation', 'error');
+    document.getElementById('quotFollowUpDate').style.borderColor = '#ef5350';
+    document.getElementById('followUpSection').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
+
   const btn = document.getElementById('btnGenerate');
   btn.disabled = true; btn.textContent = 'Generating...';
 
@@ -476,7 +490,8 @@ async function generateQuotation() {
       customAcc: customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; }),
       discount:   discount,
       isFinanced: financed,
-      color:      color
+      color:      color,
+      followUpDate: followUpDate
     };
 
     const html = buildQuotationHTML({
@@ -491,20 +506,24 @@ async function generateQuotation() {
 
     // Auto-save new lead to CRM if not already a known lead
     if (!leadId) {
-      const crmSource   = document.getElementById('crmSource').value;
-      const crmNote     = document.getElementById('crmNote').value.trim();
+      const crmSource = document.getElementById('crmSource') ? document.getElementById('crmSource').value : 'Walk-in';
+      const crmNote   = document.getElementById('crmNote')   ? document.getElementById('crmNote').value.trim() : '';
       try {
         const addRes = await API.addLead({
           customerName: custName,
           mobileNo:     mobile,
           address:      [address, district].filter(Boolean).join(', '),
           model:        model,
-          source:       crmSource
+          source:       crmSource,
+          followUpDate: followUpDate
         });
         if (addRes.success) {
           leadId = addRes.leadId;
           if (crmNote) {
-            await API.logCRMInteraction(leadId, 'Note', crmNote).catch(function() {});
+            await API.logCRMInteraction(leadId, 'Note', crmNote, followUpDate).catch(function() {});
+          } else {
+            // Log quotation interaction with follow-up date
+            await API.logCRMInteraction(leadId, 'Quotation Sent', 'Quotation ' + quotNo + ' generated', followUpDate).catch(function() {});
           }
           document.getElementById('btnOpenLead').style.display = 'block';
           document.getElementById('crmDetailsSection').style.display = 'none';
@@ -518,6 +537,13 @@ async function generateQuotation() {
       } catch(ce) {
         console.error('addLead error:', ce);
       }
+    }
+
+    // Save follow-up date for existing leads too
+    if (leadId && followUpDate) {
+      try {
+        await API.updateLead(leadId, { followUpDate: followUpDate });
+      } catch(e) { console.error('updateLead followup error:', e); }
     }
 
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });

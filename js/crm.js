@@ -23,6 +23,9 @@ let currentAllLeadsStatusFilter = 'all';
 let currentAllLeadsSourceFilter = 'all';
 let currentAllLeadsExecFilter   = 'all';
 
+// Pool claim — must submit log before lead is claimed
+let pendingPoolClaimLeadId = null;
+
 document.addEventListener('DOMContentLoaded', async function() {
   const session = SessionManager.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
@@ -527,7 +530,18 @@ function allLeadCardHtml(lead) {
 
 // ── ADMIN TAB ──────────────────────────────
 
+function _todayISOStr() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 async function loadAdmin() {
+  // Pre-fill calls report dates to today if not already set
+  const fromEl = document.getElementById('callsFromDate');
+  const toEl   = document.getElementById('callsToDate');
+  const today  = _todayISOStr();
+  if (fromEl && !fromEl.value) fromEl.value = today;
+  if (toEl   && !toEl.value)   toEl.value   = today;
   const container = document.getElementById('adminContent');
   const loading = document.getElementById('adminLoading');
   loading.style.display = '';
@@ -707,27 +721,32 @@ async function loadAnalytics() {
   }
 }
 
-// ── TODAY'S CALLS ──────────────────────────
+// ── CALLS REPORT ───────────────────────────
 
-async function loadTodaysCalls() {
-  const container = document.getElementById('todaysCallsContent');
-  const btn = document.getElementById('todaysCallsRefreshBtn');
+async function loadCallsReport() {
+  const container = document.getElementById('callsReportContent');
+  const btn = document.getElementById('callsReportBtn');
   if (!container) return;
-  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading today\'s calls...</div></div>';
+
+  const fromDate = document.getElementById('callsFromDate').value;
+  const toDate   = document.getElementById('callsToDate').value;
+  if (!fromDate || !toDate) { showMessage('Select both From and To dates', 'error'); return; }
+
+  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading calls...</div></div>';
   if (btn) btn.disabled = true;
 
   try {
-    const r = await API.getTodaysCalls();
+    const r = await API.getCallsReport(fromDate, toDate);
     if (btn) btn.disabled = false;
     if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
 
     const calls = r.calls || [];
     if (calls.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📵</div><div class="empty-title">No calls today</div><div class="empty-sub">No interactions logged today yet</div></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📵</div><div class="empty-title">No interactions</div><div class="empty-sub">No interactions logged in this date range</div></div>`;
       return;
     }
 
-    let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''} today</div>`;
+    let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>`;
     html += calls.map(c => `
       <div class="lead-card" style="border-left-color:${callTypeColor(c.type)};">
         <div class="lead-top">
@@ -737,8 +756,9 @@ async function loadTodaysCalls() {
           </div>
         </div>
         <div class="lead-info">
-          <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🕐 ${esc(c.time)}</div>
-          <div class="lead-info-row">👤 ${esc(c.by)} &nbsp;🚗 ${esc(c.model || '—')}</div>
+          <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🚗 ${esc(c.model || '—')}</div>
+          <div class="lead-info-row">🕐 ${esc(c.datetime)} &nbsp;👤 ${esc(c.by)}</div>
+          ${c.followUpDate ? `<div class="lead-info-row" style="color:#667eea;font-weight:700;">📅 Next Follow-up: ${esc(c.followUpDate)}</div>` : ''}
           ${c.note ? `<div class="lead-info-row" style="color:#555;font-style:italic;">"${esc(c.note)}"</div>` : ''}
         </div>
         <div class="lead-actions">
@@ -903,7 +923,9 @@ async function convertLead(leadId, name) {
 
 // ── LOG INTERACTION SHEET ──────────────────
 
-function openLogSheet(leadId) {
+function openLogSheet(leadId, isPoolClaim) {
+  pendingPoolClaimLeadId = isPoolClaim ? leadId : null;
+
   document.getElementById('logLeadId').value = leadId;
   selectedNoteType = '';
   selectedStatusChange = '';
@@ -919,6 +941,10 @@ function openLogSheet(leadId) {
   document.getElementById('logSubmitBtn').disabled = true;
 
   document.querySelectorAll('#statusBtns .status-btn').forEach(b => b.classList.remove('active'));
+
+  // Show/hide pool-claim notice
+  const poolNotice = document.getElementById('poolClaimNotice');
+  if (poolNotice) poolNotice.style.display = isPoolClaim ? '' : 'none';
 
   openSheet('logSheet');
 }
@@ -956,12 +982,23 @@ async function submitLog() {
 
   const followUpDate = document.getElementById('logFollowUpDate').value || null;
 
-  // If status selected, update status first
   const btn = document.getElementById('logSubmitBtn');
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
   try {
+    // If pool claim: claim lead first, then log
+    if (pendingPoolClaimLeadId) {
+      btn.textContent = 'Claiming...';
+      const cr = await API.claimLead(pendingPoolClaimLeadId);
+      if (!cr.success) {
+        showMessage(cr.message || 'Could not claim lead', 'error');
+        btn.disabled = false; btn.textContent = 'Save Log';
+        return;
+      }
+      showMessage('Lead claimed — saving interaction...', 'info');
+    }
+
     // Log interaction
     const r = await API.logCRMInteraction(leadId, selectedNoteType, note, followUpDate);
     if (!r.success) { showMessage(r.message || 'Error', 'error'); btn.disabled = false; btn.textContent = 'Save Log'; return; }
@@ -972,12 +1009,17 @@ async function submitLog() {
     }
 
     closeSheet('logSheet');
-    showMessage('Logged successfully', 'success');
+    pendingPoolClaimLeadId = null;
+
+    if (selectedNoteType && leadId) {
+      showMessage(pendingPoolClaimLeadId ? 'Lead claimed & interaction logged ✅' : 'Logged successfully', 'success');
+    }
     _bgRefreshDashboard();
 
     // Refresh current tab
     if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
     if (document.getElementById('followupsTab').classList.contains('active')) renderFollowups(currentFollowupFilter);
+    if (document.getElementById('poolTab').classList.contains('active')) loadPool();
   } catch(e) {
     showMessage('Error saving log', 'error');
   } finally {
@@ -1097,6 +1139,7 @@ function openSheet(id) {
 
 function closeSheet(id) {
   document.getElementById(id).classList.remove('open');
+  if (id === 'logSheet') pendingPoolClaimLeadId = null;
 }
 
 function handleSheetOverlayClick(e, id) {
@@ -1123,18 +1166,10 @@ function callAndLog(mobile, leadId) {
   openLogSheet(leadId);
 }
 
-// For pool leads: auto-claim then call + log
-async function callPoolLead(mobile, leadId) {
+// For pool leads: dial, then open log sheet — claim happens ONLY after log is submitted
+function callPoolLead(mobile, leadId) {
   if (mobile) window.location.href = 'tel:' + mobile;
-  openLogSheet(leadId);
-  // Silently claim in background
-  try {
-    const r = await API.claimLead(leadId);
-    if (r.success) {
-      showMessage('Lead claimed to you — log your interaction', 'success');
-      setTimeout(() => loadPool(), 1500);
-    }
-  } catch(e) {}
+  openLogSheet(leadId, true);  // isPoolClaim = true
 }
 
 function showMessage(text, type) {
