@@ -6,7 +6,8 @@ let currentUser = null;
 let leadId = null;
 let priceDetails = null;
 let lastQuotNo = '';
-let customAccItems = [];  // { id, label, price }
+let customAccItems = [];    // { id, label, price }
+let pendingQuotData = null; // quotation data for reprint restoration
 
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
@@ -28,6 +29,10 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   const urlParams = new URLSearchParams(window.location.search);
   leadId = urlParams.get('leadId');
+  const reprintQuotNo = urlParams.get('quotNo');
+
+  // If reprinting, fix the quotNo so we don't generate a new one
+  if (reprintQuotNo) lastQuotNo = reprintQuotNo;
 
   // Show CRM details section only for new customers (no leadId)
   if (!leadId) {
@@ -51,6 +56,18 @@ document.addEventListener('DOMContentLoaded', async function() {
         document.getElementById('custAddress').value = l.address       || '';
         modelHint = modelHint || l.model || '';
         document.getElementById('btnOpenLead').style.display = 'block';
+      }
+    } catch(e) {}
+  }
+
+  // If reprinting a quotation, load saved accessories/settings
+  if (reprintQuotNo) {
+    try {
+      const qr = await API.getQuotationByNo(reprintQuotNo);
+      if (qr.success && qr.quotation && qr.quotation.quotData) {
+        try { pendingQuotData = JSON.parse(qr.quotation.quotData); } catch(e) {}
+        // Override model hint from saved quotation
+        if (!modelHint && qr.quotation.model) modelHint = qr.quotation.model;
       }
     } catch(e) {}
   }
@@ -86,7 +103,6 @@ async function searchLead() {
     const lead = response.lead;
     document.getElementById('custName').value    = lead.customerName || '';
     document.getElementById('custMobile').value  = lead.mobileNo    || mobile;
-    document.getElementById('custEmail').value   = lead.email       || '';
     document.getElementById('custAddress').value = lead.address     || '';
     leadId = lead.leadId;
 
@@ -232,6 +248,10 @@ async function onVariantChange() {
     if (response.success) {
       priceDetails = response.details;
       renderAccessories(priceDetails);
+      if (pendingQuotData) {
+        restoreQuotData(pendingQuotData);
+        pendingQuotData = null;
+      }
       recalculate();
       document.getElementById('btnGenerate').disabled = false;
     } else {
@@ -320,6 +340,46 @@ function renderCustomAccRows() {
   }).join('');
 }
 
+/**
+ * Restore accessories from saved quotData (for reprint)
+ * quotData = { selectedAccKeys, customAcc, discount, isFinanced, color }
+ */
+function restoreQuotData(qd) {
+  if (!qd) return;
+
+  // 1. Uncheck all, then re-check only saved keys
+  document.querySelectorAll('#accGrid input[type="checkbox"]').forEach(function(cb) {
+    const keep = qd.selectedAccKeys && qd.selectedAccKeys.includes(cb.dataset.key);
+    cb.checked = keep;
+    const item = cb.closest('.acc-item');
+    if (item) item.classList.toggle('checked', keep);
+  });
+
+  // 2. Restore custom accessories
+  if (qd.customAcc && qd.customAcc.length > 0) {
+    customAccItems = qd.customAcc.map(function(a) {
+      return { id: Date.now() + Math.random(), label: a.label, price: Number(a.price) || 0 };
+    });
+    renderCustomAccRows();
+  }
+
+  // 3. Restore discount
+  if (qd.discount != null) {
+    const discEl = document.getElementById('discount');
+    if (discEl) discEl.value = qd.discount;
+  }
+
+  // 4. Restore hypothecation
+  const finEl = document.getElementById('isFinanced');
+  if (finEl && qd.isFinanced != null) finEl.checked = !!qd.isFinanced;
+
+  // 5. Restore color
+  if (qd.color && qd.color !== '-') {
+    const colEl = document.getElementById('vehicleColor');
+    if (colEl) colEl.value = qd.color;
+  }
+}
+
 function toggleAcc(el) {
   const cb = el.querySelector('input[type="checkbox"]');
   cb.checked = !cb.checked;
@@ -374,8 +434,8 @@ async function generateQuotation() {
   btn.disabled = true; btn.textContent = 'Generating...';
 
   try {
-    // Random 4-digit quotation number
-    const quotNo = 'QT' + Math.floor(1000 + Math.random() * 9000);
+    // Use existing quotNo if reprinting, otherwise generate new
+    const quotNo = lastQuotNo || ('QT' + Math.floor(1000 + Math.random() * 9000));
 
     const color    = document.getElementById('vehicleColor').value.trim() || '-';
     const address  = document.getElementById('custAddress').value.trim();
@@ -405,6 +465,20 @@ async function generateQuotation() {
     const grandTotal = Math.max(0, productTotal + accTotal + hypothecationCharge - discount);
 
     lastQuotNo = quotNo;
+
+    // Build quotData for saving (enables reprint restoration)
+    const selectedAccKeys = [];
+    document.querySelectorAll('#accGrid input[type="checkbox"]').forEach(function(cb) {
+      if (cb.checked && cb.dataset.key) selectedAccKeys.push(cb.dataset.key);
+    });
+    const quotDataObj = {
+      selectedAccKeys: selectedAccKeys,
+      customAcc: customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; }),
+      discount:   discount,
+      isFinanced: financed,
+      color:      color
+    };
+
     const html = buildQuotationHTML({
       quotNo, date: new Date(), custName, mobile, address, district,
       model, variant, color, execName, execMobile,
@@ -448,9 +522,9 @@ async function generateQuotation() {
 
     document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
 
-    // Save quotation record to CRM
+    // Save quotation record to CRM (with quotData for reprint)
     try {
-      await API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, totalAmount: grandTotal });
+      await API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model, variant, totalAmount: grandTotal, quotData: quotDataObj });
     } catch(sqe) {
       console.error('saveCRMQuotation error:', sqe);
     }

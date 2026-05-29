@@ -515,6 +515,22 @@ const API = {
   },
 
   /**
+   * Get a single quotation by quotation number (for reprint)
+   */
+  async getQuotationByNo(quotNo) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getQuotationByNo', { sessionId, quotNo });
+  },
+
+  /**
+   * Get today's calls/interactions (admin only)
+   */
+  async getTodaysCalls() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getTodaysCalls', { sessionId });
+  },
+
+  /**
    * Add note to lead
    */
   async addLeadNote(leadId, note) {

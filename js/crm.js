@@ -16,6 +16,13 @@ let selectedNoteType = '';
 let selectedStatusChange = '';
 let allExecutives = [];   // for admin assign
 
+// All Leads tab state
+let allLeadsAll = [];
+let allLeadsFiltered = [];
+let currentAllLeadsStatusFilter = 'all';
+let currentAllLeadsSourceFilter = 'all';
+let currentAllLeadsExecFilter   = 'all';
+
 document.addEventListener('DOMContentLoaded', async function() {
   const session = SessionManager.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
@@ -28,6 +35,10 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('navAdmin').style.display = '';
     document.getElementById('adminAnalyticsSection').style.display = '';
   }
+
+  // All Leads tab is visible for all roles
+  const navAllLeads = document.getElementById('navAllLeads');
+  if (navAllLeads) navAllLeads.style.display = '';
 
   await loadDashboard();
 });
@@ -44,6 +55,7 @@ function switchTab(tab) {
     followups:  ['followupsTab', 'navFollowups'],
     pool:       ['poolTab',      'navPool'],
     myLeads:    ['myLeadsTab',   'navMyLeads'],
+    allLeads:   ['allLeadsTab',  'navAllLeads'],
     admin:      ['adminTab',     'navAdmin'],
   };
 
@@ -56,6 +68,7 @@ function switchTab(tab) {
   if (tab === 'followups' && dashboardData) renderFollowups(currentFollowupFilter);
   if (tab === 'pool') loadPool();
   if (tab === 'myLeads') loadMyLeads();
+  if (tab === 'allLeads') loadAllLeads();
   if (tab === 'admin' && currentUser.role === 'admin') loadAdmin();
 
   window.scrollTo(0, 0);
@@ -371,6 +384,147 @@ function leadCardHtml(lead) {
   </div>`;
 }
 
+// ── ALL LEADS TAB ──────────────────────────
+
+async function loadAllLeads() {
+  const container = document.getElementById('allLeadsContent');
+  const loading   = document.getElementById('allLeadsLoading');
+  if (!container) return;
+  loading.style.display = '';
+  container.innerHTML   = '';
+
+  try {
+    const isAdmin = currentUser.role === 'admin';
+    const response = isAdmin ? await API.getAllLeads() : await API.getMyLeads();
+    loading.style.display = 'none';
+    if (!response.success) { container.innerHTML = errorHtml(response.message); return; }
+
+    allLeadsAll = response.leads || [];
+    currentAllLeadsStatusFilter = 'all';
+    currentAllLeadsSourceFilter = 'all';
+    currentAllLeadsExecFilter   = 'all';
+
+    // Reset filter chips UI
+    document.querySelectorAll('#allLeadsStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
+    const firstSt = document.querySelector('#allLeadsStatusFilter .filter-chip');
+    if (firstSt) firstSt.classList.add('active');
+
+    // Build executive list for exec filter (admin only)
+    if (isAdmin) {
+      const execSet = new Set();
+      allLeadsAll.forEach(l => { if (l.assignedTo) execSet.add(l.assignedTo); });
+      allExecutives = Array.from(execSet).sort();
+      const execFilter = document.getElementById('allLeadsExecFilter');
+      if (execFilter) {
+        execFilter.style.display = '';
+        const execSel = document.getElementById('allLeadsExecSelect');
+        if (execSel) {
+          execSel.innerHTML = '<option value="all">All Executives</option>' +
+            allExecutives.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+        }
+      }
+    }
+
+    applyAllLeadsFilters();
+  } catch(e) {
+    loading.style.display = 'none';
+    container.innerHTML = errorHtml('Error loading leads');
+  }
+}
+
+function setAllLeadsStatusFilter(filter, el) {
+  currentAllLeadsStatusFilter = filter;
+  document.querySelectorAll('#allLeadsStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyAllLeadsFilters();
+}
+
+function setAllLeadsSourceFilter(filter, el) {
+  currentAllLeadsSourceFilter = filter;
+  document.querySelectorAll('#allLeadsSourceFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyAllLeadsFilters();
+}
+
+function setAllLeadsExecFilter() {
+  const sel = document.getElementById('allLeadsExecSelect');
+  currentAllLeadsExecFilter = sel ? sel.value : 'all';
+  applyAllLeadsFilters();
+}
+
+function applyAllLeadsFilters() {
+  let leads = allLeadsAll;
+
+  if (currentAllLeadsStatusFilter !== 'all') {
+    leads = leads.filter(l => (l.status || 'Pool') === currentAllLeadsStatusFilter);
+  }
+  if (currentAllLeadsSourceFilter === 'walkin') {
+    leads = leads.filter(l => l.source && l.source.toLowerCase().includes('walk'));
+  } else if (currentAllLeadsSourceFilter === 'other') {
+    leads = leads.filter(l => !l.source || !l.source.toLowerCase().includes('walk'));
+  }
+  if (currentAllLeadsExecFilter !== 'all') {
+    leads = leads.filter(l => l.assignedTo === currentAllLeadsExecFilter);
+  }
+
+  allLeadsFiltered = leads;
+  renderAllLeads();
+}
+
+function renderAllLeads() {
+  const container = document.getElementById('allLeadsContent');
+  if (!container) return;
+
+  // Summary line
+  const total = allLeadsAll.length;
+  const shown = allLeadsFiltered.length;
+  const converted = allLeadsFiltered.filter(l => l.status === 'Converted').length;
+  const overdue    = allLeadsFiltered.filter(l => l.isOverdue).length;
+
+  let html = `<div style="display:flex;gap:10px;padding:10px 16px 0;flex-wrap:wrap;">
+    <span style="font-size:12px;color:#888;">Showing <strong>${shown}</strong> of <strong>${total}</strong> leads</span>
+    ${converted > 0 ? `<span style="font-size:12px;color:#66BB6A;font-weight:700;">✅ ${converted} converted</span>` : ''}
+    ${overdue > 0   ? `<span style="font-size:12px;color:#ef5350;font-weight:700;">⚠️ ${overdue} overdue</span>` : ''}
+  </div>`;
+
+  if (allLeadsFiltered.length === 0) {
+    html += `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No leads</div><div class="empty-sub">No leads match the current filter</div></div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  html += allLeadsFiltered.map(l => allLeadCardHtml(l)).join('');
+  container.innerHTML = html;
+}
+
+function allLeadCardHtml(lead) {
+  const stClass = statusClass(lead.status);
+  const overdueClass = lead.isOverdue ? ' overdue-left' : '';
+  const overdueBadge = lead.isOverdue ? `<span class="overdue-badge">⚠️ ${lead.daysOverdue}d overdue</span>` : '';
+
+  return `<div class="lead-card ${stClass}${overdueClass}">
+    <div class="lead-top">
+      <div class="lead-name">${esc(lead.customerName)}</div>
+      <div class="lead-badges">
+        <span class="status-pill ${pillClass(lead.status)}">${esc(lead.status || 'Pool')}</span>
+        ${overdueBadge}
+        ${agingBadgeHtml(lead.agingDays)}
+      </div>
+    </div>
+    <div class="lead-info">
+      <div class="lead-info-row">📱 ${esc(lead.mobileNo)} &nbsp;🚗 ${esc(lead.model)}</div>
+      <div class="lead-info-row">📲 ${esc(lead.source || '—')} &nbsp;👤 ${esc(lead.assignedTo || 'Pool')}</div>
+      ${lead.followUpDate ? `<div class="lead-info-row">📅 Follow-up: ${esc(lead.followUpDate)}</div>` : ''}
+      <div class="lead-info-row" style="color:#aaa;font-size:11px;">📅 Added: ${esc(lead.createdDate || '')}</div>
+    </div>
+    <div class="lead-actions">
+      <button class="btn-act btn-call-act" onclick="callLead('${esc(lead.mobileNo)}')">📞 Call</button>
+      <button class="btn-act btn-log-act"  onclick="openLogSheet('${lead.leadId}')">📝 Log</button>
+      <button class="btn-act btn-edit-act" onclick="openLead('${lead.leadId}')">Details</button>
+    </div>
+  </div>`;
+}
+
 // ── ADMIN TAB ──────────────────────────────
 
 async function loadAdmin() {
@@ -553,6 +707,63 @@ async function loadAnalytics() {
   }
 }
 
+// ── TODAY'S CALLS ──────────────────────────
+
+async function loadTodaysCalls() {
+  const container = document.getElementById('todaysCallsContent');
+  const btn = document.getElementById('todaysCallsRefreshBtn');
+  if (!container) return;
+  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading today\'s calls...</div></div>';
+  if (btn) btn.disabled = true;
+
+  try {
+    const r = await API.getTodaysCalls();
+    if (btn) btn.disabled = false;
+    if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
+
+    const calls = r.calls || [];
+    if (calls.length === 0) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📵</div><div class="empty-title">No calls today</div><div class="empty-sub">No interactions logged today yet</div></div>`;
+      return;
+    }
+
+    let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''} today</div>`;
+    html += calls.map(c => `
+      <div class="lead-card" style="border-left-color:${callTypeColor(c.type)};">
+        <div class="lead-top">
+          <div class="lead-name">${esc(c.customerName)}</div>
+          <div class="lead-badges">
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};">${esc(c.type)}</span>
+          </div>
+        </div>
+        <div class="lead-info">
+          <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🕐 ${esc(c.time)}</div>
+          <div class="lead-info-row">👤 ${esc(c.by)} &nbsp;🚗 ${esc(c.model || '—')}</div>
+          ${c.note ? `<div class="lead-info-row" style="color:#555;font-style:italic;">"${esc(c.note)}"</div>` : ''}
+        </div>
+        <div class="lead-actions">
+          <button class="btn-act btn-call-act" onclick="callLead('${esc(c.mobile)}')">📞 Call</button>
+          <button class="btn-act btn-edit-act" onclick="openLead('${c.leadId}')">Details</button>
+        </div>
+      </div>
+    `).join('');
+    container.innerHTML = html;
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    container.innerHTML = errorHtml('Error loading calls');
+  }
+}
+
+function callTypeColor(type) {
+  const t = (type || '').toLowerCase();
+  if (t.includes('answered'))    return '#4CAF50';
+  if (t.includes('no answer'))   return '#ef5350';
+  if (t.includes('whatsapp'))    return '#25D366';
+  if (t.includes('visit'))       return '#FF7043';
+  if (t.includes('quotation'))   return '#667eea';
+  return '#9E9E9E';
+}
+
 // ── LEAD DETAIL ────────────────────────────
 
 async function openLead(leadId) {
@@ -606,7 +817,7 @@ function renderLeadDetail(lead) {
         <div class="quotation-no">${esc(q.quotNo)}</div>
         <div class="quotation-meta">${esc(q.model)} · ₹${Number(q.totalAmount||0).toLocaleString('en-IN')} · ${esc(q.createdDate)}</div>
       </div>
-      <a href="crm-quote.html?leadId=${lead.leadId}" style="font-size:12px;font-weight:700;color:#667eea;text-decoration:none;white-space:nowrap;padding:4px 10px;border:1.5px solid #667eea;border-radius:8px;">
+      <a href="crm-quote.html?leadId=${lead.leadId}&quotNo=${esc(q.quotNo)}" style="font-size:12px;font-weight:700;color:#667eea;text-decoration:none;white-space:nowrap;padding:4px 10px;border:1.5px solid #667eea;border-radius:8px;">
         🔁 Reprint
       </a>
     </div>

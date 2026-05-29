@@ -427,8 +427,55 @@
     <div id="myLeads"></div>
   </div>
 
+  <!-- ═══ ALL LEADS TAB ═══ -->
+  <div id="allLeadsTab" class="tab-content">
+    <!-- Status filter -->
+    <div class="filter-row" id="allLeadsStatusFilter">
+      <div class="filter-chip active" onclick="setAllLeadsStatusFilter('all',this)">All</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('New',this)">New</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('Contacted',this)">Contacted</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('Interested',this)">Interested</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('Converted',this)">✅ Converted</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('Lost',this)">❌ Lost</div>
+      <div class="filter-chip" onclick="setAllLeadsStatusFilter('Pool',this)">Pool</div>
+    </div>
+    <!-- Source filter -->
+    <div class="filter-row" id="allLeadsSourceFilter">
+      <div class="filter-chip active" onclick="setAllLeadsSourceFilter('all',this)">All Sources</div>
+      <div class="filter-chip" onclick="setAllLeadsSourceFilter('walkin',this)">🚶 Walk-in</div>
+      <div class="filter-chip" onclick="setAllLeadsSourceFilter('other',this)">📲 Other</div>
+    </div>
+    <!-- Executive filter (admin only) -->
+    <div id="allLeadsExecFilter" style="display:none;padding:6px 16px;">
+      <select id="allLeadsExecSelect" onchange="setAllLeadsExecFilter()"
+        style="width:100%;padding:8px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;font-weight:600;color:#444;background:white;">
+        <option value="all">All Executives</option>
+      </select>
+    </div>
+    <div class="loading" id="allLeadsLoading" style="padding-top:30px;display:none;">
+      <div class="spinner"></div><div>Loading leads...</div>
+    </div>
+    <div id="allLeadsContent"></div>
+  </div>
+
   <!-- ═══ ADMIN TAB (admin only) ═══ -->
   <div id="adminTab" class="tab-content">
+    <!-- Today's Calls section (admin) -->
+    <div style="padding:12px 16px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="section-title">📞 Today's Calls</div>
+        <button id="todaysCallsRefreshBtn" onclick="loadTodaysCalls()"
+          style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;">Refresh</button>
+      </div>
+      <div id="todaysCallsContent">
+        <div style="text-align:center;padding:16px;">
+          <button onclick="loadTodaysCalls()"
+            style="background:#f0f4ff;color:#667eea;border:2px solid #667eea;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+            📞 Load Today's Calls
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="loading" id="adminLoading" style="padding-top:30px;display:none;">
       <div class="spinner"></div><div>Loading...</div>
     </div>
@@ -554,6 +601,10 @@
     <button class="nav-item" onclick="switchTab('myLeads')" id="navMyLeads">
       <div class="nav-icon">📋</div>
       <div class="nav-label">My Leads</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('allLeads')" id="navAllLeads" style="display:none;">
+      <div class="nav-icon">📊</div>
+      <div class="nav-label">All Leads</div>
     </button>
     <button class="nav-item" onclick="switchTab('admin')" id="navAdmin" style="display:none;">
       <div class="nav-icon">👑</div>
