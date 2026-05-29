@@ -581,9 +581,10 @@ async function _renderQuotPDF() {
     const scale = pdfH / imgH;
     pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pdfW * scale, pdfH);
   }
-  const custName = (document.getElementById('custName').value || 'Customer')
-    .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_');
-  const fileName = 'Quotation_' + (lastQuotNo || custName) + '_' + custName + '.pdf';
+  const custNameRaw  = (document.getElementById('custName').value || 'Customer').trim();
+  const custNameSafe = custNameRaw.replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+  const custName     = custNameSafe.replace(/\s+/g, '_'); // for legacy reference
+  const fileName     = custNameSafe + ' - ' + (lastQuotNo || 'QT') + '.pdf';
   return { pdf, custName, fileName };
 }
 
