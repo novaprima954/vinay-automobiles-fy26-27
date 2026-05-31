@@ -60,6 +60,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch(e) {}
   }
 
+  // Restrict follow-up date: today → today+10
+  _setFollowUpDateLimits('quotFollowUpDate');
+
   // If reprinting a quotation, load saved accessories/settings
   if (reprintQuotNo) {
     try {
@@ -505,16 +508,16 @@ async function generateQuotation() {
     document.getElementById('quotPreviewWrapper').style.display = 'block';
 
     // Auto-save new lead to CRM if not already a known lead
+    // Source is always 'Walk-In' for quotation-generated leads (customer is physically present)
     if (!leadId) {
-      const crmSource = document.getElementById('crmSource') ? document.getElementById('crmSource').value : 'Walk-in';
-      const crmNote   = document.getElementById('crmNote')   ? document.getElementById('crmNote').value.trim() : '';
+      const crmNote = document.getElementById('crmNote') ? document.getElementById('crmNote').value.trim() : '';
       try {
         const addRes = await API.addLead({
           customerName: custName,
           mobileNo:     mobile,
           address:      [address, district].filter(Boolean).join(', '),
           model:        model,
-          source:       crmSource,
+          source:       'Walk-In',
           followUpDate: followUpDate
         });
         if (addRes.success) {
@@ -644,12 +647,12 @@ async function sendWhatsApp() {
     const response = await API.sendQuotationWhatsApp(base64, fileName, customerName, phone, lastQuotNo, modelVariant, execName, execMobile);
 
     if (response.success) {
-      showMessage('✅ Quotation sent on WhatsApp successfully!', 'success');
+      showWAToast('✅ Quotation sent on WhatsApp!', 'success');
     } else {
-      showMessage('❌ ' + (response.message || 'Failed to send WhatsApp'), 'error');
+      showWAToast('❌ ' + (response.message || 'Failed to send WhatsApp'), 'error');
     }
   } catch (e) {
-    showMessage('Error sending WhatsApp: ' + e.message, 'error');
+    showWAToast('❌ Error: ' + e.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = '📲 Send on WhatsApp';
@@ -705,7 +708,7 @@ function buildQuotationHTML(d) {
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
           ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:8px;font-size:11px;color:#444;">Standard Accessories: ${getMandatoryAccDescription(d.model)}</div>` : ''}
-          ${d.execName ? `<div style="margin-top:6px;padding-top:5px;border-top:1px dashed #ccc;font-size:10px;color:#555;"><strong>Executive :</strong> ${d.execName}${d.execMobile ? ' · ' + d.execMobile : ''}</div>` : ''}
+          ${d.execName ? `<div style="margin-top:8px;padding-top:7px;border-top:1.5px dashed #bbb;font-size:12px;color:#222;font-weight:700;">Executive : ${d.execName}${d.execMobile ? '<span style="font-weight:500;color:#444;"> · ' + d.execMobile + '</span>' : ''}</div>` : ''}
         </div>
       </div>
     </div>
@@ -777,6 +780,20 @@ function getMandatoryAccDescription(model) {
   return 'Footrest, Side Stand, Number Plate Bracket';
 }
 
+// ── FOLLOW-UP DATE LIMITS ────────────────────
+// Restrict a date input to today … today+10 days only
+
+function _setFollowUpDateLimits(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const today = new Date();
+  const max10  = new Date(today);
+  max10.setDate(today.getDate() + 10);
+  const toISO = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  el.min = toISO(today);
+  el.max = toISO(max10);
+}
+
 function fmt(n) {
   return Number(n || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -794,6 +811,23 @@ function showMessage(text, type) {
   const el = document.getElementById('statusMessage');
   el.textContent = text; el.className = 'message ' + type; el.style.display = 'block';
   if (type === 'success') setTimeout(function() { el.style.display = 'none'; }, 3000);
+}
+
+function showWAToast(text, type) {
+  const el = document.getElementById('waToast');
+  if (!el) { showMessage(text, type); return; }
+  const isSuccess = type === 'success';
+  el.textContent  = text;
+  el.style.background   = isSuccess ? '#25D366' : '#ef5350';
+  el.style.color        = 'white';
+  el.style.display      = 'block';
+  el.style.opacity      = '1';
+  clearTimeout(el._waTimer);
+  el._waTimer = setTimeout(function() {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.5s';
+    setTimeout(function() { el.style.display = 'none'; el.style.transition = ''; }, 500);
+  }, isSuccess ? 4000 : 6000);
 }
 
 function goBack() {

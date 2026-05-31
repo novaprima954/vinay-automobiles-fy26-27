@@ -923,12 +923,24 @@ async function convertLead(leadId, name) {
 
 // ── LOG INTERACTION SHEET ──────────────────
 
+function _setFollowUpDateLimits(inputId) {
+  const el = document.getElementById(inputId);
+  if (!el) return;
+  const today = new Date();
+  const max10  = new Date(today);
+  max10.setDate(today.getDate() + 10);
+  const toISO = d => d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  el.min = toISO(today);
+  el.max = toISO(max10);
+}
+
 function openLogSheet(leadId, isPoolClaim) {
   pendingPoolClaimLeadId = isPoolClaim ? leadId : null;
 
   document.getElementById('logLeadId').value = leadId;
   selectedNoteType = '';
   selectedStatusChange = '';
+  _setFollowUpDateLimits('logFollowUpDate');
 
   document.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('selected'));
   document.getElementById('lostReasonSection').style.display = 'none';
