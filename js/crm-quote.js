@@ -633,10 +633,15 @@ async function sendWhatsApp() {
     const base64 = pdf.output('datauristring').split(',')[1];
 
     const customerName = document.getElementById('custName').value || 'Customer';
+    const model        = document.getElementById('modelSelect').value   || '';
+    const variant      = document.getElementById('variantSelect').value || '';
+    const modelVariant = (model + (variant ? ' ' + variant : '')).trim();
+    const execName     = currentUser ? (currentUser.name   || '') : '';
+    const execMobile   = currentUser ? (currentUser.mobile || '') : '';
 
     showMessage('📤 Uploading and sending...', 'info');
 
-    const response = await API.sendQuotationWhatsApp(base64, fileName, customerName, phone, lastQuotNo);
+    const response = await API.sendQuotationWhatsApp(base64, fileName, customerName, phone, lastQuotNo, modelVariant, execName, execMobile);
 
     if (response.success) {
       showMessage('✅ Quotation sent on WhatsApp successfully!', 'success');

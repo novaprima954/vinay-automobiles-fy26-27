@@ -550,10 +550,13 @@ const API = {
    * Send quotation PDF via WhatsApp (AiSensy)
    * Uploads PDF to Google Drive and sends via AiSensy API
    */
-  async sendQuotationWhatsApp(pdfBase64, fileName, customerName, customerPhone, quotNo) {
+  async sendQuotationWhatsApp(pdfBase64, fileName, customerName, customerPhone, quotNo, modelVariant, execName, execMobile) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('sendQuotationWhatsApp', {
-      sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo
+      sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo,
+      modelVariant: modelVariant || '',
+      execName:     execName     || '',
+      execMobile:   execMobile   || ''
     });
   },
   
