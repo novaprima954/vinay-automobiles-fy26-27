@@ -39,9 +39,16 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('adminAnalyticsSection').style.display = '';
   }
 
-  // All Leads tab is visible for all roles
+  // All Leads tab visible for all roles except financier
   const navAllLeads = document.getElementById('navAllLeads');
-  if (navAllLeads) navAllLeads.style.display = '';
+  if (navAllLeads && currentUser.role !== 'financier') navAllLeads.style.display = '';
+
+  // Financier role — adjust UI
+  if (currentUser.role === 'financier') {
+    _setupFinancierUI();
+    await loadFinancierDashboard();
+    return;
+  }
 
   await loadDashboard();
 });
@@ -68,11 +75,17 @@ function switchTab(tab) {
   if (navEl) navEl.classList.add('active');
 
   // Lazy loads
-  if (tab === 'followups' && dashboardData) renderFollowups(currentFollowupFilter);
-  if (tab === 'pool') loadPool();
-  if (tab === 'myLeads') loadMyLeads();
-  if (tab === 'allLeads') loadAllLeads();
-  if (tab === 'admin' && currentUser.role === 'admin') loadAdmin();
+  if (tab === 'followups') {
+    if (currentUser.role === 'financier') renderFinancierFollowups(currentFollowupFilter);
+    else if (dashboardData) renderFollowups(currentFollowupFilter);
+  }
+  if (tab === 'pool'     && currentUser.role !== 'financier') loadPool();
+  if (tab === 'myLeads') {
+    if (currentUser.role === 'financier') loadFinancierLeads();
+    else loadMyLeads();
+  }
+  if (tab === 'allLeads' && currentUser.role !== 'financier') loadAllLeads();
+  if (tab === 'admin'    && currentUser.role === 'admin') loadAdmin();
 
   window.scrollTo(0, 0);
 }
@@ -108,6 +121,10 @@ async function loadDashboard() {
 }
 
 async function _bgRefreshDashboard() {
+  if (currentUser && currentUser.role === 'financier') {
+    try { const r = await API.getFinancierDashboard(); if (r.success) _displayFinancierDashboard(r.dashboard); } catch(e) {}
+    return;
+  }
   try {
     const response = await API.getCRMDashboard();
     if (response.success) {
@@ -217,10 +234,11 @@ function followupCardHtml(lead, type) {
 }
 
 function findCachedLead(leadId) {
-  for (const l of myLeadsAll)         if (l.leadId === leadId) return l;
-  for (const l of poolLeadsCache)     if (l.leadId === leadId) return l;
+  for (const l of myLeadsAll)          if (l.leadId === leadId) return l;
+  for (const l of poolLeadsCache)      if (l.leadId === leadId) return l;
+  for (const l of financierLeadsAll)   if (l.leadId === leadId) return l;
   for (const arr of [followupData.overdue, followupData.today, followupData.week])
-    for (const l of arr)              if (l.leadId === leadId) return l;
+    for (const l of arr)               if (l.leadId === leadId) return l;
   return null;
 }
 
@@ -385,6 +403,303 @@ function leadCardHtml(lead) {
       <button class="btn-act btn-edit-act" onclick="openLead('${lead.leadId}')">Details</button>
     </div>
   </div>`;
+}
+
+// ── FINANCIER ROLE ─────────────────────────
+
+let financierDashData    = null;
+let financierLeadsAll    = [];
+let financierLeadsFiltered = [];
+let currentFinLoanFilter = 'all';
+let financierUsers       = [];  // cached list for dropdowns
+
+function _setupFinancierUI() {
+  // Hide tabs not relevant to financier
+  ['navPool','navAllLeads','navAdmin'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  // Rename My Leads nav label
+  const myLbl = document.querySelector('#navMyLeads .nav-label');
+  if (myLbl) myLbl.textContent = 'My Leads';
+  // Hide source filter rows — show loan status filter instead
+  ['myLeadsSourceFilter','myLeadsStatusFilter'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  // Move loan filter into my leads tab
+  const finFilter = document.getElementById('finLoanStatusFilter');
+  const myLeadsTab = document.getElementById('myLeadsTab');
+  if (finFilter && myLeadsTab) { finFilter.style.display = ''; myLeadsTab.insertBefore(finFilter, myLeadsTab.firstChild); }
+  // Hide FAB add-lead (financier doesn't add leads)
+  const fab = document.querySelector('.fab');
+  if (fab) fab.style.display = 'none';
+  // Update dashboard labels for financier
+  const labels = {
+    'Overdue': document.querySelector('.stat-card.overdue .stat-card-label'),
+    'Today': document.querySelector('.stat-card.urgent .stat-card-label'),
+    'Pool': document.querySelector('.stat-card.available .stat-card-label'),
+    'Disbursed': document.querySelector('.stat-card.converted .stat-card-label')
+  };
+  if (document.querySelector('.stat-card.overdue .stat-card-label'))   document.querySelector('.stat-card.overdue .stat-card-label').textContent   = 'Overdue';
+  if (document.querySelector('.stat-card.urgent .stat-card-label'))    document.querySelector('.stat-card.urgent .stat-card-label').textContent    = 'Due Today';
+  if (document.querySelector('.stat-card.available .stat-card-label')) document.querySelector('.stat-card.available .stat-card-label').textContent = 'Under Process';
+  if (document.querySelector('.stat-card.converted .stat-card-label')) document.querySelector('.stat-card.converted .stat-card-label').textContent = 'Disbursed (Month)';
+  if (document.querySelector('.stat-card.available .stat-card-icon'))  document.querySelector('.stat-card.available .stat-card-icon').textContent  = '⏳';
+  if (document.querySelector('.stat-card.converted .stat-card-icon'))  document.querySelector('.stat-card.converted .stat-card-icon').textContent  = '💰';
+}
+
+async function loadFinancierDashboard() {
+  try {
+    const r = await API.getFinancierDashboard();
+    if (!r.success) { showMessage(r.message || 'Error loading dashboard', 'error'); return; }
+    financierDashData = r.dashboard;
+    _displayFinancierDashboard(r.dashboard);
+  } catch(e) { showMessage('Error loading dashboard', 'error'); }
+}
+
+function _displayFinancierDashboard(d) {
+  // Update stat card labels (handled by _setupFinancierUI) then fill values
+  document.getElementById('overdueCount').textContent   = d.overdueCount      || 0;
+  document.getElementById('weekCount').textContent      = d.todayCount         || 0;
+  document.getElementById('availableCount').textContent = d.underProcess       || 0;
+  document.getElementById('convertedCount').textContent = d.disbursedThisMonth || 0;
+
+  const badge = document.getElementById('overdueNavBadge');
+  if (d.overdueCount > 0) { badge.textContent = d.overdueCount > 99 ? '99+' : d.overdueCount; badge.style.display = ''; }
+  else badge.style.display = 'none';
+
+  // Today's urgent
+  const urgentSection = document.getElementById('urgentSection');
+  const urgentList    = document.getElementById('urgentList');
+  const urgent = d.todayLeads || [];
+  if (urgent.length > 0) {
+    document.getElementById('todayBadge').textContent = urgent.length;
+    urgentList.innerHTML = urgent.map(l => followupCardHtml(l, 'today')).join('');
+    urgentSection.style.display = '';
+  } else { urgentSection.style.display = 'none'; }
+
+  // Sync for follow-ups tab
+  followupData.overdue = d.overdueLeads || [];
+  followupData.today   = d.todayLeads   || [];
+  followupData.week    = d.weekLeads    || [];
+
+  document.getElementById('fc_overdue').textContent = followupData.overdue.length;
+  document.getElementById('fc_today').textContent   = followupData.today.length;
+  document.getElementById('fc_week').textContent    = followupData.week.length;
+}
+
+function renderFinancierFollowups(filter) {
+  financierDashData ? renderFollowups(filter) : loadFinancierDashboard();
+}
+
+// ── Financier: My Finance Leads tab ──────
+
+async function loadFinancierLeads() {
+  const loading   = document.getElementById('myLeadsLoading');
+  loading.style.display = '';
+  try {
+    const r = await API.getFinancierLeads();
+    loading.style.display = 'none';
+    if (!r.success) { document.getElementById('myLeads').innerHTML = errorHtml(r.message); return; }
+    financierLeadsAll = r.leads || [];
+    currentFinLoanFilter = 'all';
+    document.querySelectorAll('#finLoanStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
+    const first = document.querySelector('#finLoanStatusFilter .filter-chip');
+    if (first) first.classList.add('active');
+    applyFinancierLeadsFilter();
+  } catch(e) {
+    loading.style.display = 'none';
+    document.getElementById('myLeads').innerHTML = errorHtml('Error loading leads');
+  }
+}
+
+function setFinancierLoanFilter(filter, el) {
+  currentFinLoanFilter = filter;
+  document.querySelectorAll('#finLoanStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  applyFinancierLeadsFilter();
+}
+
+function applyFinancierLeadsFilter() {
+  let leads = financierLeadsAll;
+  if (currentFinLoanFilter !== 'all') leads = leads.filter(l => (l.loanStatus || 'New') === currentFinLoanFilter);
+  financierLeadsFiltered = leads;
+  renderFinancierLeads();
+}
+
+function renderFinancierLeads() {
+  const container = document.getElementById('myLeads');
+  if (financierLeadsFiltered.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No leads</div><div class="empty-sub">No finance leads match this filter</div></div>`;
+    return;
+  }
+  container.innerHTML = financierLeadsFiltered.map(l => financierLeadCardHtml(l)).join('');
+}
+
+function financierLeadCardHtml(lead) {
+  const loanSt = lead.loanStatus || 'New';
+  const loanColor = { 'New':'#9E9E9E','Called':'#2196F3','Applied':'#FF9800','Under Process':'#9C27B0','Approved':'#4CAF50','Disbursed':'#388E3C','Rejected':'#ef5350','Not Interested':'#ef5350' }[loanSt] || '#9E9E9E';
+  return `<div class="lead-card" style="border-left-color:${loanColor};">
+    <div class="lead-top">
+      <div class="lead-name">${esc(lead.customerName)}</div>
+      <div class="lead-badges">
+        <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${loanColor}22;color:${loanColor};">${esc(loanSt)}</span>
+        ${agingBadgeHtml(lead.agingDays)}
+      </div>
+    </div>
+    <div class="lead-info">
+      <div class="lead-info-row">📱 ${esc(lead.mobileNo)} &nbsp;🚗 ${esc(lead.model || '—')}</div>
+      <div class="lead-info-row">👤 ${esc(lead.assignedTo || 'Pool')} &nbsp;📅 ${esc(lead.followUpDate || '—')}</div>
+      ${lead.loanAmount > 0 ? `<div class="lead-info-row">💰 Loan: ₹${lead.loanAmount.toLocaleString('en-IN')} &nbsp;📆 ${lead.tenure || '—'}m</div>` : ''}
+    </div>
+    <div class="lead-actions">
+      <button class="btn-act btn-call-act"  onclick="callAndLog('${esc(lead.mobileNo || '')}','${lead.leadId}')">📞 Call</button>
+      <button class="btn-act btn-log-act"   onclick="openLogSheet('${lead.leadId}')">📝 Log</button>
+      <button class="btn-act" style="flex:1;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;"
+        onclick="openFinanceSheet('${lead.leadId}')">🏦 Finance</button>
+      <button class="btn-act btn-edit-act"  onclick="openLead('${lead.leadId}')">Details</button>
+    </div>
+  </div>`;
+}
+
+// ── Finance Details Sheet (financier fills in) ──
+
+function openFinanceSheet(leadId) {
+  const lead = _findFinancierLead(leadId) || findCachedLead(leadId) || {};
+  document.getElementById('finLeadId').value = leadId;
+  document.getElementById('finLoanStatus').value   = lead.loanStatus    || 'New';
+  document.getElementById('finScheme').value        = lead.financeScheme || '';
+  document.getElementById('finDownPayment').value   = lead.downPayment   || '';
+  document.getElementById('finLoanAmount').value    = lead.loanAmount    || '';
+  document.getElementById('finEMI').value           = lead.emi           || '';
+  document.getElementById('finTenure').value        = lead.tenure        || '';
+  openSheet('financeSheet');
+}
+
+function _findFinancierLead(leadId) {
+  return financierLeadsAll.find(l => l.leadId === leadId) || null;
+}
+
+async function submitFinanceDetails() {
+  const leadId = document.getElementById('finLeadId').value;
+  const btn    = document.getElementById('finSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const data = {
+      loanStatus:    document.getElementById('finLoanStatus').value,
+      financeScheme: document.getElementById('finScheme').value.trim(),
+      downPayment:   Number(document.getElementById('finDownPayment').value) || 0,
+      loanAmount:    Number(document.getElementById('finLoanAmount').value)  || 0,
+      emi:           Number(document.getElementById('finEMI').value)         || 0,
+      tenure:        Number(document.getElementById('finTenure').value)      || 0
+    };
+    const r = await API.updateFinanceDetails(leadId, data);
+    if (r.success) {
+      closeSheet('financeSheet');
+      showMessage(r.autoConverted ? '💰 Disbursed — lead converted to Sale!' : 'Finance details saved', 'success');
+      if (currentUser.role === 'financier') loadFinancierLeads();
+      else if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
+      _bgRefreshDashboard();
+    } else { showMessage(r.message || 'Error saving', 'error'); }
+  } catch(e) { showMessage('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Save'; }
+}
+
+// ── Assign Financier Sheet (sales exec uses) ──
+
+async function openAssignFinancierSheet(leadId) {
+  document.getElementById('assignFinLeadId').value = leadId;
+  const sel = document.getElementById('assignFinSelect');
+  sel.innerHTML = '<option value="">-- Select Financier --</option>';
+  try {
+    if (financierUsers.length === 0) {
+      const r = await API.getFinancierUsers();
+      if (r.success) financierUsers = r.financiers || [];
+    }
+    financierUsers.forEach(f => {
+      const opt = document.createElement('option');
+      opt.value = f.name; opt.textContent = f.name;
+      sel.appendChild(opt);
+    });
+  } catch(e) {}
+  openSheet('assignFinSheet');
+}
+
+async function submitAssignFinancier() {
+  const leadId    = document.getElementById('assignFinLeadId').value;
+  const financier = document.getElementById('assignFinSelect').value;
+  if (!financier) { alert('Please select a financier'); return; }
+  try {
+    const r = await API.updateLead(leadId, { financierAssigned: financier });
+    if (r.success) {
+      closeSheet('assignFinSheet');
+      showMessage('Lead assigned to ' + financier, 'success');
+      if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
+    } else { showMessage(r.message || 'Error', 'error'); }
+  } catch(e) { showMessage('Error assigning', 'error'); }
+}
+
+// ── Financier Analytics (admin + financier) ──
+
+async function loadFinancierAnalytics() {
+  const container = document.getElementById('finAnalyticsContent');
+  const btn = document.getElementById('finAnalyticsRefreshBtn');
+  if (!container) return;
+  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading...</div></div>';
+  if (btn) btn.disabled = true;
+  try {
+    const r = await API.getFinancierAnalytics();
+    if (btn) btn.disabled = false;
+    if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
+
+    let html = '';
+
+    // My Stats (for financier role)
+    if (currentUser.role === 'financier' && r.myStats) {
+      const s = r.myStats;
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">📊 My Performance</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px;">
+          ${[['Total','📋',s.total,'#667eea'],['Disbursed','💰',s.disbursed,'#388E3C'],['This Month','🗓',s.disbursedMonth,'#11998e'],
+             ['Applied','📄',s.applied,'#FF9800'],['Under Process','⏳',s.underProcess,'#9C27B0'],['Rejected','❌',s.rejected,'#ef5350']]
+            .map(([l,ic,v,c]) => `<div style="text-align:center;background:#f8f9fa;border-radius:8px;padding:10px 6px;">
+              <div style="font-size:18px;">${ic}</div><div style="font-size:20px;font-weight:800;color:${c};">${v}</div>
+              <div style="font-size:10px;color:#888;">${l}</div></div>`).join('')}
+        </div></div>`;
+    }
+
+    // Per-financier table (admin)
+    if (currentUser.role === 'admin' && r.financiers && r.financiers.length > 0) {
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">🏦 Financier Performance</div>
+        <table class="analytics-table">
+          <thead><tr><th>Financier</th><th>Total</th><th>Applied</th><th>Process</th><th>Disbursed</th><th>Conv%</th></tr></thead>
+          <tbody>${r.financiers.map(f => `<tr>
+            <td style="font-weight:700;">${esc(f.financier)}</td>
+            <td>${f.total}</td><td>${f.applied}</td><td>${f.underProcess}</td>
+            <td><span style="color:#388E3C;font-weight:800;">${f.disbursed}</span>${f.disbursedMonth > 0 ? ` <span style="font-size:10px;color:#11998e;">(${f.disbursedMonth} this mo.)</span>` : ''}</td>
+            <td><span class="conv-rate">${f.convRate}%</span></td></tr>`).join('')}
+          </tbody></table></div>`;
+    }
+
+    // Exec → Financier referral matrix
+    if (r.execReferrals && r.execReferrals.length > 0) {
+      const allFins = [...new Set(r.execReferrals.flatMap(e => Object.keys(e.referrals)))];
+      html += `<div class="analytics-card">
+        <div class="analytics-card-title">👥 Executive Referrals</div>
+        <div style="overflow-x:auto;">
+        <table class="analytics-table">
+          <thead><tr><th>Executive</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}<th>Total</th></tr></thead>
+          <tbody>${r.execReferrals.map(e => {
+            const total = Object.values(e.referrals).reduce((s,v) => s+v, 0);
+            return `<tr><td style="font-weight:700;">${esc(e.executive)}</td>${allFins.map(f => `<td>${e.referrals[f] || '—'}</td>`).join('')}<td><strong>${total}</strong></td></tr>`;
+          }).join('')}</tbody></table></div></div>`;
+    }
+
+    container.innerHTML = html || '<div style="padding:20px;color:#aaa;text-align:center;">No financier data yet</div>';
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    container.innerHTML = errorHtml('Error loading analytics');
+  }
 }
 
 // ── ALL LEADS TAB ──────────────────────────
@@ -641,6 +956,11 @@ async function loadAdmin() {
   }
 }
 
+async function loadAdminFinancierAnalytics() {
+  // Called lazily when admin clicks the Financier Analytics section
+  await loadFinancierAnalytics();
+}
+
 function adminLeadCardHtml(lead) {
   return `<div class="lead-card ${statusClass(lead.status)}" style="margin-bottom:8px;">
     <div class="lead-top">
@@ -820,8 +1140,10 @@ async function openLead(leadId) {
 }
 
 function renderLeadDetail(lead) {
-  const isAdmin = currentUser.role === 'admin';
-  const isOwner = isAdmin || lead.assignedTo === currentUser.name;
+  const isAdmin      = currentUser.role === 'admin';
+  const isFinancier  = currentUser.role === 'financier';
+  const isOwner      = isAdmin || lead.assignedTo === currentUser.name ||
+                       (isFinancier && lead.financierAssigned === currentUser.name);
 
   const interactions = (lead.interactions || []).map(i => `
     <div class="interaction-item">
@@ -855,10 +1177,38 @@ function renderLeadDetail(lead) {
   ` : '';
 
   const adminAssign = isAdmin ? `
-    <div style="padding:0 18px 14px;">
-      <button class="btn-act btn-edit-act" style="width:100%;" onclick="openAssignSheet('${lead.leadId}')">👤 Assign to Executive</button>
+    <div style="padding:0 18px 14px;display:flex;gap:8px;">
+      <button class="btn-act btn-edit-act" style="flex:1;" onclick="openAssignSheet('${lead.leadId}')">👤 Assign Exec</button>
+      <button class="btn-act" style="flex:1;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;border:none;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;"
+        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 Assign Financier</button>
     </div>
   ` : '';
+
+  // Finance section
+  const hasFinance = lead.financierAssigned || lead.loanStatus;
+  const loanColor  = {'Applied':'#FF9800','Under Process':'#9C27B0','Approved':'#4CAF50','Disbursed':'#388E3C','Rejected':'#ef5350'}[lead.loanStatus] || '#9E9E9E';
+  const financeSection = hasFinance ? `
+    <div class="detail-section">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div class="detail-section-title">🏦 Finance Details</div>
+        ${(isOwner || isFinancier) && lead.financierAssigned ? `<button class="btn-act" style="padding:5px 12px;font-size:12px;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;cursor:pointer;font-weight:700;"
+          onclick="openFinanceSheet('${lead.leadId}')">✏️ Update</button>` : ''}
+      </div>
+      ${lead.financierAssigned ? `<div class="detail-row"><span class="detail-label">Financier</span><span class="detail-value" style="font-weight:800;">${esc(lead.financierAssigned)}</span></div>` : ''}
+      ${lead.loanStatus ? `<div class="detail-row"><span class="detail-label">Loan Status</span><span class="detail-value"><span style="font-weight:700;color:${loanColor};">${esc(lead.loanStatus)}</span></span></div>` : ''}
+      ${lead.financeScheme ? `<div class="detail-row"><span class="detail-label">Scheme</span><span class="detail-value">${esc(lead.financeScheme)}</span></div>` : ''}
+      ${lead.downPayment > 0 ? `<div class="detail-row"><span class="detail-label">Down Payment</span><span class="detail-value">₹${lead.downPayment.toLocaleString('en-IN')}</span></div>` : ''}
+      ${lead.loanAmount > 0  ? `<div class="detail-row"><span class="detail-label">Loan Amount</span><span class="detail-value">₹${lead.loanAmount.toLocaleString('en-IN')}</span></div>` : ''}
+      ${lead.emi > 0         ? `<div class="detail-row"><span class="detail-label">EMI</span><span class="detail-value">₹${lead.emi.toLocaleString('en-IN')}/month</span></div>` : ''}
+      ${lead.tenure > 0      ? `<div class="detail-row"><span class="detail-label">Tenure</span><span class="detail-value">${lead.tenure} months</span></div>` : ''}
+    </div>` : '';
+
+  // Assign financier button (for sales exec on leads without financier yet)
+  const assignFinBtn = (isAdmin || lead.assignedTo === currentUser.name) && !lead.financierAssigned ? `
+    <div style="padding:0 18px 10px;">
+      <button class="btn-act" style="width:100%;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;"
+        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 Assign Financier</button>
+    </div>` : '';
 
   document.getElementById('detailSheetBody').innerHTML = `
     <div class="lead-detail-header">
@@ -891,6 +1241,8 @@ function renderLeadDetail(lead) {
 
     ${actionBtns}
     ${adminAssign}
+    ${assignFinBtn}
+    ${financeSection}
 
     <div class="detail-section">
       <div class="detail-section-title">Quotations</div>
@@ -953,6 +1305,13 @@ function openLogSheet(leadId, isPoolClaim) {
   document.getElementById('logSubmitBtn').disabled = true;
 
   document.querySelectorAll('#statusBtns .status-btn').forEach(b => b.classList.remove('active'));
+
+  // Show correct interaction type list
+  const salesTypes   = document.getElementById('salesLogTypes');
+  const financeTypes = document.getElementById('financeLogTypes');
+  const isFinancier  = currentUser && currentUser.role === 'financier';
+  if (salesTypes)   salesTypes.style.display   = isFinancier ? 'none' : '';
+  if (financeTypes) financeTypes.style.display  = isFinancier ? ''     : 'none';
 
   // Show/hide pool-claim notice
   const poolNotice = document.getElementById('poolClaimNotice');

@@ -408,6 +408,7 @@
   </div>
 
   <!-- ═══ MY LEADS TAB ═══ -->
+  <!-- Financier loan filter (shown for financier role via JS) -->
   <div id="myLeadsTab" class="tab-content">
     <div class="filter-row" id="myLeadsSourceFilter">
       <div class="filter-chip active" data-ftype="all" onclick="setMyLeadsFilter('all',this)">All <span class="chip-count" id="cnt_all">0</span></div>
@@ -481,11 +482,30 @@
       </div>
       <div id="callsReportContent" style="margin-top:8px;"></div>
     </div>
+    <!-- Financier Analytics section (admin) -->
+    <div style="padding:12px 16px 0;">
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="section-title">🏦 Financier Analytics</div>
+        <button id="finAnalyticsRefreshBtn" onclick="loadFinancierAnalytics()"
+          style="background:none;border:none;color:#11998e;font-weight:700;font-size:13px;cursor:pointer;">Refresh</button>
+      </div>
+      <div id="finAnalyticsContent">
+        <div style="text-align:center;padding:12px;">
+          <button onclick="loadFinancierAnalytics()"
+            style="background:#f0faf7;color:#11998e;border:2px solid #11998e;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;">
+            🏦 Load Financier Analytics
+          </button>
+        </div>
+      </div>
+    </div>
     <div class="loading" id="adminLoading" style="padding-top:30px;display:none;">
       <div class="spinner"></div><div>Loading...</div>
     </div>
     <div id="adminContent"></div>
   </div>
+
+  <!-- ═══ FINANCIER ANALYTICS TAB (financier sees own stats) ═══ -->
+  <!-- Financier role gets analytics in their admin-equivalent section, loaded after login -->
 
   <!-- Search FAB -->
   <button class="fab-search" onclick="openSearchModal()" title="Search leads">🔍</button>
@@ -524,12 +544,25 @@
           ⚠️ This lead will be claimed to you only after you submit this log
         </div>
 
-        <div class="log-note-type-list">
+        <!-- Sales interaction types (hidden for financier) -->
+        <div class="log-note-type-list" id="salesLogTypes">
           <button class="note-type-btn" onclick="selectNoteType(this,'Called - Answered')">📞 Called — Answered</button>
           <button class="note-type-btn" onclick="selectNoteType(this,'Called - No Answer')">📵 Called — No Answer</button>
           <button class="note-type-btn" onclick="selectNoteType(this,'Will Visit Showroom')">🏪 Will Visit Showroom</button>
           <button class="note-type-btn" onclick="selectNoteType(this,'WhatsApp Sent')">💬 WhatsApp Sent</button>
           <button class="note-type-btn" onclick="selectNoteType(this,'Lost')">❌ Lost</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Other')">📝 Other</button>
+        </div>
+        <!-- Finance interaction types (only for financier role) -->
+        <div class="log-note-type-list" id="financeLogTypes" style="display:none;">
+          <button class="note-type-btn" onclick="selectNoteType(this,'Called - Answered')">📞 Called — Answered</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Called - No Answer')">📵 Called — No Answer</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'WhatsApp Sent')">💬 WhatsApp Sent</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Documents Collected')">📄 Documents Collected</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Application Submitted')">📋 Application Submitted</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Loan Approved')">✅ Loan Approved</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Disbursement Done')">💰 Disbursement Done</button>
+          <button class="note-type-btn" onclick="selectNoteType(this,'Loan Rejected')">❌ Loan Rejected</button>
           <button class="note-type-btn" onclick="selectNoteType(this,'Other')">📝 Other</button>
         </div>
 
@@ -592,6 +625,77 @@
         <button class="btn-primary" onclick="submitAssign()">Assign</button>
       </div>
     </div>
+  </div>
+
+  <!-- ═══ FINANCE DETAILS SHEET (financier fills in) ═══ -->
+  <div class="sheet-overlay" id="financeSheet" onclick="handleSheetOverlayClick(event,'financeSheet')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🏦 Finance Details <button class="sheet-close" onclick="closeSheet('financeSheet')">✕</button></div>
+      <div class="sheet-body">
+        <input type="hidden" id="finLeadId">
+        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Loan Status</label>
+        <select id="finLoanStatus" class="assign-select" style="margin-bottom:14px;">
+          <option value="New">New</option>
+          <option value="Called">Called</option>
+          <option value="Applied">Applied</option>
+          <option value="Under Process">Under Process</option>
+          <option value="Approved">Approved</option>
+          <option value="Disbursed">💰 Disbursed (will convert lead)</option>
+          <option value="Rejected">Rejected</option>
+          <option value="Not Interested">Not Interested</option>
+        </select>
+        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Scheme / Offer</label>
+        <input type="text" id="finScheme" class="assign-select" style="margin-bottom:14px;" placeholder="e.g. 0% for 12 months">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Down Payment (₹)</label>
+            <input type="number" id="finDownPayment" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Loan Amount (₹)</label>
+            <input type="number" id="finLoanAmount" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">EMI (₹/month)</label>
+            <input type="number" id="finEMI" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Tenure (months)</label>
+            <input type="number" id="finTenure" class="assign-select" placeholder="0" min="0" max="84">
+          </div>
+        </div>
+        <button class="btn-primary" id="finSubmitBtn" onclick="submitFinanceDetails()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ASSIGN FINANCIER SHEET ═══ -->
+  <div class="sheet-overlay" id="assignFinSheet" onclick="handleSheetOverlayClick(event,'assignFinSheet')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">🏦 Assign Financier <button class="sheet-close" onclick="closeSheet('assignFinSheet')">✕</button></div>
+      <div class="sheet-body">
+        <input type="hidden" id="assignFinLeadId">
+        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:8px;">Select Financier</label>
+        <select id="assignFinSelect" class="assign-select">
+          <option value="">-- Select Financier --</option>
+        </select>
+        <button class="btn-primary" onclick="submitAssignFinancier()">Assign</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FINANCIER LOAN STATUS FILTER (injected in My Leads tab for financier role) ═══ -->
+  <div id="finLoanStatusFilter" style="display:none;" class="filter-row">
+    <div class="filter-chip active"        onclick="setFinancierLoanFilter('all',this)">All</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('New',this)">New</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Called',this)">Called</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Applied',this)">Applied</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Under Process',this)">Under Process</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Approved',this)">Approved</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Disbursed',this)">💰 Disbursed</div>
+    <div class="filter-chip"               onclick="setFinancierLoanFilter('Rejected',this)">Rejected</div>
   </div>
 
   <!-- Bottom Nav -->

@@ -514,6 +514,28 @@ const API = {
     return await this.call('searchCRMLeads', { sessionId, query });
   },
 
+  // ── FINANCIER ──────────────────────────────
+  async getFinancierUsers() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getFinancierUsers', { sessionId });
+  },
+  async getFinancierLeads() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getFinancierLeads', { sessionId });
+  },
+  async getFinancierDashboard() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getFinancierDashboard', { sessionId });
+  },
+  async updateFinanceDetails(leadId, data) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('updateFinanceDetails', { sessionId, leadId, data: JSON.stringify(data) });
+  },
+  async getFinancierAnalytics() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getFinancierAnalytics', { sessionId });
+  },
+
   /**
    * Get a single quotation by quotation number (for reprint)
    */

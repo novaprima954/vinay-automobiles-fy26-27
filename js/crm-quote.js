@@ -75,8 +75,28 @@ document.addEventListener('DOMContentLoaded', async function() {
     } catch(e) {}
   }
 
+  // Load financier list for dropdown
+  _loadFinancierDropdown();
+
   await loadModels(modelHint);
 });
+
+// ── FINANCIER DROPDOWN ──────────────────────
+
+async function _loadFinancierDropdown() {
+  try {
+    const sel = document.getElementById('quotFinancier');
+    if (!sel) return;
+    const r = await API.getFinancierUsers();
+    if (r.success && r.financiers) {
+      r.financiers.forEach(function(f) {
+        const opt = document.createElement('option');
+        opt.value = f.name; opt.textContent = f.name;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+}
 
 // ── LEAD SEARCH ─────────────────────────────
 
@@ -510,15 +530,17 @@ async function generateQuotation() {
     // Auto-save new lead to CRM if not already a known lead
     // Source is always 'Walk-In' for quotation-generated leads (customer is physically present)
     if (!leadId) {
-      const crmNote = document.getElementById('crmNote') ? document.getElementById('crmNote').value.trim() : '';
+      const crmNote       = document.getElementById('crmNote')       ? document.getElementById('crmNote').value.trim()    : '';
+      const finAssigned   = document.getElementById('quotFinancier') ? document.getElementById('quotFinancier').value      : '';
       try {
         const addRes = await API.addLead({
-          customerName: custName,
-          mobileNo:     mobile,
-          address:      [address, district].filter(Boolean).join(', '),
-          model:        model,
-          source:       'Walk-In',
-          followUpDate: followUpDate
+          customerName:      custName,
+          mobileNo:          mobile,
+          address:           [address, district].filter(Boolean).join(', '),
+          model:             model,
+          source:            'Walk-In',
+          followUpDate:      followUpDate,
+          financierAssigned: finAssigned
         });
         if (addRes.success) {
           leadId = addRes.leadId;

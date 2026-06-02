@@ -53,6 +53,9 @@ const ROLE_CARDS = {
     { title: 'ALL Number Plate Update', icon: '🔢🔢', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'hsrp-update.html', description: 'V301 AD+Counter' },
     { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
     { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' }
+  ],
+  financier: [
+    { title: 'Financier CRM', icon: '🏦', color: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', link: 'crm.html', description: 'Finance leads & follow-ups' }
   ]
 };
 
