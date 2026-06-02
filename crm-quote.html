@@ -386,6 +386,43 @@
       </div>
     </div>
 
+    <!-- Compare Toggle (shown after vehicle 1 is loaded) -->
+    <div class="section-card no-print" id="compareToggleCard" style="display:none;">
+      <div class="section-card-body" style="padding:10px 14px;">
+        <button id="btnToggleCompare" onclick="toggleCompareMode()"
+          style="width:100%;padding:10px;background:#f0f4ff;color:#667eea;
+                 border:2px solid #667eea;border-radius:8px;font-size:13px;
+                 font-weight:700;cursor:pointer;">
+          ⚖️ Compare with Another Vehicle
+        </button>
+      </div>
+    </div>
+
+    <!-- Vehicle 2 (comparison) -->
+    <div class="section-card no-print" id="vehicle2Card" style="display:none;">
+      <div class="section-card-title" style="background:#fff3e0;color:#e65100;">🏍️ Vehicle 2 — Compare</div>
+      <div class="section-card-body">
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Model *</label>
+            <select id="modelSelect2" class="form-select" onchange="onModelChange2()">
+              <option value="">-- Select Model --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Variant *</label>
+            <select id="variantSelect2" class="form-select" onchange="onVariantChange2()" disabled>
+              <option value="">-- Select Variant --</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label class="form-label">Color</label>
+          <input type="text" id="vehicleColor2" class="form-input" placeholder="e.g. Rebel Red">
+        </div>
+      </div>
+    </div>
+
     <!-- Accessories -->
     <div class="section-card no-print" id="accessoriesCard" style="display:none;">
       <div class="section-card-title">🧩 Accessories <span style="font-weight:400;text-transform:none;font-size:12px;color:#888;">(check to include)</span></div>

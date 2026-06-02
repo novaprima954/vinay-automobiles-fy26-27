@@ -8,6 +8,8 @@ let priceDetails = null;
 let lastQuotNo = '';
 let customAccItems = [];    // { id, label, price }
 let pendingQuotData = null; // quotation data for reprint restoration
+let compareMode = false;
+let priceDetails2 = null;   // vehicle 2 for comparison
 
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
@@ -277,12 +279,80 @@ async function onVariantChange() {
       }
       recalculate();
       document.getElementById('btnGenerate').disabled = false;
+      // Show compare toggle now that vehicle 1 is loaded
+      const compareCard = document.getElementById('compareToggleCard');
+      if (compareCard) compareCard.style.display = '';
     } else {
       showMessage(response.message, 'error');
     }
   } catch (e) {
     showMessage('Error loading price details', 'error');
   }
+}
+
+// ── VEHICLE 2 (COMPARISON) ──────────────────
+
+function toggleCompareMode() {
+  compareMode = !compareMode;
+  const card  = document.getElementById('vehicle2Card');
+  const btn   = document.getElementById('btnToggleCompare');
+  if (compareMode) {
+    card.style.display = '';
+    btn.innerHTML = '✕ Cancel Comparison';
+    btn.style.cssText += ';background:#fff0f0;color:#ef5350;border-color:#ef5350;';
+    _populateModelSelect2();
+  } else {
+    card.style.display = 'none';
+    btn.innerHTML = '⚖️ Compare with Another Vehicle';
+    btn.style.cssText += ';background:#f0f4ff;color:#667eea;border-color:#667eea;';
+    priceDetails2 = null;
+  }
+}
+
+async function _populateModelSelect2() {
+  const sel = document.getElementById('modelSelect2');
+  if (sel.options.length > 1) return;  // already loaded
+  try {
+    const r = await API.getPriceMasterModels();
+    if (r.success && r.models) {
+      r.models.forEach(function(m) {
+        const opt = document.createElement('option');
+        opt.value = m; opt.textContent = m;
+        sel.appendChild(opt);
+      });
+    }
+  } catch(e) {}
+}
+
+async function onModelChange2() {
+  const model  = document.getElementById('modelSelect2').value;
+  const varSel = document.getElementById('variantSelect2');
+  varSel.innerHTML = '<option value="">-- Select Variant --</option>';
+  varSel.disabled  = true;
+  priceDetails2    = null;
+  if (!model) return;
+  try {
+    const r = await API.getPriceMasterVariants(model);
+    if (r.success && r.variants) {
+      r.variants.forEach(function(v) {
+        const opt = document.createElement('option');
+        opt.value = v; opt.textContent = v;
+        varSel.appendChild(opt);
+      });
+      varSel.disabled = false;
+      if (r.variants.length === 1) { varSel.value = r.variants[0]; await onVariantChange2(); }
+    }
+  } catch(e) {}
+}
+
+async function onVariantChange2() {
+  const model   = document.getElementById('modelSelect2').value;
+  const variant = document.getElementById('variantSelect2').value;
+  if (!model || !variant) return;
+  try {
+    const r = await API.getPriceMasterDetails(model, variant);
+    if (r.success) { priceDetails2 = r.details; showMessage('Vehicle 2 loaded — ready to compare', 'success'); }
+  } catch(e) {}
 }
 
 // ── ACCESSORIES ─────────────────────────────
@@ -458,6 +528,11 @@ async function generateQuotation() {
   if (!custName) { showMessage('Please enter customer name', 'error'); return; }
   if (!mobile || !/^\d{10}$/.test(mobile)) { showMessage('Please enter valid 10-digit mobile', 'error'); return; }
   if (!model || !variant) { showMessage('Please select model and variant', 'error'); return; }
+  if (compareMode && !priceDetails2) {
+    showMessage('Please select Model and Variant for Vehicle 2 before comparing', 'error');
+    document.getElementById('vehicle2Card').scrollIntoView({ behavior: 'smooth' });
+    return;
+  }
 
   const followUpDate = document.getElementById('quotFollowUpDate') ? document.getElementById('quotFollowUpDate').value : '';
   if (!followUpDate) {
@@ -502,6 +577,55 @@ async function generateQuotation() {
     const grandTotal = Math.max(0, productTotal + accTotal + hypothecationCharge - discount);
 
     lastQuotNo = quotNo;
+
+    // ── Comparison mode ─────────────────────
+    if (compareMode && priceDetails2) {
+      const model2    = document.getElementById('modelSelect2').value;
+      const variant2  = document.getElementById('variantSelect2').value;
+      const color2    = document.getElementById('vehicleColor2').value.trim() || '-';
+      const pd2       = priceDetails2;
+
+      const exShowroom2 = Number(pd2.exShowroom) || 0;
+      const insurance2  = Number(pd2.insurance)  || 0;
+      const rto2        = Number(pd2.rto)        || 0;
+      const pdi2        = Number(pd2.serviceCharge) || 0;
+      const mandAcc2    = Number(pd2.mandAccessories) || 0;
+      const productTotal2 = exShowroom2 + insurance2 + rto2 + pdi2 + mandAcc2;
+
+      // Accessories: use same checked keys, look up price in pd2
+      const compAcc = [];
+      document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
+        const acc  = ACC_CONFIG.find(function(a) { return a.key === cb.dataset.key; });
+        if (!acc) return;
+        const p1 = Number(cb.dataset.price) || 0;
+        const p2 = Number(pd2[acc.key]) || 0;
+        compAcc.push({ label: acc.label, p1: p1, p2: p2 });
+      });
+      // Custom accessories — same price for both
+      customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; })
+        .forEach(function(a) { compAcc.push({ label: a.label, p1: Number(a.price), p2: Number(a.price) }); });
+
+      const accTotal2    = compAcc.reduce(function(s,a){ return s+a.p2; }, 0);
+      const grandTotal2  = Math.max(0, productTotal2 + accTotal2 + hypothecationCharge - discount);
+
+      const compHtml = buildComparisonQuotationHTML({
+        quotNo, date: new Date(), custName, mobile, address, district, execName, execMobile,
+        v1: { model, variant, color, exShowroom, insurance, rto, pdi, mandAcc, productTotal, accTotal, hypothecationCharge, discount, grandTotal },
+        v2: { model: model2, variant: variant2, color: color2, exShowroom: exShowroom2, insurance: insurance2, rto: rto2, pdi: pdi2, mandAcc: mandAcc2, productTotal: productTotal2, accTotal: accTotal2, hypothecationCharge, discount, grandTotal: grandTotal2 },
+        compAcc
+      });
+
+      document.getElementById('quotContent').innerHTML = compHtml;
+      document.getElementById('quotPreviewWrapper').style.display = 'block';
+      document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
+
+      // Save quotation to CRM (vehicle 1 details)
+      try {
+        await API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model: model + ' vs ' + model2, variant, totalAmount: grandTotal });
+      } catch(e) { console.error(e); }
+      return;  // skip normal path below
+    }
+    // ── End comparison mode ──────────────────
 
     // Build quotData for saving (enables reprint restoration)
     const selectedAccKeys = [];
@@ -780,6 +904,116 @@ function buildQuotationHTML(d) {
       <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are subject to change without notice at the time of delivery.</li>
       <li>Booking subject to availability.</li>
       <li>All the above Terms &amp; Conditions of Sales are subject to change without notice.</li>
+      <li>All matters are subject to Yavatmal jurisdiction only.</li>
+    </ol>
+  </div>
+  <div class="quot-company-footer">Vinay Automobiles — Darwha Road, Yavatmal, Maharashtra | Authorised TVS Dealer</div>
+</div>`;
+}
+
+// ── COMPARISON QUOTATION ────────────────────
+
+function buildComparisonQuotationHTML(d) {
+  const today = fmtDateDisplay(d.date);
+  const v1 = d.v1, v2 = d.v2;
+  const fmtOrDash = function(n) { return n > 0 ? '₹ ' + fmt(n) : '—'; };
+
+  // Build accessory rows
+  let accRows = '';
+  if (d.compAcc && d.compAcc.length > 0) {
+    accRows += `<tr class="section-header"><td colspan="3"><strong>Extra Accessories</strong></td></tr>`;
+    d.compAcc.forEach(function(a) {
+      accRows += `<tr><td>${a.label}</td><td>${fmtOrDash(a.p1)}</td><td>${fmtOrDash(a.p2)}</td></tr>`;
+    });
+    accRows += `<tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>${fmtOrDash(v1.accTotal)}</strong></td><td><strong>${fmtOrDash(v2.accTotal)}</strong></td></tr>`;
+  }
+
+  const showRow = function(label, val1, val2) {
+    if (val1 <= 0 && val2 <= 0) return '';
+    return `<tr><td>${label}</td><td>${fmtOrDash(val1)}</td><td>${fmtOrDash(val2)}</td></tr>`;
+  };
+
+  const addressFull = [d.address, d.district].filter(Boolean).join(', ');
+
+  return `
+<div class="quot-wrap">
+  <div class="quot-header">
+    <div>
+      <div class="quot-company-name">VINAY AUTOMOBILES</div>
+      <div class="quot-company-sub">Authorised TVS Dealer</div>
+      <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>
+        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · ' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="quot-brand">TVS</div>
+      <div class="quot-brand-sub">Motor Company</div>
+    </div>
+  </div>
+
+  <div class="quot-heading">COMPARISON QUOTATION</div>
+  <div class="quot-meta">
+    <div>Quotation No : <span>${d.quotNo}</span></div>
+    <div>Date : <span>${today}</span></div>
+  </div>
+
+  <!-- Customer row -->
+  <div style="border:1px solid #bbb;padding:10px 12px;margin-bottom:12px;font-size:12px;">
+    <span style="font-weight:700;margin-right:16px;">Name : ${d.custName}</span>
+    <span style="margin-right:16px;">Mobile : ${d.mobile}</span>
+    ${addressFull ? `<span>Address : ${addressFull}</span>` : ''}
+  </div>
+
+  <!-- Comparison Table -->
+  <table class="quot-price-table" style="width:100%;">
+    <thead>
+      <tr>
+        <th style="width:38%;">Item</th>
+        <th style="width:31%;text-align:center;background:#e8f4ff;">${v1.model}<br><span style="font-size:10px;font-weight:500;">${v1.variant}</span></th>
+        <th style="width:31%;text-align:center;background:#fff3e0;">${v2.model}<br><span style="font-size:10px;font-weight:500;">${v2.variant}</span></th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr style="background:#f9f9f9;">
+        <td>Color</td>
+        <td style="text-align:center;background:#e8f4ff;">${v1.color}</td>
+        <td style="text-align:center;background:#fff3e0;">${v2.color}</td>
+      </tr>
+      ${showRow('Ex-Showroom Price', v1.exShowroom, v2.exShowroom)}
+      ${showRow('Insurance', v1.insurance, v2.insurance)}
+      ${showRow('Road Tax', v1.rto, v2.rto)}
+      ${v1.mandAcc > 0 || v2.mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(v1.model)}</span></td><td style="background:#e8f4ff;">${fmtOrDash(v1.mandAcc)}</td><td style="background:#fff3e0;">${fmtOrDash(v2.mandAcc)}</td></tr>` : ''}
+      ${showRow('Service Charge', v1.pdi, v2.pdi)}
+      <tr class="total-row">
+        <td><strong>Product Total</strong></td>
+        <td style="background:#dceeff;"><strong>₹ ${fmt(v1.productTotal)}</strong></td>
+        <td style="background:#ffe8c0;"><strong>₹ ${fmt(v2.productTotal)}</strong></td>
+      </tr>
+      ${accRows}
+      ${v1.hypothecationCharge > 0 || v2.hypothecationCharge > 0 ? showRow('Hypothecation Charge', v1.hypothecationCharge, v2.hypothecationCharge) : ''}
+      ${v1.discount > 0 || v2.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;background:#e8f4ff;"><strong>- ₹ ${fmt(v1.discount)}</strong></td><td style="color:#ef5350;background:#fff3e0;"><strong>- ₹ ${fmt(v2.discount)}</strong></td></tr>` : ''}
+      <tr class="grand-total">
+        <td><strong>Final Total</strong></td>
+        <td style="background:#1a73e8;"><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
+        <td style="background:#e65100;"><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="quot-desc" style="margin-top:12px;">
+    <div class="quot-desc-title">🏦 Bank Details (for Online Transfer)</div>
+    <div class="quot-desc-body" style="display:flex;gap:24px;flex-wrap:wrap;">
+      <div><strong>Bank Name :</strong> HDFC Bank</div>
+      <div><strong>Account No :</strong> 50200038743479</div>
+      <div><strong>IFSC :</strong> HDFC0001017</div>
+      <div><strong>Branch :</strong> Yavatmal</div>
+      <div><strong>Account Name :</strong> Vinay Automobiles</div>
+    </div>
+  </div>
+  <div class="quot-terms">
+    <strong>Terms and Conditions:</strong>
+    <ol>
+      <li>Prices, taxes, duties &amp; any other Govt. levies are subject to change without notice at time of delivery.</li>
+      <li>Booking subject to availability.</li>
       <li>All matters are subject to Yavatmal jurisdiction only.</li>
     </ol>
   </div>
