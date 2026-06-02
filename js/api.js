@@ -477,9 +477,9 @@ const API = {
   /**
    * Get CRM analytics (admin only) — source effectiveness + exec performance
    */
-  async getCRMAnalytics() {
+  async getCRMAnalytics(monthFilter) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getCRMAnalytics', { sessionId });
+    return await this.call('getCRMAnalytics', { sessionId, monthFilter: monthFilter || 'all' });
   },
 
   /**

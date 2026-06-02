@@ -1010,18 +1010,52 @@ function adminLeadCardHtml(lead) {
 }
 
 async function loadAnalytics() {
-  const container = document.getElementById('analyticsContent');
-  const btn = document.getElementById('analyticsRefreshBtn');
+  const container  = document.getElementById('analyticsContent');
+  const btn        = document.getElementById('analyticsRefreshBtn');
+  const monthSel   = document.getElementById('analyticsMonthFilter');
+  const monthFilter = monthSel ? monthSel.value : 'all';
+
   container.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading analytics...</div></div>';
   if (btn) btn.disabled = true;
 
   try {
-    const r = await API.getCRMAnalytics();
+    const r = await API.getCRMAnalytics(monthFilter);
     if (btn) btn.disabled = false;
     if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
 
     const a = r.analytics;
+
+    // Populate month dropdown on first load
+    if (monthSel && monthSel.options.length <= 1 && a.availableMonths) {
+      a.availableMonths.forEach(function(m) {
+        const opt = document.createElement('option');
+        opt.value = m;
+        const [y, mo] = m.split('-');
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        opt.textContent = (months[parseInt(mo)-1] || mo) + ' ' + y;
+        monthSel.appendChild(opt);
+      });
+      if (monthFilter !== 'all') monthSel.value = monthFilter;
+    }
+
     let html = '';
+
+    // ── Totals summary ─────────────────────────────────────────────────
+    if (a.totals) {
+      const t = a.totals;
+      const convRate = t.total > 0 ? Math.round(t.converted * 100 / t.total) : 0;
+      html += `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:12px 16px 4px;">
+        ${[['Total Leads','📋',t.total,'#667eea'],['Converted','✅',t.converted,'#388E3C'],
+           ['Active','🔄',t.active,'#FF9800'],['Lost','❌',t.lost,'#ef5350']]
+          .map(([l,ic,v,c]) => `<div style="background:white;border-radius:10px;padding:12px;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,0.07);">
+            <div style="font-size:18px;">${ic}</div>
+            <div style="font-size:22px;font-weight:800;color:${c};">${v}</div>
+            <div style="font-size:11px;color:#888;">${l}</div></div>`).join('')}
+      </div>
+      <div style="padding:4px 16px 8px;font-size:13px;color:#555;text-align:center;">
+        Overall conversion rate: <strong style="color:#667eea;">${convRate}%</strong>
+      </div>`;
+    }
 
     if (a.bySource && a.bySource.length > 0) {
       html += `<div class="analytics-card">
@@ -1398,9 +1432,9 @@ function selectNoteType(el, type) {
   el.classList.add('selected');
 
   document.getElementById('lostReasonSection').style.display  = type === 'Lost' ? '' : 'none';
-  document.getElementById('otherNoteSection').style.display   = type === 'Other' ? '' : 'none';
+  document.getElementById('otherNoteSection').style.display   = type !== 'Lost' ? '' : 'none'; // show for ALL except Lost
   document.getElementById('followupDateRow').style.display    = type === 'Lost' ? 'none' : '';
-  document.getElementById('statusChangeRow').style.display    = (type !== 'Lost' && type !== 'Other') ? '' : 'none';
+  document.getElementById('statusChangeRow').style.display    = (type !== 'Lost') ? '' : 'none';
 
   document.getElementById('logSubmitBtn').disabled = false;
 }
@@ -1419,7 +1453,8 @@ async function submitLog() {
   if (selectedNoteType === 'Lost') {
     note = document.getElementById('lostReasonText').value.trim();
     if (!note) { alert('Please enter a lost reason'); return; }
-  } else if (selectedNoteType === 'Other') {
+  } else {
+    // Notes available for all interaction types
     note = document.getElementById('otherNoteText').value.trim();
   }
 

@@ -372,7 +372,13 @@
     <div id="adminAnalyticsSection" style="margin-top:8px;display:none;">
       <div class="section-header">
         <div class="section-title">📊 Analytics</div>
-        <button onclick="loadAnalytics()" style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;" id="analyticsRefreshBtn">Refresh</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <select id="analyticsMonthFilter" onchange="loadAnalytics()"
+            style="padding:5px 8px;border:1.5px solid #e0e0e0;border-radius:8px;font-size:12px;font-weight:600;color:#555;background:white;cursor:pointer;">
+            <option value="all">All Time</option>
+          </select>
+          <button onclick="loadAnalytics()" style="background:none;border:none;color:#667eea;font-weight:700;font-size:13px;cursor:pointer;" id="analyticsRefreshBtn">↻</button>
+        </div>
       </div>
       <div id="analyticsContent">
         <div style="text-align:center;padding:24px 16px;">
@@ -590,10 +596,10 @@
           <textarea id="lostReasonText" class="lost-textarea" rows="3" placeholder="Why was this lead lost?"></textarea>
         </div>
 
-        <!-- Shown only for Other -->
+        <!-- Call notes — shown for all types except Lost -->
         <div id="otherNoteSection" style="display:none; margin-bottom:14px;">
-          <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Note</label>
-          <textarea id="otherNoteText" class="log-note-textarea" rows="3" placeholder="Add a note..."></textarea>
+          <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Notes <span style="font-weight:400;color:#999;">(optional — what was discussed?)</span></label>
+          <textarea id="otherNoteText" class="log-note-textarea" rows="3" placeholder="e.g. Customer interested in Jupiter 110, wants finance option..."></textarea>
         </div>
 
         <div class="log-followup-row" id="followupDateRow">
