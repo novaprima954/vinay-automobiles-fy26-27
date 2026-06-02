@@ -43,11 +43,16 @@ document.addEventListener('DOMContentLoaded', async function() {
   const navAllLeads = document.getElementById('navAllLeads');
   if (navAllLeads && currentUser.role !== 'financier') navAllLeads.style.display = '';
 
-  // Financier role — adjust UI
+  // Financier role — adjust UI and load their dashboard
   if (currentUser.role === 'financier') {
     _setupFinancierUI();
     await loadFinancierDashboard();
     return;
+  }
+
+  // Admin visiting Financier CRM view (via ?view=financier from home)
+  if (currentUser.role === 'admin' && new URLSearchParams(window.location.search).get('view') === 'financier') {
+    setTimeout(() => switchTab('admin'), 300);
   }
 
   await loadDashboard();
@@ -85,7 +90,14 @@ function switchTab(tab) {
     else loadMyLeads();
   }
   if (tab === 'allLeads' && currentUser.role !== 'financier') loadAllLeads();
-  if (tab === 'admin'    && currentUser.role === 'admin') loadAdmin();
+  if (tab === 'admin') {
+    if (currentUser.role === 'admin') loadAdmin();
+    else if (currentUser.role === 'financier') {
+      // Show financier's own analytics in the admin tab
+      const container = document.getElementById('finAnalyticsContent');
+      if (container && container.querySelector('button')) loadFinancierAnalytics();
+    }
+  }
 
   window.scrollTo(0, 0);
 }
@@ -429,6 +441,15 @@ function _setupFinancierUI() {
   const finFilter = document.getElementById('finLoanStatusFilter');
   const myLeadsTab = document.getElementById('myLeadsTab');
   if (finFilter && myLeadsTab) { finFilter.style.display = ''; myLeadsTab.insertBefore(finFilter, myLeadsTab.firstChild); }
+  // Show "Analytics" tab for financier (reuse navAdmin element, renamed)
+  const navAdmin = document.getElementById('navAdmin');
+  if (navAdmin) {
+    navAdmin.style.display = '';
+    const adminIcon  = navAdmin.querySelector('.nav-icon');
+    const adminLabel = navAdmin.querySelector('.nav-label');
+    if (adminIcon)  adminIcon.textContent  = '📊';
+    if (adminLabel) adminLabel.textContent = 'Analytics';
+  }
   // Hide FAB add-lead (financier doesn't add leads)
   const fab = document.querySelector('.fab');
   if (fab) fab.style.display = 'none';
@@ -565,13 +586,15 @@ function financierLeadCardHtml(lead) {
 
 function openFinanceSheet(leadId) {
   const lead = _findFinancierLead(leadId) || findCachedLead(leadId) || {};
-  document.getElementById('finLeadId').value = leadId;
-  document.getElementById('finLoanStatus').value   = lead.loanStatus    || 'New';
-  document.getElementById('finScheme').value        = lead.financeScheme || '';
-  document.getElementById('finDownPayment').value   = lead.downPayment   || '';
-  document.getElementById('finLoanAmount').value    = lead.loanAmount    || '';
-  document.getElementById('finEMI').value           = lead.emi           || '';
-  document.getElementById('finTenure').value        = lead.tenure        || '';
+  document.getElementById('finLeadId').value           = leadId;
+  document.getElementById('finLoanStatus').value       = lead.loanStatus           || 'New';
+  document.getElementById('finScheme').value           = lead.financeScheme        || '';
+  document.getElementById('finDownPayment').value      = lead.downPayment          || '';
+  document.getElementById('finLoanAmount').value       = lead.loanAmount           || '';
+  document.getElementById('finEMI').value              = lead.emi                  || '';
+  document.getElementById('finTenure').value           = lead.tenure               || '';
+  const finFuEl = document.getElementById('finFollowUpDate');
+  if (finFuEl) { finFuEl.value = lead.financierFollowUpDate || ''; _setFollowUpDateLimits('finFollowUpDate'); }
   openSheet('financeSheet');
 }
 
@@ -584,13 +607,15 @@ async function submitFinanceDetails() {
   const btn    = document.getElementById('finSubmitBtn');
   btn.disabled = true; btn.textContent = 'Saving...';
   try {
+    const finFuEl = document.getElementById('finFollowUpDate');
     const data = {
-      loanStatus:    document.getElementById('finLoanStatus').value,
-      financeScheme: document.getElementById('finScheme').value.trim(),
-      downPayment:   Number(document.getElementById('finDownPayment').value) || 0,
-      loanAmount:    Number(document.getElementById('finLoanAmount').value)  || 0,
-      emi:           Number(document.getElementById('finEMI').value)         || 0,
-      tenure:        Number(document.getElementById('finTenure').value)      || 0
+      loanStatus:           document.getElementById('finLoanStatus').value,
+      financeScheme:        document.getElementById('finScheme').value.trim(),
+      downPayment:          Number(document.getElementById('finDownPayment').value) || 0,
+      loanAmount:           Number(document.getElementById('finLoanAmount').value)  || 0,
+      emi:                  Number(document.getElementById('finEMI').value)         || 0,
+      tenure:               Number(document.getElementById('finTenure').value)      || 0,
+      financierFollowUpDate: finFuEl ? finFuEl.value : ''
     };
     const r = await API.updateFinanceDetails(leadId, data);
     if (r.success) {
@@ -1043,9 +1068,11 @@ async function loadAnalytics() {
 
 // ── CALLS REPORT ───────────────────────────
 
+let _callsReportData = [];   // all loaded calls, for client-side filtering
+
 async function loadCallsReport() {
   const container = document.getElementById('callsReportContent');
-  const btn = document.getElementById('callsReportBtn');
+  const btn       = document.getElementById('callsReportBtn');
   if (!container) return;
 
   const fromDate = document.getElementById('callsFromDate').value;
@@ -1060,38 +1087,73 @@ async function loadCallsReport() {
     if (btn) btn.disabled = false;
     if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
 
-    const calls = r.calls || [];
-    if (calls.length === 0) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">📵</div><div class="empty-title">No interactions</div><div class="empty-sub">No interactions logged in this date range</div></div>`;
-      return;
-    }
+    _callsReportData = r.calls || [];
 
-    let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>`;
-    html += calls.map(c => `
-      <div class="lead-card" style="border-left-color:${callTypeColor(c.type)};">
-        <div class="lead-top">
-          <div class="lead-name">${esc(c.customerName)}</div>
-          <div class="lead-badges">
-            <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};">${esc(c.type)}</span>
-          </div>
-        </div>
-        <div class="lead-info">
-          <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🚗 ${esc(c.model || '—')}</div>
-          <div class="lead-info-row">🕐 ${esc(c.datetime)} &nbsp;👤 ${esc(c.by)}</div>
-          ${c.followUpDate ? `<div class="lead-info-row" style="color:#667eea;font-weight:700;">📅 Next Follow-up: ${esc(c.followUpDate)}</div>` : ''}
-          ${c.note ? `<div class="lead-info-row" style="color:#555;font-style:italic;">"${esc(c.note)}"</div>` : ''}
-        </div>
-        <div class="lead-actions">
-          <button class="btn-act btn-call-act" onclick="callLead('${esc(c.mobile)}')">📞 Call</button>
-          <button class="btn-act btn-edit-act" onclick="openLead('${c.leadId}')">Details</button>
-        </div>
-      </div>
-    `).join('');
-    container.innerHTML = html;
+    // Build executive filter list
+    const execSel = document.getElementById('callsExecFilter');
+    if (execSel) {
+      const execs = [...new Set(_callsReportData.map(c => c.by).filter(Boolean))].sort();
+      execSel.innerHTML = '<option value="">All Executives</option>' +
+        execs.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+    }
+    document.getElementById('callsTypeFilter').value = '';
+    const filtersEl = document.getElementById('callsFilters');
+    if (filtersEl) filtersEl.style.display = _callsReportData.length > 0 ? 'flex' : 'none';
+
+    applyCallsFilters();
   } catch(e) {
     if (btn) btn.disabled = false;
     container.innerHTML = errorHtml('Error loading calls');
   }
+}
+
+function applyCallsFilters() {
+  const container  = document.getElementById('callsReportContent');
+  const execFilter = (document.getElementById('callsExecFilter')  || {}).value || '';
+  const typeFilter = (document.getElementById('callsTypeFilter')   || {}).value || '';
+
+  let calls = _callsReportData;
+
+  if (execFilter) calls = calls.filter(c => c.by === execFilter);
+  if (typeFilter) {
+    calls = calls.filter(c => {
+      const t = (c.type || '').toLowerCase();
+      if (typeFilter === 'called')     return t.includes('called');
+      if (typeFilter === 'whatsapp')   return t.includes('whatsapp');
+      if (typeFilter === 'quotation')  return t.includes('quotation');
+      if (typeFilter === 'finance')    return t.includes('finance');
+      if (typeFilter === 'visit')      return t.includes('visit') || t.includes('showroom');
+      return true;
+    });
+  }
+
+  if (calls.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">📵</div><div class="empty-title">No interactions</div><div class="empty-sub">No interactions match the filter</div></div>`;
+    return;
+  }
+
+  let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>`;
+  html += calls.map(c => `
+    <div class="lead-card" style="border-left-color:${callTypeColor(c.type)};">
+      <div class="lead-top">
+        <div class="lead-name">${esc(c.customerName)}</div>
+        <div class="lead-badges">
+          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};">${esc(c.type)}</span>
+        </div>
+      </div>
+      <div class="lead-info">
+        <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🚗 ${esc(c.model || '—')}</div>
+        <div class="lead-info-row">🕐 ${esc(c.datetime)} &nbsp;👤 ${esc(c.by)}</div>
+        ${c.followUpDate ? `<div class="lead-info-row" style="color:#667eea;font-weight:700;">📅 Follow-up: ${esc(c.followUpDate)}</div>` : ''}
+        ${c.note ? `<div class="lead-info-row" style="color:#555;font-style:italic;">"${esc(c.note)}"</div>` : ''}
+      </div>
+      <div class="lead-actions">
+        <button class="btn-act btn-call-act" onclick="callLead('${esc(c.mobile)}')">📞 Call</button>
+        <button class="btn-act btn-edit-act" onclick="openLead('${c.leadId}')">Details</button>
+      </div>
+    </div>
+  `).join('');
+  container.innerHTML = html;
 }
 
 function callTypeColor(type) {
@@ -1197,10 +1259,11 @@ function renderLeadDetail(lead) {
       ${lead.financierAssigned ? `<div class="detail-row"><span class="detail-label">Financier</span><span class="detail-value" style="font-weight:800;">${esc(lead.financierAssigned)}</span></div>` : ''}
       ${lead.loanStatus ? `<div class="detail-row"><span class="detail-label">Loan Status</span><span class="detail-value"><span style="font-weight:700;color:${loanColor};">${esc(lead.loanStatus)}</span></span></div>` : ''}
       ${lead.financeScheme ? `<div class="detail-row"><span class="detail-label">Scheme</span><span class="detail-value">${esc(lead.financeScheme)}</span></div>` : ''}
-      ${lead.downPayment > 0 ? `<div class="detail-row"><span class="detail-label">Down Payment</span><span class="detail-value">₹${lead.downPayment.toLocaleString('en-IN')}</span></div>` : ''}
-      ${lead.loanAmount > 0  ? `<div class="detail-row"><span class="detail-label">Loan Amount</span><span class="detail-value">₹${lead.loanAmount.toLocaleString('en-IN')}</span></div>` : ''}
-      ${lead.emi > 0         ? `<div class="detail-row"><span class="detail-label">EMI</span><span class="detail-value">₹${lead.emi.toLocaleString('en-IN')}/month</span></div>` : ''}
-      ${lead.tenure > 0      ? `<div class="detail-row"><span class="detail-label">Tenure</span><span class="detail-value">${lead.tenure} months</span></div>` : ''}
+      ${lead.downPayment > 0            ? `<div class="detail-row"><span class="detail-label">Down Payment</span><span class="detail-value">₹${lead.downPayment.toLocaleString('en-IN')}</span></div>` : ''}
+      ${lead.loanAmount > 0             ? `<div class="detail-row"><span class="detail-label">Loan Amount</span><span class="detail-value">₹${lead.loanAmount.toLocaleString('en-IN')}</span></div>` : ''}
+      ${lead.emi > 0                    ? `<div class="detail-row"><span class="detail-label">EMI</span><span class="detail-value">₹${lead.emi.toLocaleString('en-IN')}/month</span></div>` : ''}
+      ${lead.tenure > 0                 ? `<div class="detail-row"><span class="detail-label">Tenure</span><span class="detail-value">${lead.tenure} months</span></div>` : ''}
+      ${lead.financierFollowUpDate      ? `<div class="detail-row"><span class="detail-label" style="color:#11998e;">📅 Follow-up</span><span class="detail-value" style="color:#11998e;font-weight:700;">${esc(lead.financierFollowUpDate)}</span></div>` : ''}
     </div>` : '';
 
   // Assign financier button (for sales exec on leads without financier yet)
@@ -1306,12 +1369,15 @@ function openLogSheet(leadId, isPoolClaim) {
 
   document.querySelectorAll('#statusBtns .status-btn').forEach(b => b.classList.remove('active'));
 
-  // Show correct interaction type list
+  // Show correct interaction type list + follow-up label
   const salesTypes   = document.getElementById('salesLogTypes');
   const financeTypes = document.getElementById('financeLogTypes');
   const isFinancier  = currentUser && currentUser.role === 'financier';
   if (salesTypes)   salesTypes.style.display   = isFinancier ? 'none' : '';
   if (financeTypes) financeTypes.style.display  = isFinancier ? ''     : 'none';
+  // Rename follow-up date label based on role
+  const fuLabel = document.querySelector('#followupDateRow label');
+  if (fuLabel) fuLabel.textContent = isFinancier ? 'Finance Follow-up Date' : 'Next Follow-up Date';
 
   // Show/hide pool-claim notice
   const poolNotice = document.getElementById('poolClaimNotice');

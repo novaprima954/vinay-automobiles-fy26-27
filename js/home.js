@@ -21,7 +21,8 @@ const ROLE_CARDS = {
     { title: 'HPCL Tracker', icon: '⛽', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'vehicle-mileage.html', description: 'Track HPCL Fuel and Mileage' },
     { title: 'Financier Details', icon: '🏦', color: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', link: 'financier.html', description: 'HP Finance tracking' },
     { title: 'Employee Tracker', icon: '👤', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', link: 'salary.html', description: 'Salary, incentive & bonus' },
-    { title: 'Busy Upload', icon: '📤', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'busy-upload.html', description: 'Export Vehicle Invoice Master' }
+    { title: 'Busy Upload', icon: '📤', color: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', link: 'busy-upload.html', description: 'Export Vehicle Invoice Master' },
+    { title: 'Financier CRM', icon: '💹', color: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', link: 'crm.html?view=financier', description: 'Finance leads & analytics' }
   ],
   sales: [
     { title: 'Dashboard', icon: '📊', color: 'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)', link: 'dashboard.html', description: 'View your performance' },

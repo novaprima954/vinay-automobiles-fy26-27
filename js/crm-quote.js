@@ -537,7 +537,7 @@ async function generateQuotation() {
           customerName:      custName,
           mobileNo:          mobile,
           address:           [address, district].filter(Boolean).join(', '),
-          model:             model,
+          model:             (model + (variant ? ' ' + variant : '')).trim(), // store model+variant
           source:            'Walk-In',
           followUpDate:      followUpDate,
           financierAssigned: finAssigned
