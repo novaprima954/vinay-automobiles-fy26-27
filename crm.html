@@ -220,16 +220,19 @@
     .sheet-body { padding: 16px 18px; }
     .sheet-close { float: right; background: none; border: none; font-size: 20px; color: #999; cursor: pointer; padding: 0; }
 
-    /* Log sheet */
-    .log-note-type-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+    /* Log sheet — 2-column pill grid */
+    .log-note-type-list {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 8px; margin-bottom: 14px;
+    }
     .note-type-btn {
-      padding: 13px 16px; border-radius: 10px; border: 2px solid #e0e0e0;
-      background: white; font-size: 15px; font-weight: 600; color: #333;
-      cursor: pointer; text-align: left; display: flex; align-items: center; gap: 10px;
-      transition: all 0.15s;
+      padding: 10px 8px; border-radius: 10px; border: 2px solid #e0e0e0;
+      background: white; font-size: 13px; font-weight: 600; color: #444;
+      cursor: pointer; text-align: center;
+      transition: all 0.15s; line-height: 1.3;
     }
     .note-type-btn:active { background: #f0f4ff; }
-    .note-type-btn.selected { border-color: #667eea; background: #f0f4ff; color: #667eea; }
+    .note-type-btn.selected { border-color: #667eea; background: #667eea; color: white; }
 
     .log-followup-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; }
     .log-followup-row label { font-size: 13px; font-weight: 700; color: #555; }

@@ -968,33 +968,33 @@ function buildComparisonQuotationHTML(d) {
     <thead>
       <tr>
         <th style="width:38%;">Item</th>
-        <th style="width:31%;text-align:center;background:#e8f4ff;">${v1.model}<br><span style="font-size:10px;font-weight:500;">${v1.variant}</span></th>
-        <th style="width:31%;text-align:center;background:#fff3e0;">${v2.model}<br><span style="font-size:10px;font-weight:500;">${v2.variant}</span></th>
+        <th style="width:31%;text-align:center;background:#e0e0e0;">${v1.model}<br><span style="font-size:10px;font-weight:500;">${v1.variant}</span></th>
+        <th style="width:31%;text-align:center;background:#c8c8c8;">${v2.model}<br><span style="font-size:10px;font-weight:500;">${v2.variant}</span></th>
       </tr>
     </thead>
     <tbody>
-      <tr style="background:#f9f9f9;">
+      <tr style="background:#f5f5f5;">
         <td>Color</td>
-        <td style="text-align:center;background:#e8f4ff;">${v1.color}</td>
-        <td style="text-align:center;background:#fff3e0;">${v2.color}</td>
+        <td style="text-align:center;">${v1.color}</td>
+        <td style="text-align:center;">${v2.color}</td>
       </tr>
       ${showRow('Ex-Showroom Price', v1.exShowroom, v2.exShowroom)}
       ${showRow('Insurance', v1.insurance, v2.insurance)}
       ${showRow('Road Tax', v1.rto, v2.rto)}
-      ${v1.mandAcc > 0 || v2.mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(v1.model)}</span></td><td style="background:#e8f4ff;">${fmtOrDash(v1.mandAcc)}</td><td style="background:#fff3e0;">${fmtOrDash(v2.mandAcc)}</td></tr>` : ''}
+      ${v1.mandAcc > 0 || v2.mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(v1.model)}</span></td><td>${fmtOrDash(v1.mandAcc)}</td><td>${fmtOrDash(v2.mandAcc)}</td></tr>` : ''}
       ${showRow('Service Charge', v1.pdi, v2.pdi)}
       <tr class="total-row">
         <td><strong>Product Total</strong></td>
-        <td style="background:#dceeff;"><strong>₹ ${fmt(v1.productTotal)}</strong></td>
-        <td style="background:#ffe8c0;"><strong>₹ ${fmt(v2.productTotal)}</strong></td>
+        <td style="background:#e0e0e0;"><strong>₹ ${fmt(v1.productTotal)}</strong></td>
+        <td style="background:#c8c8c8;"><strong>₹ ${fmt(v2.productTotal)}</strong></td>
       </tr>
       ${accRows}
       ${v1.hypothecationCharge > 0 || v2.hypothecationCharge > 0 ? showRow('Hypothecation Charge', v1.hypothecationCharge, v2.hypothecationCharge) : ''}
-      ${v1.discount > 0 || v2.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;background:#e8f4ff;"><strong>- ₹ ${fmt(v1.discount)}</strong></td><td style="color:#ef5350;background:#fff3e0;"><strong>- ₹ ${fmt(v2.discount)}</strong></td></tr>` : ''}
+      ${v1.discount > 0 || v2.discount > 0 ? `<tr><td><strong>Discount</strong></td><td><strong>- ₹ ${fmt(v1.discount)}</strong></td><td><strong>- ₹ ${fmt(v2.discount)}</strong></td></tr>` : ''}
       <tr class="grand-total">
         <td><strong>Final Total</strong></td>
-        <td style="background:#1a73e8;"><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
-        <td style="background:#e65100;"><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
+        <td style="background:#222;"><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
+        <td style="background:#444;"><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
       </tr>
     </tbody>
   </table>

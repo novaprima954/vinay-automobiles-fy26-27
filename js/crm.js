@@ -26,6 +26,9 @@ let currentAllLeadsExecFilter   = 'all';
 // Pool claim — must submit log before lead is claimed
 let pendingPoolClaimLeadId = null;
 
+// Race-condition guard for openLead: only render the most-recently requested lead
+let _openLeadToken = 0;
+
 document.addEventListener('DOMContentLoaded', async function() {
   const session = SessionManager.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
@@ -1169,6 +1172,7 @@ function callTypeColor(type) {
 // ── LEAD DETAIL ────────────────────────────
 
 async function openLead(leadId) {
+  const myToken = ++_openLeadToken;  // each click gets a unique token
   openSheet('detailSheet');
 
   // Show cached basic info instantly while we fetch the full record
@@ -1194,10 +1198,12 @@ async function openLead(leadId) {
 
   try {
     const r = await API.getLeadDetails(leadId);
+    if (_openLeadToken !== myToken) return;  // a newer lead was clicked — discard this result
     if (!r.success) { document.getElementById('detailSheetBody').innerHTML = errorHtml(r.message); return; }
     renderLeadDetail(r.lead);
   } catch(e) {
-    document.getElementById('detailSheetBody').innerHTML = errorHtml('Error loading lead');
+    if (_openLeadToken === myToken)
+      document.getElementById('detailSheetBody').innerHTML = errorHtml('Error loading lead');
   }
 }
 
@@ -1445,12 +1451,10 @@ async function submitLog() {
       await API.updateLead(leadId, { status: selectedStatusChange, followUpDate: followUpDate || undefined });
     }
 
-    closeSheet('logSheet');
-    pendingPoolClaimLeadId = null;
+    const wasClaim = !!pendingPoolClaimLeadId;
+    closeSheet('logSheet');  // also clears pendingPoolClaimLeadId
 
-    if (selectedNoteType && leadId) {
-      showMessage(pendingPoolClaimLeadId ? 'Lead claimed & interaction logged ✅' : 'Logged successfully', 'success');
-    }
+    showMessage(wasClaim ? '✅ Lead claimed & interaction logged!' : '✅ Logged successfully', 'success');
     _bgRefreshDashboard();
 
     // Refresh current tab
