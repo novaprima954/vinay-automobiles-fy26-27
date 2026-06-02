@@ -528,7 +528,7 @@ async function generateQuotation() {
     document.getElementById('quotPreviewWrapper').style.display = 'block';
 
     // Auto-save new lead to CRM if not already a known lead
-    // Source is always 'Walk-In' for quotation-generated leads (customer is physically present)
+    // Source is always 'Walk-in' for quotation-generated leads (customer is physically present)
     if (!leadId) {
       const crmNote       = document.getElementById('crmNote')       ? document.getElementById('crmNote').value.trim()    : '';
       const finAssigned   = document.getElementById('quotFinancier') ? document.getElementById('quotFinancier').value      : '';
@@ -538,7 +538,7 @@ async function generateQuotation() {
           mobileNo:          mobile,
           address:           [address, district].filter(Boolean).join(', '),
           model:             (model + (variant ? ' ' + variant : '')).trim(), // store model+variant
-          source:            'Walk-In',
+          source:            'Walk-in',
           followUpDate:      followUpDate,
           financierAssigned: finAssigned
         });
@@ -700,7 +700,8 @@ function buildQuotationHTML(d) {
     <div>
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
       <div class="quot-company-sub">Authorised TVS Dealer</div>
-      <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>📞 9130040050</div>
+      <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>
+        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · ' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
     </div>
     <div style="text-align:right;">
       <div class="quot-brand">TVS</div>
@@ -797,9 +798,9 @@ function getVehicleType(model) {
 function getMandatoryAccDescription(model) {
   const m = (model || '').toLowerCase();
   const models = ['jupiter', 'ntorq', 'zest', 'orbiter', 'iqube'];
-  if (models.some(function(s) { return m.includes(s); })) return 'Footrest, Side Stand, Number Plate Bracket, Centre Stand';
-  // Motorcycles get simpler set
-  return 'Footrest, Side Stand, Number Plate Bracket';
+  if (models.some(function(s) { return m.includes(s); }))
+    return '<strong>Footrest</strong>, Side Stand, Number Plate Bracket, Centre Stand';
+  return '<strong>Footrest</strong>, Side Stand, Number Plate Bracket';
 }
 
 // ── FOLLOW-UP DATE LIMITS ────────────────────
