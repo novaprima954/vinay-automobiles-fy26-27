@@ -1142,5 +1142,19 @@ const API = {
    */
   async getMonthlySalaryReport(month) {
     return await this.call('getMonthlySalaryReport', { sessionId: SessionManager.getSessionId(), month });
+  },
+
+  // ── Daily Activity ──────────────────────────────────────────────────────
+
+  async getDailyActivity() {
+    return await this.call('getDailyActivity', { sessionId: SessionManager.getSessionId() });
+  },
+
+  async saveDailyActivity(data) {
+    return await this.call('saveDailyActivity', { sessionId: SessionManager.getSessionId(), data: JSON.stringify(data) });
+  },
+
+  async getDailyActivityReport(dateFrom, dateTo) {
+    return await this.call('getDailyActivityReport', { sessionId: SessionManager.getSessionId(), dateFrom, dateTo });
   }
 };
