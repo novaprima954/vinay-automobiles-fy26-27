@@ -27,10 +27,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     const divider = document.querySelector('.booking-divider');
     if (sysHalf) sysHalf.style.display = 'none';
     if (divider) divider.style.display = 'none';
-
-    // Show system counts section
-    document.getElementById('sysCountsSection').style.display = 'block';
-    loadSalesSystemCounts();
   }
 
   if (isAdmin) {
@@ -41,17 +37,6 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   await loadTodayEntry();
 });
-
-// ── System counts for sales exec ─────────────────────────────────────────────
-
-async function loadSalesSystemCounts() {
-  try {
-    const res = await API.getSalesActivitySystemCounts();
-    if (!res.success) return;
-    document.getElementById('sys-bookings').textContent = res.bookings;
-    document.getElementById('sys-sales').textContent    = res.sales;
-  } catch(e) {}
-}
 
 // ── Today's Entry ─────────────────────────────────────────────────────────────
 
@@ -93,7 +78,6 @@ async function saveActivity() {
     if (!res.success) { showMsg('Save failed: ' + res.message, 'error'); return; }
 
     if (currentUser.role === 'admin') setLiveCount(res.bookingsLive);
-    if (currentUser.role === 'sales') loadSalesSystemCounts();
 
     document.getElementById('savedBadge').style.display = 'inline-flex';
     showMsg('✅ Activity saved!', 'success');
@@ -129,7 +113,7 @@ async function loadAdminReport() {
 
   const tbody = document.getElementById('rpt-body');
   const empty = document.getElementById('rpt-empty');
-  tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="15" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -155,15 +139,12 @@ function renderReportTable() {
 function buildReportRow(r, idx) {
   const eGap = gapHtml(r.enquiryGap);
   const bGap = gapHtml(r.bookingGap);
+  const sGap = gapHtml(r.salesGap);
 
-  // Confirmed column
-  var confirmCell;
-  if (r.confirmedBy) {
-    confirmCell = '<td class="c"><div class="confirmed-badge">✅ ' + esc(r.confirmedBy)
-      + '<br><span style="font-weight:400;color:#888">' + esc(r.confirmedAt) + '</span></div></td>';
-  } else {
-    confirmCell = '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
-  }
+  var confirmCell = r.confirmedBy
+    ? '<td class="c"><div class="confirmed-badge">✅ ' + esc(r.confirmedBy)
+        + '<br><span style="font-weight:400;color:#888">' + esc(r.confirmedAt) + '</span></div></td>'
+    : '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
 
   return '<tr id="rpt-row-' + idx + '">'
     + '<td style="white-space:nowrap">' + fmtDate(r.date) + '</td>'
@@ -174,7 +155,9 @@ function buildReportRow(r, idx) {
     + '<td class="c">' + r.bookingsManual + '</td>'
     + '<td class="c">' + r.bookingsSystem + '</td>'
     + '<td class="c gap ' + bGap.cls + '">' + bGap.txt + '</td>'
-    + '<td class="c">' + r.sales          + '</td>'
+    + '<td class="c">' + r.salesManual    + '</td>'
+    + '<td class="c">' + r.salesSystem    + '</td>'
+    + '<td class="c gap ' + sGap.cls + '">' + sGap.txt + '</td>'
     + '<td class="c">' + r.googleRatings  + '</td>'
     + '<td class="c">' + r.testRides      + '</td>'
     + '<td class="c"><button class="btn-row-edit" onclick="startEditRow(' + idx + ')">✏️</button></td>'
@@ -194,21 +177,21 @@ function startEditRow(idx) {
     : '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
 
   row.innerHTML =
-    '<td style="white-space:nowrap">' + fmtDate(r.date) + '</td>'
-    + '<td><strong>' + esc(r.executiveName) + '</strong></td>'
-    + '<td class="c"><input type="number" class="edit-input" id="ei-enq-' + idx  + '" value="' + r.enquiries      + '" min="0"></td>'
-    + '<td class="c" style="color:#aaa">' + r.crmWalkIns + '</td>'
-    + '<td class="c" style="color:#aaa">—</td>'
-    + '<td class="c"><input type="number" class="edit-input" id="ei-bm-'  + idx  + '" value="' + r.bookingsManual + '" min="0"></td>'
-    + '<td class="c" style="color:#aaa">' + r.bookingsSystem + '</td>'
-    + '<td class="c" style="color:#aaa">—</td>'
-    + '<td class="c"><input type="number" class="edit-input" id="ei-sal-' + idx  + '" value="' + r.sales          + '" min="0"></td>'
-    + '<td class="c"><input type="number" class="edit-input" id="ei-goo-' + idx  + '" value="' + r.googleRatings  + '" min="0"></td>'
-    + '<td class="c"><input type="number" class="edit-input" id="ei-tr-'  + idx  + '" value="' + r.testRides      + '" min="0"></td>'
-    + '<td class="c" style="display:flex;gap:4px;justify-content:center">'
-    + '<button class="btn-edit-save"   onclick="saveEditRow(' + idx + ')">✓</button>'
-    + '<button class="btn-edit-cancel" onclick="renderReportTable()">✗</button>'
-    + '</td>'
+    '<td style="white-space:nowrap;font-size:11px">' + fmtDate(r.date) + '</td>'
+    + '<td style="font-size:11px"><strong>' + esc(r.executiveName) + '</strong></td>'
+    + '<td class="c"><input type="number" class="edit-input" id="ei-enq-' + idx + '" value="' + r.enquiries      + '" min="0"></td>'
+    + '<td class="c" style="color:#aaa;font-size:11px">'  + r.crmWalkIns     + '</td>'
+    + '<td class="c" style="color:#aaa;font-size:10px">—</td>'
+    + '<td class="c"><input type="number" class="edit-input" id="ei-bm-'  + idx + '" value="' + r.bookingsManual + '" min="0"></td>'
+    + '<td class="c" style="color:#aaa;font-size:11px">'  + r.bookingsSystem + '</td>'
+    + '<td class="c" style="color:#aaa;font-size:10px">—</td>'
+    + '<td class="c"><input type="number" class="edit-input" id="ei-sal-' + idx + '" value="' + r.salesManual    + '" min="0"></td>'
+    + '<td class="c" style="color:#aaa;font-size:11px">'  + r.salesSystem    + '</td>'
+    + '<td class="c" style="color:#aaa;font-size:10px">—</td>'
+    + '<td class="c"><input type="number" class="edit-input" id="ei-goo-' + idx + '" value="' + r.googleRatings  + '" min="0"></td>'
+    + '<td class="c"><input type="number" class="edit-input" id="ei-tr-'  + idx + '" value="' + r.testRides      + '" min="0"></td>'
+    + '<td class="c"><button class="btn-edit-save"   onclick="saveEditRow(' + idx + ')">✓</button> '
+    +                '<button class="btn-edit-cancel" onclick="renderReportTable()">✗</button></td>'
     + confirmCell;
 }
 
@@ -217,16 +200,22 @@ async function saveEditRow(idx) {
   const data = {
     enquiries:      numEl('ei-enq-' + idx),
     bookingsManual: numEl('ei-bm-'  + idx),
-    sales:          numEl('ei-sal-' + idx),
+    sales:          numEl('ei-sal-' + idx),   // maps to salesManual in sheet col F
     googleRatings:  numEl('ei-goo-' + idx),
     testRides:      numEl('ei-tr-'  + idx)
   };
   try {
     const res = await API.adminUpdateDailyActivity(r.date, r.executiveName, data);
     if (!res.success) { showMsg('Update failed: ' + res.message, 'error'); return; }
-    _reportCache[idx] = Object.assign({}, r, data, {
-      bookingGap: data.bookingsManual - r.bookingsSystem,
-      enquiryGap: data.enquiries      - r.crmWalkIns
+    _reportCache[idx] = Object.assign({}, r, {
+      enquiries:      data.enquiries,
+      bookingsManual: data.bookingsManual,
+      salesManual:    data.sales,
+      googleRatings:  data.googleRatings,
+      testRides:      data.testRides,
+      bookingGap:     data.bookingsManual - r.bookingsSystem,
+      salesGap:       data.sales          - r.salesSystem,
+      enquiryGap:     data.enquiries      - r.crmWalkIns
     });
     renderReportTable();
     showMsg('✅ Updated', 'success');
