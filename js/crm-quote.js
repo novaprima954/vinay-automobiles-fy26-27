@@ -619,9 +619,47 @@ async function generateQuotation() {
       document.getElementById('quotPreviewWrapper').style.display = 'block';
       document.getElementById('quotPreviewWrapper').scrollIntoView({ behavior: 'smooth' });
 
-      // Save quotation to CRM (vehicle 1 details)
+      // ── Create / link CRM lead (same logic as single-vehicle path) ────────────
+      if (!leadId) {
+        const crmNote2     = document.getElementById('crmNote')       ? document.getElementById('crmNote').value.trim() : '';
+        const finAssigned2 = document.getElementById('quotFinancier') ? document.getElementById('quotFinancier').value  : '';
+        try {
+          const addRes2 = await API.addLead({
+            customerName:      custName,
+            mobileNo:          mobile,
+            address:           [address, district].filter(Boolean).join(', '),
+            model:             (model + (variant ? ' ' + variant : '')).trim(),
+            source:            'Walk-in',
+            followUpDate:      followUpDate,
+            financierAssigned: finAssigned2
+          });
+          if (addRes2.success) {
+            leadId = addRes2.leadId;
+            if (crmNote2) {
+              await API.logCRMInteraction(leadId, 'Note', crmNote2, followUpDate).catch(function() {});
+            }
+            document.getElementById('btnOpenLead').style.display = 'block';
+            document.getElementById('crmDetailsSection').style.display = 'none';
+          } else if (addRes2.isDuplicate && addRes2.existingLead) {
+            leadId = addRes2.existingLead.leadId;
+            document.getElementById('btnOpenLead').style.display = 'block';
+            document.getElementById('crmDetailsSection').style.display = 'none';
+            showMessage('ℹ️ Customer already in CRM — quotation linked to existing lead', 'success');
+          }
+        } catch(ce) { console.error('addLead (comparison) error:', ce); }
+      }
+
+      // Update follow-up date for existing leads
+      if (leadId && followUpDate) {
+        try { await API.updateLead(leadId, { followUpDate: followUpDate }); } catch(e) {}
+      }
+
+      // Save comparison quotation to CRM_Quotations
       try {
-        await API.saveCRMQuotation({ quotNo, leadId: leadId || '', customerName: custName, model: model + ' vs ' + model2, variant, totalAmount: grandTotal });
+        await API.saveCRMQuotation({
+          quotNo, leadId: leadId || '', customerName: custName,
+          model: model + ' vs ' + model2, variant, totalAmount: grandTotal
+        });
       } catch(e) { console.error(e); }
       return;  // skip normal path below
     }
@@ -668,11 +706,9 @@ async function generateQuotation() {
         });
         if (addRes.success) {
           leadId = addRes.leadId;
+          // Log initial note if the user typed one (saveCRMQuotation will log the quotation itself)
           if (crmNote) {
             await API.logCRMInteraction(leadId, 'Note', crmNote, followUpDate).catch(function() {});
-          } else {
-            // Log quotation interaction with follow-up date
-            await API.logCRMInteraction(leadId, 'Quotation Sent', 'Quotation ' + quotNo + ' generated', followUpDate).catch(function() {});
           }
           document.getElementById('btnOpenLead').style.display = 'block';
           document.getElementById('crmDetailsSection').style.display = 'none';
@@ -794,6 +830,14 @@ async function sendWhatsApp() {
 
     if (response.success) {
       showWAToast('✅ Quotation sent on WhatsApp!', 'success');
+      // Log WhatsApp send in CRM notes
+      if (leadId) {
+        API.logCRMInteraction(
+          leadId, 'WhatsApp',
+          'Quotation ' + lastQuotNo + ' sent via WhatsApp to ' + phone,
+          null
+        ).catch(function() {});
+      }
     } else {
       showWAToast('❌ ' + (response.message || 'Failed to send WhatsApp'), 'error');
     }
