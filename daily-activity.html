@@ -113,7 +113,15 @@
     .edit-input::-webkit-inner-spin-button, .edit-input::-webkit-outer-spin-button { -webkit-appearance:none; }
     .btn-edit-save   { padding:3px 8px; background:#1565C0; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer; font-weight:700; }
     .btn-edit-cancel { padding:3px 8px; background:#eee; color:#555; border:none; border-radius:4px; font-size:11px; cursor:pointer; }
-    .btn-row-edit { padding:3px 8px; background:#f0f4ff; color:#1565C0; border:1px solid #c5cae9; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; }
+    .btn-row-edit    { padding:3px 8px; background:#f0f4ff; color:#1565C0; border:1px solid #c5cae9; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; }
+    .btn-row-confirm { padding:3px 8px; background:#e8f5e9; color:#2e7d32; border:1px solid #a5d6a7; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; }
+    .confirmed-badge { font-size:11px; color:#2e7d32; font-weight:600; line-height:1.4; }
+
+    /* Sales system counts card */
+    .sys-counts-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    .sys-count-card  { background:white; border-radius:12px; padding:14px; box-shadow:0 1px 6px rgba(0,0,0,0.07); text-align:center; border-top:3px solid #1565C0; }
+    .sys-count-val   { font-size:28px; font-weight:800; color:#1565C0; margin:4px 0; }
+    .sys-count-lbl   { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.5px; }
 
     .empty-state { text-align:center; padding:30px; color:#aaa; font-size:14px; }
     .legend { font-size:11px; color:#999; margin-top:10px; line-height:1.7; }
@@ -192,6 +200,27 @@
 
     <button class="btn-save" id="btnSave" onclick="saveActivity()">💾 Save Today's Log</button>
 
+    <!-- ── Sales: system-computed counts (bookings col C, sales delivery+account check) ── -->
+    <div id="sysCountsSection" style="display:none">
+      <div class="section-card" style="margin-bottom:14px">
+        <div class="section-title">📊 Today's System Numbers <span style="font-size:11px;font-weight:400;color:#888;text-transform:none;letter-spacing:0">(auto from Data sheet)</span></div>
+        <div class="section-body" style="padding:12px 16px">
+          <div class="sys-counts-grid">
+            <div class="sys-count-card">
+              <div class="sys-count-lbl">📝 Bookings</div>
+              <div class="sys-count-val" id="sys-bookings">—</div>
+              <div style="font-size:11px;color:#aaa">Booking date = today</div>
+            </div>
+            <div class="sys-count-card">
+              <div class="sys-count-lbl">🛵 Sales</div>
+              <div class="sys-count-val" id="sys-sales">—</div>
+              <div style="font-size:11px;color:#aaa">Delivery today + A/C ✓</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Admin comparison report ─────────────────────────────────── -->
     <div id="adminSection" style="display:none">
       <div class="section-card">
@@ -224,7 +253,8 @@
                   <th class="th-group c" rowspan="2">🛵 Sales</th>
                   <th class="th-group c" rowspan="2">⭐ Google</th>
                   <th class="th-group c" rowspan="2">🏍️ TR</th>
-                  <th class="th-group c" rowspan="2">✏️ Edit</th>
+                  <th class="th-group c" rowspan="2">✏️</th>
+                  <th class="th-group c" rowspan="2">✅ Confirm</th>
                 </tr>
                 <tr>
                   <th class="c" title="Self-reported enquiries">Self</th>
@@ -236,7 +266,7 @@
                 </tr>
               </thead>
               <tbody id="rpt-body">
-                <tr><td colspan="12" class="empty-state">Select date range and click Apply.</td></tr>
+                <tr><td colspan="13" class="empty-state">Select date range and click Apply.</td></tr>
               </tbody>
             </table>
           </div>
@@ -256,6 +286,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/daily-activity.js?v=2"></script>
+  <script src="js/daily-activity.js?v=3"></script>
 </body>
 </html>

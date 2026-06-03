@@ -1,9 +1,9 @@
 // ==========================================
-// DAILY ACTIVITY LOG  v2
+// DAILY ACTIVITY LOG  v3
 // ==========================================
 
 let currentUser  = null;
-let _reportCache = [];   // last loaded report rows (for inline edit)
+let _reportCache = [];
 
 document.addEventListener('DOMContentLoaded', async function () {
   const session = SessionManager.getSession();
@@ -14,12 +14,26 @@ document.addEventListener('DOMContentLoaded', async function () {
   document.getElementById('userName').textContent   = currentUser.name  || '';
   document.getElementById('userRole').textContent   = cap(currentUser.role || '');
 
-  const today = new Date();
-  document.getElementById('todayLabel').textContent = today.toLocaleDateString('en-IN', {
+  document.getElementById('todayLabel').textContent = new Date().toLocaleDateString('en-IN', {
     weekday:'long', day:'numeric', month:'long', year:'numeric'
   });
 
-  if (currentUser.role === 'admin') {
+  const isAdmin = currentUser.role === 'admin';
+  const isSales = currentUser.role === 'sales';
+
+  // Sales: simplify booking card to manual-only (hide live system side)
+  if (isSales) {
+    const sysHalf = document.querySelector('.booking-half:last-child');
+    const divider = document.querySelector('.booking-divider');
+    if (sysHalf) sysHalf.style.display = 'none';
+    if (divider) divider.style.display = 'none';
+
+    // Show system counts section
+    document.getElementById('sysCountsSection').style.display = 'block';
+    loadSalesSystemCounts();
+  }
+
+  if (isAdmin) {
     document.getElementById('adminSection').style.display = 'block';
     setDefaultDates();
     loadAdminReport();
@@ -27,6 +41,17 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   await loadTodayEntry();
 });
+
+// ── System counts for sales exec ─────────────────────────────────────────────
+
+async function loadSalesSystemCounts() {
+  try {
+    const res = await API.getSalesActivitySystemCounts();
+    if (!res.success) return;
+    document.getElementById('sys-bookings').textContent = res.bookings;
+    document.getElementById('sys-sales').textContent    = res.sales;
+  } catch(e) {}
+}
 
 // ── Today's Entry ─────────────────────────────────────────────────────────────
 
@@ -36,14 +61,17 @@ async function loadTodayEntry() {
     const res = await API.getDailyActivity();
     if (!res.success) { showMsg('Failed to load: ' + res.message, 'error'); return; }
 
-    setLiveCount(res.bookingsLive);
+    // Only show live booking count on admin's own form
+    if (currentUser.role === 'admin') {
+      setLiveCount(res.bookingsLive);
+    }
 
     if (res.entry) {
-      setField('inp-enquiries',      res.entry.enquiries);
+      setField('inp-enquiries',       res.entry.enquiries);
       setField('inp-bookings-manual', res.entry.bookingsManual);
-      setField('inp-sales',          res.entry.sales);
-      setField('inp-google',         res.entry.googleRatings);
-      setField('inp-testrides',      res.entry.testRides);
+      setField('inp-sales',           res.entry.sales);
+      setField('inp-google',          res.entry.googleRatings);
+      setField('inp-testrides',       res.entry.testRides);
       document.getElementById('savedBadge').style.display = 'inline-flex';
     }
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
@@ -63,7 +91,10 @@ async function saveActivity() {
     };
     const res = await API.saveDailyActivity(data);
     if (!res.success) { showMsg('Save failed: ' + res.message, 'error'); return; }
-    setLiveCount(res.bookingsLive);
+
+    if (currentUser.role === 'admin') setLiveCount(res.bookingsLive);
+    if (currentUser.role === 'sales') loadSalesSystemCounts();
+
     document.getElementById('savedBadge').style.display = 'inline-flex';
     showMsg('✅ Activity saved!', 'success');
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
@@ -73,7 +104,8 @@ async function saveActivity() {
 }
 
 function setLiveCount(n) {
-  document.getElementById('bookingLiveCount').textContent = (n != null ? n : '—');
+  const el = document.getElementById('bookingLiveCount');
+  if (el) el.textContent = (n != null ? n : '—');
 }
 function setFormDisabled(on) {
   ['inp-enquiries','inp-bookings-manual','inp-sales','inp-google','inp-testrides','btnSave'].forEach(function(id) {
@@ -85,10 +117,9 @@ function setFormDisabled(on) {
 // ── Admin Report ──────────────────────────────────────────────────────────────
 
 function setDefaultDates() {
-  const today = new Date();
-  const d6    = new Date(today); d6.setDate(d6.getDate() - 6);
-  document.getElementById('rpt-from').value = iso(d6);
-  document.getElementById('rpt-to').value   = iso(today);
+  const today = iso(new Date());
+  document.getElementById('rpt-from').value = today;
+  document.getElementById('rpt-to').value   = today;
 }
 
 async function loadAdminReport() {
@@ -98,7 +129,7 @@ async function loadAdminReport() {
 
   const tbody = document.getElementById('rpt-body');
   const empty = document.getElementById('rpt-empty');
-  tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -116,8 +147,7 @@ async function loadAdminReport() {
 }
 
 function renderReportTable() {
-  const tbody = document.getElementById('rpt-body');
-  tbody.innerHTML = _reportCache.map(function(r, idx) {
+  document.getElementById('rpt-body').innerHTML = _reportCache.map(function(r, idx) {
     return buildReportRow(r, idx);
   }).join('');
 }
@@ -125,26 +155,43 @@ function renderReportTable() {
 function buildReportRow(r, idx) {
   const eGap = gapHtml(r.enquiryGap);
   const bGap = gapHtml(r.bookingGap);
+
+  // Confirmed column
+  var confirmCell;
+  if (r.confirmedBy) {
+    confirmCell = '<td class="c"><div class="confirmed-badge">✅ ' + esc(r.confirmedBy)
+      + '<br><span style="font-weight:400;color:#888">' + esc(r.confirmedAt) + '</span></div></td>';
+  } else {
+    confirmCell = '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
+  }
+
   return '<tr id="rpt-row-' + idx + '">'
     + '<td style="white-space:nowrap">' + fmtDate(r.date) + '</td>'
     + '<td><strong>' + esc(r.executiveName) + '</strong></td>'
-    + '<td class="c">' + r.enquiries     + '</td>'
-    + '<td class="c">' + r.crmWalkIns    + '</td>'
+    + '<td class="c">' + r.enquiries      + '</td>'
+    + '<td class="c">' + r.crmWalkIns     + '</td>'
     + '<td class="c gap ' + eGap.cls + '">' + eGap.txt + '</td>'
     + '<td class="c">' + r.bookingsManual + '</td>'
     + '<td class="c">' + r.bookingsSystem + '</td>'
     + '<td class="c gap ' + bGap.cls + '">' + bGap.txt + '</td>'
-    + '<td class="c">' + r.sales         + '</td>'
-    + '<td class="c">' + r.googleRatings + '</td>'
-    + '<td class="c">' + r.testRides     + '</td>'
+    + '<td class="c">' + r.sales          + '</td>'
+    + '<td class="c">' + r.googleRatings  + '</td>'
+    + '<td class="c">' + r.testRides      + '</td>'
     + '<td class="c"><button class="btn-row-edit" onclick="startEditRow(' + idx + ')">✏️</button></td>'
+    + confirmCell
     + '</tr>';
 }
+
+// ── Admin inline edit ─────────────────────────────────────────────────────────
 
 function startEditRow(idx) {
   const r   = _reportCache[idx];
   const row = document.getElementById('rpt-row-' + idx);
   if (!row) return;
+
+  const confirmCell = r.confirmedBy
+    ? '<td class="c"><div class="confirmed-badge">✅ ' + esc(r.confirmedBy) + '</div></td>'
+    : '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
 
   row.innerHTML =
     '<td style="white-space:nowrap">' + fmtDate(r.date) + '</td>'
@@ -161,7 +208,8 @@ function startEditRow(idx) {
     + '<td class="c" style="display:flex;gap:4px;justify-content:center">'
     + '<button class="btn-edit-save"   onclick="saveEditRow(' + idx + ')">✓</button>'
     + '<button class="btn-edit-cancel" onclick="renderReportTable()">✗</button>'
-    + '</td>';
+    + '</td>'
+    + confirmCell;
 }
 
 async function saveEditRow(idx) {
@@ -173,18 +221,31 @@ async function saveEditRow(idx) {
     googleRatings:  numEl('ei-goo-' + idx),
     testRides:      numEl('ei-tr-'  + idx)
   };
-
   try {
     const res = await API.adminUpdateDailyActivity(r.date, r.executiveName, data);
     if (!res.success) { showMsg('Update failed: ' + res.message, 'error'); return; }
-
-    // Update local cache
     _reportCache[idx] = Object.assign({}, r, data, {
-      bookingGap:  data.bookingsManual - r.bookingsSystem,
-      enquiryGap:  data.enquiries      - r.crmWalkIns
+      bookingGap: data.bookingsManual - r.bookingsSystem,
+      enquiryGap: data.enquiries      - r.crmWalkIns
     });
     renderReportTable();
     showMsg('✅ Updated', 'success');
+  } catch(e) { showMsg('Error: ' + e.message, 'error'); }
+}
+
+// ── Admin confirm ─────────────────────────────────────────────────────────────
+
+async function confirmRow(idx) {
+  const r = _reportCache[idx];
+  try {
+    const res = await API.adminConfirmDailyActivity(r.date, r.executiveName);
+    if (!res.success) { showMsg('Confirm failed: ' + res.message, 'error'); return; }
+    _reportCache[idx] = Object.assign({}, r, {
+      confirmedBy: res.confirmedBy,
+      confirmedAt: res.confirmedAt
+    });
+    renderReportTable();
+    showMsg('✅ Confirmed by ' + res.confirmedBy, 'success');
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
 }
 
@@ -199,8 +260,7 @@ function gapHtml(gap) {
 function fmtDate(s) {
   if (!s) return '—';
   try {
-    const d = new Date(s + 'T00:00:00');
-    return d.toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+    return new Date(s + 'T00:00:00').toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
   } catch(e) { return s; }
 }
 
@@ -210,9 +270,9 @@ function iso(d) {
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
-function getNum(id) { return parseInt(document.getElementById(id).value) || 0; }
+function getNum(id) { const el = document.getElementById(id); return el ? (parseInt(el.value) || 0) : 0; }
 function numEl(id)  { const el = document.getElementById(id); return el ? (parseInt(el.value) || 0) : 0; }
-function setField(id, val) { const el = document.getElementById(id); if (el) el.value = val || 0; }
+function setField(id, val) { const el = document.getElementById(id); if (el) el.value = (val || 0); }
 
 let _msgTimer = null;
 function showMsg(msg, type) {
@@ -221,5 +281,5 @@ function showMsg(msg, type) {
   el.className   = 'msg msg-' + (type || 'info');
   el.style.display = 'block';
   clearTimeout(_msgTimer);
-  _msgTimer = setTimeout(function() { el.style.display = 'none'; }, 3500);
+  _msgTimer = setTimeout(function() { el.style.display = 'none'; }, 4000);
 }

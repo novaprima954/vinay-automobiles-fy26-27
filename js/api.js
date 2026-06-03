@@ -1160,10 +1160,17 @@ const API = {
 
   async adminUpdateDailyActivity(date, executiveName, data) {
     return await this.call('adminUpdateDailyActivity', {
-      sessionId: SessionManager.getSessionId(),
-      date,
-      executiveName,
-      data: JSON.stringify(data)
+      sessionId: SessionManager.getSessionId(), date, executiveName, data: JSON.stringify(data)
     });
+  },
+
+  async adminConfirmDailyActivity(date, executiveName) {
+    return await this.call('adminConfirmDailyActivity', {
+      sessionId: SessionManager.getSessionId(), date, executiveName
+    });
+  },
+
+  async getSalesActivitySystemCounts() {
+    return await this.call('getSalesActivitySystemCounts', { sessionId: SessionManager.getSessionId() });
   }
 };
