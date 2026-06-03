@@ -285,7 +285,7 @@ async function loadHSRPStatus(engineNumber, frameNumber) {
   if (hsrpDetail) hsrpDetail.textContent = '';
 
   try {
-    const res = await API.call('getHSRPStatusForRecord', { engineNo: engineNumber || '', frameNo: frameNumber || '' });
+    const res = await API.call('getHSRPStatusForRecord', { sessionId: SessionManager.getSessionId(), engineNo: engineNumber || '', frameNo: frameNumber || '' });
     const hs = (res && res.status) ? res.status.trim() : '';
 
     if (hs === 'Fitted') {
