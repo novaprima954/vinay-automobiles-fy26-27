@@ -402,6 +402,12 @@
       <div class="filter-chip" onclick="setFollowupSourceFilter('walkin',this)">🚶 Walk-in</div>
       <div class="filter-chip" onclick="setFollowupSourceFilter('other',this)">📲 Other Sources</div>
     </div>
+    <div style="padding:6px 16px 4px;">
+      <input type="search" id="followupSearch" placeholder="🔍 Search customer name…"
+        oninput="filterFollowupsByName()"
+        style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+    </div>
     <div id="followupsList"></div>
   </div>
 
@@ -430,6 +436,12 @@
       <div class="filter-chip" data-st="Contacted" onclick="filterMyLeadsByStatus('Contacted',this)">Contacted</div>
       <div class="filter-chip" data-st="Interested" onclick="filterMyLeadsByStatus('Interested',this)">Interested</div>
       <div class="filter-chip" data-st="Lost" onclick="filterMyLeadsByStatus('Lost',this)">Lost</div>
+    </div>
+    <div style="padding:6px 16px 4px;">
+      <input type="search" id="myLeadsSearch" placeholder="🔍 Search customer name…"
+        oninput="filterMyLeadsByName()"
+        style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
     </div>
     <div class="loading" id="myLeadsLoading" style="padding-top:30px;display:none;">
       <div class="spinner"></div><div>Loading your leads...</div>
@@ -461,6 +473,12 @@
         style="width:100%;padding:8px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;font-weight:600;color:#444;background:white;">
         <option value="all">All Executives</option>
       </select>
+    </div>
+    <div style="padding:6px 16px 4px;">
+      <input type="search" id="allLeadsSearch" placeholder="🔍 Search customer name…"
+        oninput="filterAllLeadsByName()"
+        style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
     </div>
     <div class="loading" id="allLeadsLoading" style="padding-top:30px;display:none;">
       <div class="spinner"></div><div>Loading leads...</div>

@@ -11,6 +11,9 @@ let currentMyLeadsStatusFilter = 'all';
 let poolLeadsCache = [];
 let currentFollowupFilter = 'overdue';
 let currentFollowupSourceFilter = 'all';  // 'all' | 'walkin' | 'other'
+let currentFollowupSearch = '';
+let currentMyLeadsSearch  = '';
+let currentAllLeadsSearch = '';
 let followupData = { overdue: [], today: [], week: [] };
 let selectedNoteType = '';
 let selectedStatusChange = '';
@@ -203,6 +206,17 @@ function setFollowupSourceFilter(filter, el) {
   renderFollowups(currentFollowupFilter);
 }
 
+function filterFollowupsByName() {
+  const el = document.getElementById('followupSearch');
+  currentFollowupSearch = el ? el.value : '';
+  renderFollowups(currentFollowupFilter);
+}
+
+function _nameMatch(lead, query) {
+  if (!query) return true;
+  return (lead.customerName || '').toLowerCase().includes(query.toLowerCase().trim());
+}
+
 function renderFollowups(filter) {
   const list = document.getElementById('followupsList');
   let leads = followupData[filter] || [];
@@ -214,8 +228,11 @@ function renderFollowups(filter) {
     leads = leads.filter(l => !l.source || !l.source.toLowerCase().includes('walk'));
   }
 
+  // Apply name search
+  if (currentFollowupSearch) leads = leads.filter(l => _nameMatch(l, currentFollowupSearch));
+
   if (leads.length === 0) {
-    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">All clear!</div><div class="empty-sub">No ${filter} follow-ups</div></div>`;
+    list.innerHTML = `<div class="empty-state"><div class="empty-icon">🎉</div><div class="empty-title">All clear!</div><div class="empty-sub">No ${filter} follow-ups${currentFollowupSearch ? ' matching "' + currentFollowupSearch + '"' : ''}</div></div>`;
     return;
   }
 
@@ -366,6 +383,12 @@ function filterMyLeadsByStatus(st, el) {
   applyMyLeadsFilters();
 }
 
+function filterMyLeadsByName() {
+  const el = document.getElementById('myLeadsSearch');
+  currentMyLeadsSearch = el ? el.value : '';
+  applyMyLeadsFilters();
+}
+
 function applyMyLeadsFilters() {
   let leads = myLeadsAll;
 
@@ -375,6 +398,8 @@ function applyMyLeadsFilters() {
   if (currentMyLeadsStatusFilter !== 'all') {
     leads = leads.filter(l => l.status === currentMyLeadsStatusFilter);
   }
+
+  if (currentMyLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentMyLeadsSearch));
 
   myLeadsFiltered = leads;
   renderMyLeads();
@@ -798,6 +823,12 @@ function setAllLeadsExecFilter() {
   applyAllLeadsFilters();
 }
 
+function filterAllLeadsByName() {
+  const el = document.getElementById('allLeadsSearch');
+  currentAllLeadsSearch = el ? el.value : '';
+  applyAllLeadsFilters();
+}
+
 function applyAllLeadsFilters() {
   let leads = allLeadsAll;
 
@@ -812,6 +843,7 @@ function applyAllLeadsFilters() {
   if (currentAllLeadsExecFilter !== 'all') {
     leads = leads.filter(l => l.assignedTo === currentAllLeadsExecFilter);
   }
+  if (currentAllLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentAllLeadsSearch));
 
   allLeadsFiltered = leads;
   renderAllLeads();
