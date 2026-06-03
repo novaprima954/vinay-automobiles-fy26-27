@@ -21,7 +21,7 @@
     .user-avatar { width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-weight:700; font-size:15px; }
     .user-info-sm { font-size:12px; line-height:1.4; }
 
-    .page-body { max-width: 700px; margin: 0 auto; padding: 16px 14px 40px; }
+    .page-body { max-width: 760px; margin: 0 auto; padding: 16px 14px 60px; }
 
     /* ── Date strip ── */
     .date-strip {
@@ -29,52 +29,49 @@
       margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
       box-shadow: 0 1px 6px rgba(0,0,0,0.07);
     }
-    .date-strip .date-label { font-size:14px; font-weight:700; color:#1565C0; }
-    .saved-badge {
-      display: none; align-items: center; gap: 5px;
-      background: #e8f5e9; color: #2e7d32; font-size:12px; font-weight:600;
-      padding: 4px 10px; border-radius: 20px;
-    }
+    .date-label { font-size:14px; font-weight:700; color:#1565C0; }
+    .saved-badge { display:none; align-items:center; gap:5px; background:#e8f5e9; color:#2e7d32; font-size:12px; font-weight:600; padding:4px 10px; border-radius:20px; }
 
-    /* ── Metric cards grid ── */
-    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
-    @media (min-width: 500px) { .metrics-grid { grid-template-columns: repeat(3, 1fr); } }
+    /* ── Metric cards ── */
+    .metrics-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    @media(min-width:500px){ .metrics-grid { grid-template-columns: repeat(3,1fr); } }
 
-    .metric-card {
-      background: white; border-radius: 12px; padding: 14px;
-      box-shadow: 0 1px 6px rgba(0,0,0,0.07); text-align: center;
-    }
-    .metric-card.bookings-card { grid-column: span 2; }
-    @media (min-width: 500px) { .metric-card.bookings-card { grid-column: span 1; } }
+    .metric-card { background:white; border-radius:12px; padding:14px; box-shadow:0 1px 6px rgba(0,0,0,0.07); text-align:center; }
+    .metric-icon { font-size:24px; margin-bottom:5px; }
+    .metric-label { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
 
-    .metric-icon { font-size: 26px; margin-bottom: 6px; }
-    .metric-label { font-size: 11px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
     .metric-input {
-      width: 100%; text-align: center; font-size: 22px; font-weight: 700;
-      border: 2px solid #e0e0e0; border-radius: 8px; padding: 6px 4px;
-      background: #fafafa; box-sizing: border-box; color: #1a1a1a;
-      -moz-appearance: textfield;
+      width:100%; text-align:center; font-size:22px; font-weight:700;
+      border:2px solid #e0e0e0; border-radius:8px; padding:6px 4px;
+      background:#fafafa; box-sizing:border-box; color:#1a1a1a;
+      -moz-appearance:textfield;
     }
-    .metric-input:focus { border-color: #1565C0; outline: none; background: white; }
+    .metric-input:focus { border-color:#1565C0; outline:none; background:white; }
     .metric-input::-webkit-inner-spin-button,
-    .metric-input::-webkit-outer-spin-button { -webkit-appearance: none; }
-    .metric-input[readonly] { background: #f5f5f5; color: #555; cursor: default; border-style: dashed; }
+    .metric-input::-webkit-outer-spin-button { -webkit-appearance:none; }
 
-    .booking-live {
-      display: flex; align-items: center; justify-content: center; gap: 8px;
-      font-size: 22px; font-weight: 700; color: #1565C0; padding: 6px 0;
+    /* Bookings card spans 2 cols on small, 1 on wide */
+    .booking-card { grid-column:span 2; }
+    @media(min-width:500px){ .booking-card { grid-column:span 1; } }
+
+    .booking-split {
+      display:flex; gap:8px; align-items:flex-start; margin-top:4px;
     }
-    .booking-live .live-dot { width:8px; height:8px; border-radius:50%; background:#4caf50; animation: pulse 1.5s ease-in-out infinite; }
+    .booking-half { flex:1; text-align:center; }
+    .booking-sublabel { font-size:10px; color:#999; font-weight:600; text-transform:uppercase; margin-bottom:4px; }
+    .booking-live-val { font-size:22px; font-weight:700; color:#1565C0; display:flex; align-items:center; justify-content:center; gap:6px; }
+    .live-dot { width:7px; height:7px; border-radius:50%; background:#4caf50; animation:pulse 1.5s ease-in-out infinite; flex-shrink:0; }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .booking-divider { width:1px; background:#eee; align-self:stretch; margin:4px 0; }
 
     /* ── Save button ── */
     .btn-save {
-      width: 100%; padding: 14px; font-size: 15px; font-weight: 700;
-      background: linear-gradient(135deg, #1565C0, #0D47A1);
-      color: white; border: none; border-radius: 10px; cursor: pointer;
-      margin-bottom: 14px; box-shadow: 0 3px 10px rgba(21,101,192,0.3);
+      width:100%; padding:14px; font-size:15px; font-weight:700;
+      background:linear-gradient(135deg, #1565C0, #0D47A1);
+      color:white; border:none; border-radius:10px; cursor:pointer;
+      margin-bottom:14px; box-shadow:0 3px 10px rgba(21,101,192,.3);
     }
-    .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
+    .btn-save:disabled { opacity:.6; cursor:not-allowed; }
 
     /* ── Message ── */
     .msg { display:none; padding:10px 14px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:14px; }
@@ -84,32 +81,43 @@
 
     /* ── Section card ── */
     .section-card { background:white; border-radius:12px; box-shadow:0 1px 6px rgba(0,0,0,0.07); margin-bottom:14px; overflow:hidden; }
-    .section-title { background:#f8f9fa; padding:12px 16px; font-size:13px; font-weight:800; color:#555; text-transform:uppercase; letter-spacing:0.4px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:8px; }
+    .section-title { background:#f8f9fa; padding:12px 16px; font-size:13px; font-weight:800; color:#555; text-transform:uppercase; letter-spacing:.4px; border-bottom:1px solid #eee; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
     .section-body  { padding:16px; }
 
-    /* ── Admin report ── */
-    .filter-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; }
+    /* ── Admin filters ── */
+    .filter-row { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; margin-bottom:14px; }
     .filter-group { display:flex; flex-direction:column; gap:4px; }
     .filter-label { font-size:12px; font-weight:600; color:#666; }
-    .filter-input { padding:8px 10px; border:2px solid #e0e0e0; border-radius:8px; font-size:13px; }
-    .btn-load { padding:8px 16px; background:#1565C0; color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
+    .filter-input { padding:8px 10px; border:2px solid #e0e0e0; border-radius:8px; font-size:13px; background:white; }
+    .btn-apply { padding:8px 16px; background:#1565C0; color:white; border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; }
 
-    .table-wrap { overflow-x:auto; }
-    table { width:100%; border-collapse:collapse; font-size:13px; }
-    th { background:#1565C0; color:white; padding:9px 10px; text-align:left; font-weight:600; white-space:nowrap; }
-    th.num, td.num { text-align:center; }
-    td { padding:9px 10px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
+    /* ── Admin table ── */
+    .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    table { width:100%; border-collapse:collapse; font-size:12px; min-width:700px; }
+    th { background:#1565C0; color:white; padding:8px 8px; text-align:left; font-weight:600; white-space:nowrap; }
+    th.c, td.c { text-align:center; }
+    td { padding:8px 8px; border-bottom:1px solid #f0f0f0; vertical-align:middle; }
     tr:hover td { background:#f9f9f9; }
 
-    .gap-cell { font-weight:700; }
-    .gap-red   { color:#c62828; background:#fff8f8; }
+    /* Gap badges */
+    .gap { font-weight:700; font-size:12px; }
+    .gap-red   { color:#c62828; }
     .gap-green { color:#2e7d32; }
-    .gap-zero  { color:#888; }
+    .gap-zero  { color:#aaa; }
 
-    /* Totals row */
-    .totals-row td { background:#e8f0fe; font-weight:700; border-top:2px solid #1565C0; }
+    /* Column group headers */
+    .th-group { background:#1a237e; font-size:10px; text-transform:uppercase; letter-spacing:.5px; }
 
-    .empty-state { text-align:center; padding:30px 16px; color:#aaa; font-size:14px; }
+    /* Edit row inputs */
+    .edit-input { width:52px; text-align:center; border:1px solid #1565C0; border-radius:4px; padding:3px 4px; font-size:12px; -moz-appearance:textfield; }
+    .edit-input::-webkit-inner-spin-button, .edit-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+    .btn-edit-save   { padding:3px 8px; background:#1565C0; color:white; border:none; border-radius:4px; font-size:11px; cursor:pointer; font-weight:700; }
+    .btn-edit-cancel { padding:3px 8px; background:#eee; color:#555; border:none; border-radius:4px; font-size:11px; cursor:pointer; }
+    .btn-row-edit { padding:3px 8px; background:#f0f4ff; color:#1565C0; border:1px solid #c5cae9; border-radius:4px; font-size:11px; cursor:pointer; font-weight:600; }
+
+    .empty-state { text-align:center; padding:30px; color:#aaa; font-size:14px; }
+    .legend { font-size:11px; color:#999; margin-top:10px; line-height:1.7; }
+    .legend strong { color:#555; }
   </style>
 </head>
 <body>
@@ -136,41 +144,44 @@
 
     <div id="msg" class="msg"></div>
 
-    <!-- ── Entry form (sales + admin self-log) ──────────────────────── -->
+    <!-- ── Entry form (sales + admin self-log) ─────────────────────── -->
     <div class="metrics-grid">
 
-      <!-- Enquiries -->
       <div class="metric-card">
         <div class="metric-icon">📋</div>
         <div class="metric-label">Enquiries</div>
         <input type="number" class="metric-input" id="inp-enquiries" value="0" min="0" max="999">
       </div>
 
-      <!-- Bookings — live from Data sheet -->
-      <div class="metric-card bookings-card">
+      <!-- Bookings: manual entry + live system count side by side -->
+      <div class="metric-card booking-card">
         <div class="metric-icon">📝</div>
-        <div class="metric-label">Bookings <span style="font-size:10px;font-weight:400;color:#4caf50">● live</span></div>
-        <div class="booking-live">
-          <div class="live-dot"></div>
-          <span id="bookingLiveCount">—</span>
+        <div class="metric-label">Bookings</div>
+        <div class="booking-split">
+          <div class="booking-half">
+            <div class="booking-sublabel">Manual</div>
+            <input type="number" class="metric-input" id="inp-bookings-manual" value="0" min="0" max="999">
+          </div>
+          <div class="booking-divider"></div>
+          <div class="booking-half">
+            <div class="booking-sublabel">System <span style="color:#4caf50">● live</span></div>
+            <div class="booking-live-val"><div class="live-dot"></div><span id="bookingLiveCount">—</span></div>
+          </div>
         </div>
       </div>
 
-      <!-- Sales -->
       <div class="metric-card">
         <div class="metric-icon">🛵</div>
         <div class="metric-label">Sales (Delivered)</div>
         <input type="number" class="metric-input" id="inp-sales" value="0" min="0" max="999">
       </div>
 
-      <!-- Google Rating -->
       <div class="metric-card">
         <div class="metric-icon">⭐</div>
         <div class="metric-label">Google Ratings</div>
         <input type="number" class="metric-input" id="inp-google" value="0" min="0" max="999">
       </div>
 
-      <!-- Test Rides -->
       <div class="metric-card">
         <div class="metric-icon">🏍️</div>
         <div class="metric-label">Test Rides</div>
@@ -181,13 +192,15 @@
 
     <button class="btn-save" id="btnSave" onclick="saveActivity()">💾 Save Today's Log</button>
 
-    <!-- ── Admin comparison section ────────────────────────────────── -->
+    <!-- ── Admin comparison report ─────────────────────────────────── -->
     <div id="adminSection" style="display:none">
       <div class="section-card">
-        <div class="section-title">📊 Team Activity Report</div>
+        <div class="section-title">
+          📊 Team Activity Report
+        </div>
         <div class="section-body">
 
-          <div class="filter-row" style="margin-bottom:14px">
+          <div class="filter-row">
             <div class="filter-group">
               <span class="filter-label">From</span>
               <input type="date" class="filter-input" id="rpt-from">
@@ -196,44 +209,53 @@
               <span class="filter-label">To</span>
               <input type="date" class="filter-input" id="rpt-to">
             </div>
-            <button class="btn-load" onclick="loadAdminReport()">Apply</button>
+            <button class="btn-apply" onclick="loadAdminReport()">Apply</button>
           </div>
 
           <div class="table-wrap">
             <table>
               <thead>
+                <!-- Group header row -->
                 <tr>
-                  <th>Date</th>
-                  <th>Executive</th>
-                  <th class="num" title="Self-reported enquiries">📋 Enq</th>
-                  <th class="num" title="Bookings from Data sheet">📝 Book</th>
-                  <th class="num" title="Self-reported deliveries">🛵 Sales</th>
-                  <th class="num" title="Google ratings collected">⭐ Google</th>
-                  <th class="num" title="Test rides done">🏍️ TR</th>
-                  <th class="num" title="Walk-in leads logged in CRM">👥 CRM WI</th>
-                  <th class="num" title="Enquiries minus CRM Walk-ins">Gap</th>
+                  <th class="th-group" rowspan="2">Date</th>
+                  <th class="th-group" rowspan="2">Executive</th>
+                  <th class="th-group c" colspan="3">Enquiry</th>
+                  <th class="th-group c" colspan="3">Booking</th>
+                  <th class="th-group c" rowspan="2">🛵 Sales</th>
+                  <th class="th-group c" rowspan="2">⭐ Google</th>
+                  <th class="th-group c" rowspan="2">🏍️ TR</th>
+                  <th class="th-group c" rowspan="2">✏️ Edit</th>
+                </tr>
+                <tr>
+                  <th class="c" title="Self-reported enquiries">Self</th>
+                  <th class="c" title="CRM Walk-in leads logged">CRM WI</th>
+                  <th class="c" title="Enquiries minus CRM Walk-ins">Gap</th>
+                  <th class="c" title="Self-reported booking count">Manual</th>
+                  <th class="c" title="Bookings in Data sheet">System</th>
+                  <th class="c" title="Manual minus System">Gap</th>
                 </tr>
               </thead>
               <tbody id="rpt-body">
-                <tr><td colspan="9" class="empty-state">Select date range and click Apply.</td></tr>
+                <tr><td colspan="12" class="empty-state">Select date range and click Apply.</td></tr>
               </tbody>
             </table>
           </div>
           <div id="rpt-empty" style="display:none" class="empty-state">📭 No activity data for this period.</div>
 
-          <div style="margin-top:10px;font-size:11px;color:#999;line-height:1.6">
-            <strong>Gap</strong> = Enquiries (self-reported) − CRM Walk-ins (logged in CRM).
-            ▲ positive = enquiries not logged in CRM &nbsp;·&nbsp; ✓ = all accounted for.
+          <div class="legend">
+            <strong>Enquiry Gap</strong> = Self-reported − CRM Walk-ins &nbsp;·&nbsp;
+            <strong>Booking Gap</strong> = Manual − System (Data sheet) &nbsp;·&nbsp;
+            ▲ positive = unaccounted &nbsp;·&nbsp; ▼ negative = more in system &nbsp;·&nbsp; ✓ = matched
           </div>
         </div>
       </div>
     </div>
 
-  </div><!-- /page-body -->
+  </div>
 
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/daily-activity.js"></script>
+  <script src="js/daily-activity.js?v=2"></script>
 </body>
 </html>

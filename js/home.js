@@ -32,6 +32,7 @@ const ROLE_CARDS = {
     { title: 'Edit Sales', icon: '✏️', color: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', link: 'salesedit.html', description: 'Modify existing sales' },
     { title: 'Vehicle Scanner', icon: '📷', color: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', link: 'scanner.html', description: 'Scan vehicle stickers' },
     { title: 'Customer Form', icon: '📋', color: 'linear-gradient(135deg, #fbc2eb 0%, #a6c1ee 100%)', link: 'customer-form.html', description: 'Generate customer forms' },
+    { title: 'View Records', icon: '📋', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', link: 'view.html', description: 'View all records' },
     { title: 'CRM', icon: '👥', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', link: 'crm.html', description: 'Manage customer leads' }
   ],
   accounts: [

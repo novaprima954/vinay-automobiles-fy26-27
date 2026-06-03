@@ -1156,5 +1156,14 @@ const API = {
 
   async getDailyActivityReport(dateFrom, dateTo) {
     return await this.call('getDailyActivityReport', { sessionId: SessionManager.getSessionId(), dateFrom, dateTo });
+  },
+
+  async adminUpdateDailyActivity(date, executiveName, data) {
+    return await this.call('adminUpdateDailyActivity', {
+      sessionId: SessionManager.getSessionId(),
+      date,
+      executiveName,
+      data: JSON.stringify(data)
+    });
   }
 };
