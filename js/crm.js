@@ -1201,27 +1201,39 @@ function applyCallsFilters() {
     return;
   }
 
-  let html = `<div style="padding:8px 16px 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>`;
-  html += calls.map(c => `
-    <div class="lead-card" style="border-left-color:${callTypeColor(c.type)};">
-      <div class="lead-top">
-        <div class="lead-name">${esc(c.customerName)}</div>
-        <div class="lead-badges">
-          <span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};">${esc(c.type)}</span>
-        </div>
-      </div>
-      <div class="lead-info">
-        <div class="lead-info-row">📱 ${esc(c.mobile)} &nbsp;🚗 ${esc(c.model || '—')}</div>
-        <div class="lead-info-row">🕐 ${esc(c.datetime)} &nbsp;👤 ${esc(c.by)}</div>
-        ${c.followUpDate ? `<div class="lead-info-row" style="color:#667eea;font-weight:700;">📅 Follow-up: ${esc(c.followUpDate)}</div>` : ''}
-        ${c.note ? `<div class="lead-info-row" style="color:#555;font-style:italic;">"${esc(c.note)}"</div>` : ''}
-      </div>
-      <div class="lead-actions">
-        <button class="btn-act btn-call-act" onclick="callLead('${esc(c.mobile)}')">📞 Call</button>
-        <button class="btn-act btn-edit-act" onclick="openLead('${c.leadId}')">Details</button>
-      </div>
-    </div>
-  `).join('');
+  let html = `<div style="padding:8px 0 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>
+  <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
+    <table class="analytics-table" style="min-width:640px;font-size:12px;">
+      <thead>
+        <tr>
+          <th style="white-space:nowrap;">Date &amp; Time</th>
+          <th>Customer</th>
+          <th>Mobile</th>
+          <th>Model</th>
+          <th>Type</th>
+          <th>Notes</th>
+          <th>Executive</th>
+          <th style="white-space:nowrap;">Follow-up</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${calls.map(c => `<tr>
+          <td style="white-space:nowrap;color:#888;font-size:11px;">${esc(c.datetime)}</td>
+          <td style="font-weight:700;white-space:nowrap;">
+            <span style="color:#667eea;cursor:pointer;text-decoration:underline;" onclick="openLead('${c.leadId}')">${esc(c.customerName)}</span>
+          </td>
+          <td style="white-space:nowrap;">
+            <a href="tel:${esc(c.mobile)}" style="color:#4CAF50;font-weight:700;text-decoration:none;">${esc(c.mobile)}</a>
+          </td>
+          <td style="font-size:11px;">${esc(c.model || '—')}</td>
+          <td><span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};white-space:nowrap;">${esc(c.type)}</span></td>
+          <td style="font-size:12px;color:#444;font-style:${c.note ? 'italic' : 'normal'};max-width:180px;">${c.note ? esc(c.note) : '<span style="color:#ccc;">—</span>'}</td>
+          <td style="font-size:11px;white-space:nowrap;">${esc(c.by)}</td>
+          <td style="font-size:11px;white-space:nowrap;${c.followUpDate ? 'color:#667eea;font-weight:700;' : 'color:#ccc;'}">${c.followUpDate ? esc(c.followUpDate) : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>
+  </div>`;
   container.innerHTML = html;
 }
 
@@ -1486,11 +1498,16 @@ async function submitLog() {
     note = document.getElementById('lostReasonText').value.trim();
     if (!note) { alert('Please enter a lost reason'); return; }
   } else {
-    // Notes available for all interaction types
     note = document.getElementById('otherNoteText').value.trim();
+    if (!note) { alert('Please enter interaction notes — what was discussed?'); return; }
   }
 
   const followUpDate = document.getElementById('logFollowUpDate').value || null;
+  // Follow-up date is mandatory for all types except Lost
+  if (selectedNoteType !== 'Lost' && !followUpDate) {
+    alert('Please select a next follow-up date');
+    return;
+  }
 
   const btn = document.getElementById('logSubmitBtn');
   btn.disabled = true;

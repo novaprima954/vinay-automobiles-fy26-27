@@ -830,14 +830,7 @@ async function sendWhatsApp() {
 
     if (response.success) {
       showWAToast('✅ Quotation sent on WhatsApp!', 'success');
-      // Log WhatsApp send in CRM notes
-      if (leadId) {
-        API.logCRMInteraction(
-          leadId, 'WhatsApp',
-          'Quotation ' + lastQuotNo + ' sent via WhatsApp to ' + phone,
-          null
-        ).catch(function() {});
-      }
+      // Note: WhatsApp interaction is logged server-side by GAS — no duplicate log here
     } else {
       showWAToast('❌ ' + (response.message || 'Failed to send WhatsApp'), 'error');
     }
