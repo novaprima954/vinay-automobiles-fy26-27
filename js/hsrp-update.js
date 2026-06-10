@@ -219,8 +219,9 @@ function handleSearchByChange() {
   customDateGroup.style.display = 'none';
   refCustomerDropdownGroup.style.display = 'none';
 
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'hpCompany') {
     searchValueGroup.style.display = 'block';
+    document.getElementById('searchValue').placeholder = searchBy === 'hpCompany' ? 'Enter HP Company name' : 'Enter search value';
   } else if (searchBy === 'refCustomer') {
     refCustomerDropdownGroup.style.display = 'block';
     loadRefCustomerOptions();
@@ -276,7 +277,7 @@ async function searchData() {
   let dateFilter = '';
   let customDate = '';
   
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'hpCompany') {
     searchValue = document.getElementById('searchValue').value.trim();
     if (!searchValue) {
       alert('Please enter a search value');
@@ -330,6 +331,7 @@ async function searchData() {
 function clearSearch() {
   document.getElementById('searchBy').value = '';
   document.getElementById('searchValue').value = '';
+  document.getElementById('searchValue').placeholder = 'Enter search value';
   document.getElementById('dateFilter').value = '';
   document.getElementById('customDate').value = '';
 
