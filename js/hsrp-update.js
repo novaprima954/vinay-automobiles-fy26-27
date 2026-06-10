@@ -205,6 +205,7 @@ function showDashboardFilterData(cardKey) {
 // ==========================================
 
 let refCustomerOptions = null;
+let hpCompanyOptions = null;
 
 function handleSearchByChange() {
   const searchBy = document.getElementById('searchBy').value;
@@ -212,19 +213,24 @@ function handleSearchByChange() {
   const dateFilterGroup = document.getElementById('dateFilterGroup');
   const customDateGroup = document.getElementById('customDateGroup');
   const refCustomerDropdownGroup = document.getElementById('refCustomerDropdownGroup');
+  const hpCompanyDropdownGroup = document.getElementById('hpCompanyDropdownGroup');
 
   // Reset all
   searchValueGroup.style.display = 'none';
   dateFilterGroup.style.display = 'none';
   customDateGroup.style.display = 'none';
   refCustomerDropdownGroup.style.display = 'none';
+  hpCompanyDropdownGroup.style.display = 'none';
 
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'hpCompany') {
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
     searchValueGroup.style.display = 'block';
-    document.getElementById('searchValue').placeholder = searchBy === 'hpCompany' ? 'Enter HP Company name' : 'Enter search value';
+    document.getElementById('searchValue').placeholder = 'Enter search value';
   } else if (searchBy === 'refCustomer') {
     refCustomerDropdownGroup.style.display = 'block';
     loadRefCustomerOptions();
+  } else if (searchBy === 'hpCompany') {
+    hpCompanyDropdownGroup.style.display = 'block';
+    loadHpCompanyOptions();
   } else if (searchBy === 'invoiceDate' || searchBy === 'orderDate') {
     dateFilterGroup.style.display = 'block';
   }
@@ -239,7 +245,7 @@ async function loadRefCustomerOptions() {
     const response = await API.call('getHSRPRefCustomers', { sessionId: session.sessionId });
     if (response.success && response.refCustomers) {
       refCustomerOptions = response.refCustomers;
-      sel.innerHTML = '<option value="">-- All Ref Customers --</option>';
+      sel.innerHTML = '<option value="">-- Select Ref Customer --</option>';
       response.refCustomers.forEach(function(rc) {
         const opt = document.createElement('option');
         opt.value = rc; opt.textContent = rc;
@@ -251,6 +257,30 @@ async function loadRefCustomerOptions() {
   } catch(e) {
     sel.innerHTML = '<option value="">-- Error --</option>';
     console.error('loadRefCustomerOptions error:', e);
+  }
+}
+
+async function loadHpCompanyOptions() {
+  if (hpCompanyOptions !== null) return; // already loaded
+  const sel = document.getElementById('searchHpCompanySel');
+  sel.innerHTML = '<option value="">-- Loading... --</option>';
+  try {
+    const session = SessionManager.getSession();
+    const response = await API.call('getHSRPHpCompanies', { sessionId: session.sessionId });
+    if (response.success && response.hpCompanies) {
+      hpCompanyOptions = response.hpCompanies;
+      sel.innerHTML = '<option value="">-- Select HP Company --</option>';
+      response.hpCompanies.forEach(function(hp) {
+        const opt = document.createElement('option');
+        opt.value = hp; opt.textContent = hp;
+        sel.appendChild(opt);
+      });
+    } else {
+      sel.innerHTML = '<option value="">-- Failed to load --</option>';
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="">-- Error --</option>';
+    console.error('loadHpCompanyOptions error:', e);
   }
 }
 
@@ -277,7 +307,7 @@ async function searchData() {
   let dateFilter = '';
   let customDate = '';
   
-  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo' || searchBy === 'hpCompany') {
+  if (searchBy === 'invoiceNo' || searchBy === 'customerName' || searchBy === 'registrationNo') {
     searchValue = document.getElementById('searchValue').value.trim();
     if (!searchValue) {
       alert('Please enter a search value');
@@ -287,6 +317,12 @@ async function searchData() {
     searchValue = document.getElementById('searchRefCustomerSel').value;
     if (!searchValue) {
       alert('Please select a Ref Customer');
+      return;
+    }
+  } else if (searchBy === 'hpCompany') {
+    searchValue = document.getElementById('searchHpCompanySel').value;
+    if (!searchValue) {
+      alert('Please select an HP Company');
       return;
     }
   // NEW: Updated condition to include orderDate
@@ -331,7 +367,6 @@ async function searchData() {
 function clearSearch() {
   document.getElementById('searchBy').value = '';
   document.getElementById('searchValue').value = '';
-  document.getElementById('searchValue').placeholder = 'Enter search value';
   document.getElementById('dateFilter').value = '';
   document.getElementById('customDate').value = '';
 
@@ -339,7 +374,9 @@ function clearSearch() {
   document.getElementById('dateFilterGroup').style.display = 'none';
   document.getElementById('customDateGroup').style.display = 'none';
   document.getElementById('refCustomerDropdownGroup').style.display = 'none';
+  document.getElementById('hpCompanyDropdownGroup').style.display = 'none';
   document.getElementById('searchRefCustomerSel').value = '';
+  document.getElementById('searchHpCompanySel').value = '';
 
   document.getElementById('dataTableContainer').style.display = 'none';
 
