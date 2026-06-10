@@ -100,6 +100,16 @@ async function _loadFinancierDropdown() {
   } catch(e) {}
 }
 
+// ── ACCELERATOR TOGGLE ───────────────────────
+
+function toggleAccelerator() {
+  const checked = document.getElementById('punchedInAccelerator').checked;
+  const followUpSection = document.getElementById('followUpSection');
+  if (followUpSection) {
+    followUpSection.style.display = checked ? 'none' : '';
+  }
+}
+
 // ── LEAD SEARCH ─────────────────────────────
 
 async function searchLead() {
@@ -534,8 +544,9 @@ async function generateQuotation() {
     return;
   }
 
-  const followUpDate = document.getElementById('quotFollowUpDate') ? document.getElementById('quotFollowUpDate').value : '';
-  if (!followUpDate) {
+  const punchedInAccelerator = !!(document.getElementById('punchedInAccelerator') && document.getElementById('punchedInAccelerator').checked);
+  const followUpDate = (!punchedInAccelerator && document.getElementById('quotFollowUpDate')) ? document.getElementById('quotFollowUpDate').value : '';
+  if (!punchedInAccelerator && !followUpDate) {
     showMessage('Please set a Follow-up Date before generating the quotation', 'error');
     document.getElementById('quotFollowUpDate').style.borderColor = '#ef5350';
     document.getElementById('followUpSection').scrollIntoView({ behavior: 'smooth' });
@@ -625,13 +636,14 @@ async function generateQuotation() {
         const finAssigned2 = document.getElementById('quotFinancier') ? document.getElementById('quotFinancier').value  : '';
         try {
           const addRes2 = await API.addLead({
-            customerName:      custName,
-            mobileNo:          mobile,
-            address:           [address, district].filter(Boolean).join(', '),
-            model:             (model + (variant ? ' ' + variant : '')).trim(),
-            source:            'Walk-in',
-            followUpDate:      followUpDate,
-            financierAssigned: finAssigned2
+            customerName:         custName,
+            mobileNo:             mobile,
+            address:              [address, district].filter(Boolean).join(', '),
+            model:                (model + (variant ? ' ' + variant : '')).trim(),
+            source:               'Walk-in',
+            followUpDate:         followUpDate,
+            financierAssigned:    finAssigned2,
+            punchedInAccelerator: punchedInAccelerator
           });
           if (addRes2.success) {
             leadId = addRes2.leadId;
@@ -676,7 +688,8 @@ async function generateQuotation() {
       discount:   discount,
       isFinanced: financed,
       color:      color,
-      followUpDate: followUpDate
+      followUpDate:        followUpDate,
+      punchedInAccelerator: punchedInAccelerator
     };
 
     const html = buildQuotationHTML({
@@ -696,13 +709,14 @@ async function generateQuotation() {
       const finAssigned   = document.getElementById('quotFinancier') ? document.getElementById('quotFinancier').value      : '';
       try {
         const addRes = await API.addLead({
-          customerName:      custName,
-          mobileNo:          mobile,
-          address:           [address, district].filter(Boolean).join(', '),
-          model:             (model + (variant ? ' ' + variant : '')).trim(), // store model+variant
-          source:            'Walk-in',
-          followUpDate:      followUpDate,
-          financierAssigned: finAssigned
+          customerName:         custName,
+          mobileNo:             mobile,
+          address:              [address, district].filter(Boolean).join(', '),
+          model:                (model + (variant ? ' ' + variant : '')).trim(),
+          source:               'Walk-in',
+          followUpDate:         followUpDate,
+          financierAssigned:    finAssigned,
+          punchedInAccelerator: punchedInAccelerator
         });
         if (addRes.success) {
           leadId = addRes.leadId;

@@ -1365,6 +1365,7 @@ function renderLeadDetail(lead) {
         <span class="status-pill ${pillClass(lead.status)}" style="display:inline-block;margin-right:6px;">${esc(lead.status || 'Pool')}</span>
         ${lead.isSocial ? `<span class="social-badge">📲 ${esc(lead.source)}</span>` : ''}
         ${lead.isOverdue ? `<span class="overdue-badge" style="display:inline-block;margin-left:4px;">⚠️ ${lead.daysOverdue}d overdue</span>` : ''}
+        ${lead.punchedInAccelerator ? `<span style="display:inline-block;margin-left:4px;font-size:10px;font-weight:700;padding:3px 8px;border-radius:8px;background:#e8f5e9;color:#2e7d32;">🚀 Accelerator</span>` : ''}
       </div>
     </div>
 
