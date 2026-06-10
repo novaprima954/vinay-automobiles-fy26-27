@@ -201,7 +201,7 @@ const API = {
   async getSalesDashboard(filter) {
     const session = SessionManager.getSession();
     if (!session) throw new Error('No session');
-    return await this.call('getSalesDashboard', { sessionId: session.sessionId, filter });
+    return await this.call('getSalesDashboard', { sessionId: session.sessionId, dateFilter: filter });
   },
 
   /**
