@@ -923,7 +923,7 @@ function buildQuotationHTML(d) {
               ${d.rto > 0 ? `<tr><td>Road Tax</td><td>₹ ${fmt(d.rto)}</td></tr>` : ''}
               ${mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(d.model)}</span></td><td>₹ ${fmt(mandAcc)}</td></tr>` : ''}
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
-              <tr class="total-row"><td><strong>Product Total</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
+              <tr class="grand-total"><td><strong>On Road Price</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
                 ${accRows}
@@ -931,7 +931,7 @@ function buildQuotationHTML(d) {
               ` : ''}
               ${d.hypothecationCharge > 0 ? `<tr><td>Hypothecation Charge</td><td>₹ ${fmt(d.hypothecationCharge)}</td></tr>` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
-              <tr class="grand-total"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
+              <tr class="total-row"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
           </table>
         </div>
@@ -1034,18 +1034,18 @@ function buildComparisonQuotationHTML(d) {
       ${showRow('Road Tax', v1.rto, v2.rto)}
       ${v1.mandAcc > 0 || v2.mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(v1.model)}</span></td><td>${fmtOrDash(v1.mandAcc)}</td><td>${fmtOrDash(v2.mandAcc)}</td></tr>` : ''}
       ${showRow('Service Charge', v1.pdi, v2.pdi)}
-      <tr class="total-row">
-        <td><strong>Product Total</strong></td>
-        <td style="background:#e0e0e0;"><strong>₹ ${fmt(v1.productTotal)}</strong></td>
-        <td style="background:#c8c8c8;"><strong>₹ ${fmt(v2.productTotal)}</strong></td>
+      <tr class="grand-total">
+        <td><strong>On Road Price</strong></td>
+        <td style="background:#222;"><strong>₹ ${fmt(v1.productTotal)}</strong></td>
+        <td style="background:#444;"><strong>₹ ${fmt(v2.productTotal)}</strong></td>
       </tr>
       ${accRows}
       ${v1.hypothecationCharge > 0 || v2.hypothecationCharge > 0 ? showRow('Hypothecation Charge', v1.hypothecationCharge, v2.hypothecationCharge) : ''}
       ${v1.discount > 0 || v2.discount > 0 ? `<tr><td><strong>Discount</strong></td><td><strong>- ₹ ${fmt(v1.discount)}</strong></td><td><strong>- ₹ ${fmt(v2.discount)}</strong></td></tr>` : ''}
-      <tr class="grand-total">
+      <tr class="total-row">
         <td><strong>Final Total</strong></td>
-        <td style="background:#222;"><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
-        <td style="background:#444;"><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
+        <td><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
+        <td><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
       </tr>
     </tbody>
   </table>
