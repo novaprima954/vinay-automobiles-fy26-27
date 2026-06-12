@@ -185,9 +185,10 @@ function renderAccessories(details) {
     { key: 'matinPrice', name: 'Matin', id: 'matin' },
     { key: 'tankCoverPrice', name: 'Tank Cover', id: 'tankCover' },
     { key: 'handleHookPrice', name: 'Handle Hook', id: 'handleHook' },
-    { key: 'rainCoverPrice', name: 'Rain Cover', id: 'rainCover' },
-    { key: 'buzzerPrice', name: 'Buzzer', id: 'buzzer' },
-    { key: 'backRestPrice', name: 'Back Rest', id: 'backRest' }
+    { key: 'rainCoverPrice',        name: 'Rain Cover',        id: 'rainCover' },
+    { key: 'buzzerPrice',           name: 'Buzzer',            id: 'buzzer' },
+    { key: 'backRestPrice',         name: 'Back Rest',         id: 'backRest' },
+    { key: 'extendedWarrantyPrice', name: 'Extended Warranty', id: 'extendedWarranty' },
   ];
   
   // Render regular checkboxes
@@ -295,7 +296,8 @@ function getAccessoryValues() {
     helmet: '',
     raincover: '',
     buzzer: '',
-    backrest: ''
+    backrest: '',
+    extendedwarranty: ''
   };
   
   // Only set Yes/No for accessories that are actually rendered (exist in DOM)
@@ -349,6 +351,11 @@ function getAccessoryValues() {
   const backRestEl = document.getElementById('backRest');
   if (backRestEl) {
     values.backrest = backRestEl.checked ? 'Yes' : 'No';
+  }
+
+  const extWarrantyEl = document.getElementById('extendedWarranty');
+  if (extWarrantyEl) {
+    values.extendedwarranty = extWarrantyEl.checked ? 'Yes' : 'No';
   }
 
   return values;
@@ -414,6 +421,7 @@ async function handleSubmit(e) {
     raincover: accessories.raincover,
     buzzer: accessories.buzzer,
     backrest: accessories.backrest,
+    extendedwarranty: accessories.extendedwarranty,
     salesRemark: document.getElementById('salesRemark').value.trim(),
     receiptNo1: document.getElementById('receiptNo1').value.trim(),
     receipt1Amount: document.getElementById('receipt1Amount').value,
@@ -513,7 +521,10 @@ function showWhatsAppModal(data) {
       accessoriesText += `Buzzer - ${data.buzzer}\n`;
     }
     if (priceMasterDetails.backRestPrice) {
-      accessoriesText += `Back Rest - ${data.backrest}`;
+      accessoriesText += `Back Rest - ${data.backrest}\n`;
+    }
+    if (priceMasterDetails.extendedWarrantyPrice) {
+      accessoriesText += `Extended Warranty - ${data.extendedwarranty}`;
     }
   }
   

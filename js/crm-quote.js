@@ -19,9 +19,10 @@ const ACC_CONFIG = [
   { key: 'tankCoverPrice',  label: 'Tank Cover' },
   { key: 'handleHookPrice', label: 'Handle Hook / Ladies Hook' },
   { key: 'helmetPrice',     label: 'TVS Genuine Helmet' },
-  { key: 'rainCoverPrice',  label: 'Rain Cover' },
-  { key: 'buzzerPrice',     label: 'Buzzer' },
-  { key: 'backRestPrice',   label: 'Back Rest' }
+  { key: 'rainCoverPrice',           label: 'Rain Cover' },
+  { key: 'buzzerPrice',              label: 'Buzzer' },
+  { key: 'backRestPrice',            label: 'Back Rest' },
+  { key: 'extendedWarrantyPrice',    label: 'Extended Warranty' },
 ];
 
 document.addEventListener('DOMContentLoaded', async function() {

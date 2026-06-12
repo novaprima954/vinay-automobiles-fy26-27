@@ -303,6 +303,10 @@ function renderSalesDashboard(data) {
           <div class="accessory-name">Handle Hook</div>
           <div class="accessory-count">${data.myAccessories.handleHook}</div>
         </div>
+        <div class="accessory-item" onclick="showAccessoryBreakdown('extendedwarranty', 'Extended Warranty')">
+          <div class="accessory-name">Ext. Warranty</div>
+          <div class="accessory-count">${data.myAccessories.extendedWarranty || 0}</div>
+        </div>
       </div>
     </div>
 
