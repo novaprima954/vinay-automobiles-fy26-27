@@ -536,15 +536,27 @@ function renderReportList(data) {
   }).join('');
 }
 
+let currentDetailHpCompany = '';
+
 function showReportDetail(idx) {
   const item = reportData[idx];
   if (!item) return;
+
+  currentDetailHpCompany = item.hpCompany;
 
   document.getElementById('reportDetailTitle').textContent = '🏦 ' + item.hpCompany;
   document.getElementById('rStatCount').textContent     = item.count;
   document.getElementById('rStatDisbursed').textContent = formatCurrency(item.totalDisbursed);
   document.getElementById('rStatPayout').textContent    = formatCurrency(item.totalPayout);
   document.getElementById('rStatPct').textContent       = item.percentage + '%';
+
+  // Show payout % box only for admin
+  const pctBox = document.getElementById('payoutPctBox');
+  if (pctBox) pctBox.style.display = currentUserRole === 'admin' ? '' : 'none';
+
+  // Reset payout detail records
+  const detailEl = document.getElementById('payoutDetailRecords');
+  if (detailEl) detailEl.style.display = 'none';
 
   // Ref Customer breakdown
   const refEl = document.getElementById('rRefBreakdown');
@@ -567,6 +579,53 @@ function showReportDetail(idx) {
   const panel = document.getElementById('reportDetailPanel');
   panel.style.display = 'block';
   panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+async function showPayoutPctDetails() {
+  if (currentUserRole !== 'admin') return;
+  const container = document.getElementById('payoutDetailRecords');
+  const body = document.getElementById('payoutDetailBody');
+  if (!container || !body) return;
+
+  container.style.display = 'block';
+  body.innerHTML = '<div style="color:#999;font-size:13px;padding:10px 0;">Loading...</div>';
+
+  // Fetch if not yet loaded
+  if (payoutRecords.length === 0) {
+    const session = SessionManager.getSession();
+    if (session) {
+      const res = await API.call('getPayouts', { sessionId: session.sessionId, month: '' });
+      if (res.success) payoutRecords = res.payouts || [];
+    }
+  }
+
+  const records = payoutRecords.filter(function(p) { return p.hpCompany === currentDetailHpCompany; });
+
+  if (records.length === 0) {
+    body.innerHTML = '<div style="color:#999;font-size:13px;">No payout records found.</div>';
+    return;
+  }
+
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">' +
+    '<thead><tr style="background:#f5f5f5;">' +
+    '<th style="padding:7px 10px;text-align:left;font-weight:600;color:#555;">Date</th>' +
+    '<th style="padding:7px 10px;text-align:right;font-weight:600;color:#555;">Invoice Amt</th>' +
+    '<th style="padding:7px 10px;text-align:right;font-weight:600;color:#555;">Payout</th>' +
+    '<th style="padding:7px 10px;font-weight:600;color:#555;">Month</th>' +
+    '<th style="padding:7px 10px;font-weight:600;color:#555;">Notes</th>' +
+    '</tr></thead><tbody>';
+  records.forEach(function(p) {
+    html += '<tr style="border-bottom:1px solid #f0f0f0;">' +
+      '<td style="padding:6px 10px;color:#666;">' + (p.createdDate || '—') + '</td>' +
+      '<td style="padding:6px 10px;text-align:right;">' + (p.invoiceAmount != null && p.invoiceAmount !== '' ? formatCurrency(p.invoiceAmount) : '—') + '</td>' +
+      '<td style="padding:6px 10px;text-align:right;color:#166534;font-weight:600;">' + (p.payoutAmount != null && p.payoutAmount !== '' ? formatCurrency(p.payoutAmount) : '—') + '</td>' +
+      '<td style="padding:6px 10px;">' + (p.payoutMonth || '—') + '</td>' +
+      '<td style="padding:6px 10px;color:#555;">' + (p.notes || '—') + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  body.innerHTML = html;
+  container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // ==========================================

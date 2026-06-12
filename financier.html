@@ -677,9 +677,9 @@
             <div id="rStatPayout" style="font-size:28px;font-weight:800;line-height:1.1;">—</div>
             <div style="font-size:13px;margin-top:6px;opacity:0.9;">Total Payout</div>
           </div>
-          <div class="report-stat-box" style="background:linear-gradient(135deg,#f7971e,#ffd200);color:white;border-radius:12px;padding:22px 18px;text-align:center;">
+          <div id="payoutPctBox" class="report-stat-box" onclick="showPayoutPctDetails()" style="display:none;background:linear-gradient(135deg,#f7971e,#ffd200);color:white;border-radius:12px;padding:22px 18px;text-align:center;cursor:pointer;" title="Click to view payout records">
             <div id="rStatPct" style="font-size:36px;font-weight:800;line-height:1.1;">—</div>
-            <div style="font-size:13px;margin-top:6px;opacity:0.9;">Payout %</div>
+            <div style="font-size:13px;margin-top:6px;opacity:0.9;">Payout % 🔍</div>
           </div>
         </div>
 
@@ -687,6 +687,12 @@
         <div style="margin-top:20px;">
           <h4 style="margin:0 0 10px;font-size:14px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">&#128203; Financing by Customer Type</h4>
           <div id="rRefBreakdown" style="min-height:40px;"></div>
+        </div>
+
+        <!-- Payout Records Detail (shown on payout% click, admin only) -->
+        <div id="payoutDetailRecords" style="display:none;margin-top:20px;">
+          <h4 style="margin:0 0 10px;font-size:14px;font-weight:700;color:#555;text-transform:uppercase;letter-spacing:0.5px;">&#128176; Payout Records</h4>
+          <div id="payoutDetailBody"></div>
         </div>
       </div>
 

@@ -811,7 +811,7 @@ function renderAdminDashboard(data) {
                 ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
                 ${exec.executive}
               </div>
-              <div class="list-item-subtitle">Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0}</div>
+              <div class="list-item-subtitle">Enquiry: ${exec.walkInEnquiry || 0} | Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0}</div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;">
               <span style="font-size:18px;font-weight:700;color:#667eea;">${exec.completedSales}</span>
@@ -973,6 +973,10 @@ function renderAdminDashboard(data) {
         <div class="accessory-item" onclick="showAccessoryBreakdown('backrest', 'Back Rest')">
           <div class="accessory-name">Back Rest</div>
           <div class="accessory-count">${acc.backRest || 0}</div>
+        </div>
+        <div class="accessory-item" onclick="showAccessoryBreakdown('extendedwarranty', 'Extended Warranty')">
+          <div class="accessory-name">Ext. Warranty</div>
+          <div class="accessory-count">${acc.extendedWarranty || 0}</div>
         </div>
       </div>
     </div>

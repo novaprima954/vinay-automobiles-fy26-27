@@ -928,7 +928,6 @@ function buildQuotationHTML(d) {
               ${d.selectedAcc.length > 0 ? `
                 <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
                 ${accRows}
-                <tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>₹ ${fmt(d.accTotal)}</strong></td></tr>
               ` : ''}
               ${d.hypothecationCharge > 0 ? `<tr><td>Hypothecation Charge</td><td>₹ ${fmt(d.hypothecationCharge)}</td></tr>` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
@@ -977,7 +976,6 @@ function buildComparisonQuotationHTML(d) {
     d.compAcc.forEach(function(a) {
       accRows += `<tr><td>${a.label}</td><td>${fmtOrDash(a.p1)}</td><td>${fmtOrDash(a.p2)}</td></tr>`;
     });
-    accRows += `<tr class="total-row"><td><strong>Accessories Total</strong></td><td><strong>${fmtOrDash(v1.accTotal)}</strong></td><td><strong>${fmtOrDash(v2.accTotal)}</strong></td></tr>`;
   }
 
   const showRow = function(label, val1, val2) {

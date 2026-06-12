@@ -504,10 +504,9 @@ function renderAccessoriesWithSavedValues(pmDetails, savedRecord) {
       const select = document.createElement('select');
       select.id = acc.id;
       select.className = 'editable-highlight';
-      select.innerHTML = 
-        '<option value="">-- Select --</option>' +
+      select.innerHTML =
         '<option value="Yes"' + (savedValue === 'Yes' ? ' selected' : '') + '>Yes</option>' +
-        '<option value="No"' + (savedValue === 'No' ? ' selected' : '') + '>No</option>';
+        '<option value="No"' + (savedValue !== 'Yes' ? ' selected' : '') + '>No</option>';
       
       formGroup.appendChild(label);
       formGroup.appendChild(select);
