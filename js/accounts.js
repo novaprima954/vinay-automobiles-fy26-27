@@ -1033,7 +1033,8 @@ async function calculatePrice() {
       { id: 'handlehook', name: 'Handle Hook', priceKey: 'handleHookPrice' },
       { id: 'raincover', name: 'Rain Cover', priceKey: 'rainCoverPrice' },
       { id: 'buzzer', name: 'Buzzer', priceKey: 'buzzerPrice' },
-      { id: 'backrest', name: 'Back Rest', priceKey: 'backRestPrice' }
+      { id: 'backrest', name: 'Back Rest', priceKey: 'backRestPrice' },
+      { id: 'extendedwarranty', name: 'Extended Warranty', priceKey: 'extendedWarrantyPrice' }
     ];
     
     accessoryMappings.forEach(acc => {
