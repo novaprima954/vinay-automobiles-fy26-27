@@ -22,7 +22,7 @@ const ACC_CONFIG = [
   { key: 'rainCoverPrice',           label: 'Rain Cover' },
   { key: 'buzzerPrice',              label: 'Buzzer' },
   { key: 'backRestPrice',            label: 'Back Rest' },
-  { key: 'extendedWarrantyPrice',    label: 'Extended Warranty' },
+  { key: 'extendedWarrantyPrice',    label: 'Extended Warranty (+5Years/50K km)' },
 ];
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -835,7 +835,7 @@ async function sendWhatsApp() {
     const customerName = document.getElementById('custName').value || 'Customer';
     const model        = document.getElementById('modelSelect').value   || '';
     const variant      = document.getElementById('variantSelect').value || '';
-    const modelVariant = (model + (variant ? ' ' + variant : '')).trim();
+    const modelVariant = model.trim();
     const execName     = currentUser ? (currentUser.name   || '') : '';
     const execMobile   = currentUser ? (currentUser.mobile || '') : '';
 
