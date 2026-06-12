@@ -426,9 +426,10 @@ function displayRecordDetails(record) {
     { label: 'Tank Cover',  value: record.tankCover },
     { label: 'Handle Hook', value: record.handleHook },
     { label: 'Helmet',      value: record.helmet },
-    { label: 'Rain Cover',  value: record.rainCover,  alwaysShow: true },
-    { label: 'Buzzer',      value: record.buzzer,     alwaysShow: true },
-    { label: 'Back Rest',   value: record.backRest,   alwaysShow: true }
+    { label: 'Rain Cover',         value: record.rainCover,         alwaysShow: true },
+    { label: 'Buzzer',             value: record.buzzer,             alwaysShow: true },
+    { label: 'Back Rest',          value: record.backRest,           alwaysShow: true },
+    { label: 'Extended Warranty',  value: record.extendedWarranty,   alwaysShow: true }
   ];
 
   accessories.forEach(acc => {

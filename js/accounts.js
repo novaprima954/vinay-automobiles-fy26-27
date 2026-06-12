@@ -583,11 +583,12 @@ async function renderAccessoriesFromPriceMaster(model, variant, record) {
         { key: 'handleHookPrice', name: 'Handle Hook', id: 'handlehook' },
         { key: 'rainCoverPrice', name: 'Rain Cover', id: 'raincover' },
         { key: 'buzzerPrice', name: 'Buzzer', id: 'buzzer' },
-        { key: 'backRestPrice', name: 'Back Rest', id: 'backrest' }
+        { key: 'backRestPrice', name: 'Back Rest', id: 'backrest' },
+        { key: 'extendedWarrantyPrice', name: 'Extended Warranty', id: 'extendedwarranty' }
       ];
-      
+
       accessories.forEach(function(acc) {
-        if (details[acc.key] || acc.id === 'backrest') {
+        if (details[acc.key]) {
           const formGroup = document.createElement('div');
           formGroup.className = 'form-group';
 
@@ -743,7 +744,7 @@ async function handleUpdate(e) {
   
   // Collect accessory values
   const accessories = {};
-  ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet', 'raincover', 'buzzer', 'backrest'].forEach(function(id) {
+  ['guard', 'gripcover', 'seatcover', 'matin', 'tankcover', 'handlehook', 'helmet', 'raincover', 'buzzer', 'backrest', 'extendedwarranty'].forEach(function(id) {
     const element = document.getElementById(id);
     if (element) {
       accessories[id] = element.value;
