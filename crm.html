@@ -307,6 +307,7 @@
     @media (min-width: 600px) {
       .dashboard-cards { grid-template-columns: repeat(4,1fr); }
       .crm-container { max-width: 640px; margin: 0 auto; }
+      .crm-container.admin-wide { max-width: 1100px; }
     }
   </style>
 </head>
@@ -474,8 +475,25 @@
         <option value="all">All Executives</option>
       </select>
     </div>
-    <div style="padding:6px 16px 4px;">
-      <input type="search" id="allLeadsSearch" placeholder="🔍 Search customer name…"
+    <!-- Date range filter -->
+    <div style="padding:4px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+      <div style="flex:1;min-width:120px;">
+        <label style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:2px;">From Date</label>
+        <input type="date" id="allLeadsFromDate" onchange="applyAllLeadsFilters()"
+          style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+      </div>
+      <div style="flex:1;min-width:120px;">
+        <label style="font-size:10px;font-weight:700;color:#aaa;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:2px;">To Date</label>
+        <input type="date" id="allLeadsToDate" onchange="applyAllLeadsFilters()"
+          style="width:100%;padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;"
+          onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+      </div>
+      <button onclick="clearAllLeadsDateFilter()" style="margin-top:14px;padding:7px 12px;background:#f5f5f5;color:#666;border:2px solid #e0e0e0;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;">Clear</button>
+    </div>
+    <!-- Search box -->
+    <div style="padding:4px 16px 4px;">
+      <input type="search" id="allLeadsSearch" placeholder="🔍 Search by name or mobile…"
         oninput="filterAllLeadsByName()"
         style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
         onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">

@@ -85,6 +85,13 @@ function switchTab(tab) {
   const navEl = document.getElementById(navId);
   if (navEl) navEl.classList.add('active');
 
+  // Widen container for admin tab so call report table columns fit
+  const crmContainer = document.querySelector('.crm-container');
+  if (crmContainer) {
+    if (tab === 'admin') crmContainer.classList.add('admin-wide');
+    else crmContainer.classList.remove('admin-wide');
+  }
+
   // Lazy loads
   if (tab === 'followups') {
     if (currentUser.role === 'financier') renderFinancierFollowups(currentFollowupFilter);
@@ -214,7 +221,9 @@ function filterFollowupsByName() {
 
 function _nameMatch(lead, query) {
   if (!query) return true;
-  return (lead.customerName || '').toLowerCase().includes(query.toLowerCase().trim());
+  const q = query.toLowerCase().trim();
+  return (lead.customerName || '').toLowerCase().includes(q) ||
+         (lead.mobileNo || '').includes(q);
 }
 
 function renderFollowups(filter) {
@@ -843,10 +852,30 @@ function applyAllLeadsFilters() {
   if (currentAllLeadsExecFilter !== 'all') {
     leads = leads.filter(l => l.assignedTo === currentAllLeadsExecFilter);
   }
+  const fromEl = document.getElementById('allLeadsFromDate');
+  const toEl   = document.getElementById('allLeadsToDate');
+  const fromDate = fromEl && fromEl.value ? fromEl.value : '';
+  const toDate   = toEl   && toEl.value   ? toEl.value   : '';
+  if (fromDate || toDate) {
+    leads = leads.filter(l => {
+      if (!l.createdDate) return true;
+      if (fromDate && l.createdDate < fromDate) return false;
+      if (toDate   && l.createdDate > toDate)   return false;
+      return true;
+    });
+  }
   if (currentAllLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentAllLeadsSearch));
 
   allLeadsFiltered = leads;
   renderAllLeads();
+}
+
+function clearAllLeadsDateFilter() {
+  const fromEl = document.getElementById('allLeadsFromDate');
+  const toEl   = document.getElementById('allLeadsToDate');
+  if (fromEl) fromEl.value = '';
+  if (toEl)   toEl.value   = '';
+  applyAllLeadsFilters();
 }
 
 function renderAllLeads() {
@@ -1203,7 +1232,7 @@ function applyCallsFilters() {
 
   let html = `<div style="padding:8px 0 4px;font-size:12px;color:#888;font-weight:700;">${calls.length} interaction${calls.length !== 1 ? 's' : ''}</div>
   <div style="overflow-x:auto;-webkit-overflow-scrolling:touch;">
-    <table class="analytics-table" style="min-width:640px;font-size:12px;">
+    <table class="analytics-table" style="min-width:820px;font-size:12px;">
       <thead>
         <tr>
           <th style="white-space:nowrap;">Date &amp; Time</th>
@@ -1213,6 +1242,8 @@ function applyCallsFilters() {
           <th>Type</th>
           <th>Notes</th>
           <th>Executive</th>
+          <th>Financier</th>
+          <th style="white-space:nowrap;text-align:center;">Accel.</th>
           <th style="white-space:nowrap;">Follow-up</th>
         </tr>
       </thead>
@@ -1229,6 +1260,8 @@ function applyCallsFilters() {
           <td><span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:8px;background:${callTypeColor(c.type)}22;color:${callTypeColor(c.type)};white-space:nowrap;">${esc(c.type)}</span></td>
           <td style="font-size:12px;color:#444;font-style:${c.note ? 'italic' : 'normal'};max-width:180px;">${c.note ? esc(c.note) : '<span style="color:#ccc;">—</span>'}</td>
           <td style="font-size:11px;white-space:nowrap;">${esc(c.by)}</td>
+          <td style="font-size:11px;white-space:nowrap;color:${c.financierAssigned ? '#444' : '#ccc'};">${c.financierAssigned ? esc(c.financierAssigned) : '—'}</td>
+          <td style="text-align:center;font-size:14px;font-weight:700;">${c.punchedInAccelerator ? '<span style="color:#4CAF50;">✓</span>' : '<span style="color:#ccc;">✗</span>'}</td>
           <td style="font-size:11px;white-space:nowrap;${c.followUpDate ? 'color:#667eea;font-weight:700;' : 'color:#ccc;'}">${c.followUpDate ? esc(c.followUpDate) : '—'}</td>
         </tr>`).join('')}
       </tbody>
