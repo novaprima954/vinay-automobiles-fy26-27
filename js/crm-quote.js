@@ -98,6 +98,9 @@ async function _loadFinancierDropdown() {
         sel.appendChild(opt);
       });
     }
+    const noFinOpt = document.createElement('option');
+    noFinOpt.value = 'No Finance'; noFinOpt.textContent = 'No Finance';
+    sel.appendChild(noFinOpt);
   } catch(e) {}
 }
 
