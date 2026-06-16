@@ -539,6 +539,14 @@ async function generateQuotation() {
   if (!custName) { showMessage('Please enter customer name', 'error'); return; }
   if (!mobile || !/^\d{10}$/.test(mobile)) { showMessage('Please enter valid 10-digit mobile', 'error'); return; }
   if (!model || !variant) { showMessage('Please select model and variant', 'error'); return; }
+  const finSel = document.getElementById('quotFinancier');
+  if (!finSel || !finSel.value) {
+    showMessage('Please select a Financier before generating the quotation', 'error');
+    document.getElementById('financierSection').scrollIntoView({ behavior: 'smooth' });
+    if (finSel) finSel.style.borderColor = '#ef5350';
+    return;
+  }
+  if (finSel) finSel.style.borderColor = '';
   if (compareMode && !priceDetails2) {
     showMessage('Please select Model and Variant for Vehicle 2 before comparing', 'error');
     document.getElementById('vehicle2Card').scrollIntoView({ behavior: 'smooth' });
