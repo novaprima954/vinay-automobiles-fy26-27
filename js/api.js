@@ -581,6 +581,18 @@ const API = {
       execMobile:   execMobile   || ''
     });
   },
+
+  async getBrochures(modelName) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getBrochures', { sessionId, modelName: modelName || '' });
+  },
+
+  async sendBrochureWhatsApp(leadId, brochureName, driveFileId, customerName, customerPhone, modelName) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('sendBrochureWhatsApp', {
+      sessionId, leadId: leadId || '', brochureName, driveFileId, customerName, customerPhone, modelName: modelName || ''
+    });
+  },
   
   /**
    * Get Dashboard Data

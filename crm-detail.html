@@ -59,10 +59,11 @@
       flex: 1; padding: 9px 10px; border: none; border-radius: 8px;
       font-weight: 700; font-size: 13px; cursor: pointer; text-align: center;
     }
-    .btn-hdr-call    { background: rgba(76,175,80,0.9); color: white; }
-    .btn-hdr-wa      { background: rgba(37,211,102,0.9); color: white; }
-    .btn-hdr-convert { background: rgba(255,152,0,0.9); color: white; }
-    .btn-hdr-quote   { background: rgba(255,255,255,0.25); color: white; border: 1.5px solid rgba(255,255,255,0.5); }
+    .btn-hdr-call     { background: rgba(76,175,80,0.9); color: white; }
+    .btn-hdr-wa       { background: rgba(37,211,102,0.9); color: white; }
+    .btn-hdr-convert  { background: rgba(255,152,0,0.9); color: white; }
+    .btn-hdr-quote    { background: rgba(255,255,255,0.25); color: white; border: 1.5px solid rgba(255,255,255,0.5); }
+    .btn-hdr-brochure { background: rgba(103,126,234,0.9); color: white; }
 
     /* ── Status badge ── */
     .status-banner {
@@ -234,6 +235,7 @@
     <div class="header-actions">
       <button class="btn-hdr btn-hdr-call" id="btnCall" onclick="callLead()">📞 Call</button>
       <button class="btn-hdr btn-hdr-wa"   id="btnWA"   onclick="whatsappLead()">💬 WhatsApp</button>
+      <button class="btn-hdr btn-hdr-brochure" id="btnBrochure" onclick="sendBrochure()">📖 Brochure</button>
       <button class="btn-hdr btn-hdr-quote" onclick="generateQuote()">📄 Quote</button>
       <button class="btn-hdr btn-hdr-convert" id="btnConvert" onclick="convertToSale()" style="display:none;">✅ Convert</button>
     </div>
@@ -382,6 +384,19 @@
 
   </div>
 
+</div>
+
+<!-- Brochure picker modal -->
+<div id="brochureModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9999;align-items:flex-end;justify-content:center;">
+  <div style="background:white;width:100%;max-width:480px;border-radius:18px 18px 0 0;padding:20px 16px 32px;">
+    <div style="font-size:16px;font-weight:700;color:#333;margin-bottom:4px;">📖 Select Brochure</div>
+    <div style="font-size:12px;color:#888;margin-bottom:14px;" id="brochureModalSub"></div>
+    <div id="brochureList" style="display:flex;flex-direction:column;gap:8px;max-height:260px;overflow-y:auto;"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <button onclick="closeBrochureModal()" style="flex:1;padding:11px;background:#f5f5f5;color:#666;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">Cancel</button>
+      <button id="brochureSendBtn" onclick="confirmSendBrochure()" style="flex:2;padding:11px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;">📲 Send on WhatsApp</button>
+    </div>
+  </div>
 </div>
 
 <script src="js/config.js"></script>

@@ -436,3 +436,96 @@ function showMessage(text, type) {
 function goBack() {
   window.location.href = 'crm.html';
 }
+
+// ── BROCHURE SEND ─────────────────────────────
+
+let _brochureList = [];
+let _selectedBrochureIdx = -1;
+
+async function sendBrochure() {
+  if (!currentLead) return;
+  const model  = (currentLead.model || '').trim();
+  const mobile = (currentLead.mobileNo || '').trim();
+  if (!mobile) { showMessage('No mobile number on this lead', 'error'); return; }
+
+  const btn = document.getElementById('btnBrochure');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳...'; }
+
+  try {
+    const res = await API.getBrochures(model);
+    if (!res.success) { showMessage('Failed to load brochures: ' + res.message, 'error'); return; }
+    if (!res.brochures || res.brochures.length === 0) {
+      showMessage('No brochure available for ' + (model || 'this model'), 'error'); return;
+    }
+    _brochureList = res.brochures;
+    _selectedBrochureIdx = 0;
+    _openBrochureModal(model);
+  } catch(e) {
+    showMessage('Error: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '📖 Brochure'; }
+  }
+}
+
+function _openBrochureModal(model) {
+  const modal = document.getElementById('brochureModal');
+  const sub   = document.getElementById('brochureModalSub');
+  const list  = document.getElementById('brochureList');
+  if (!modal) return;
+
+  sub.textContent = model ? 'Model: ' + model : '';
+
+  list.innerHTML = _brochureList.map(function(b, i) {
+    return '<div onclick="_selectBrochure(' + i + ')" id="brochureOpt_' + i + '" style="padding:11px 14px;border:2px solid ' + (i === 0 ? '#667eea' : '#e0e0e0') + ';border-radius:10px;cursor:pointer;font-size:14px;font-weight:600;color:' + (i === 0 ? '#667eea' : '#444') + ';">' +
+      (i === 0 ? '✅ ' : '') + b.name + '</div>';
+  }).join('');
+
+  modal.style.display = 'flex';
+}
+
+function _selectBrochure(idx) {
+  _selectedBrochureIdx = idx;
+  _brochureList.forEach(function(_, i) {
+    const el = document.getElementById('brochureOpt_' + i);
+    if (!el) return;
+    const selected = i === idx;
+    el.style.borderColor = selected ? '#667eea' : '#e0e0e0';
+    el.style.color = selected ? '#667eea' : '#444';
+    el.textContent = (selected ? '✅ ' : '') + _brochureList[i].name;
+  });
+}
+
+function closeBrochureModal() {
+  const modal = document.getElementById('brochureModal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function confirmSendBrochure() {
+  if (_selectedBrochureIdx < 0 || !_brochureList[_selectedBrochureIdx]) return;
+  const brochure = _brochureList[_selectedBrochureIdx];
+  const sendBtn  = document.getElementById('brochureSendBtn');
+  if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = '⏳ Sending...'; }
+
+  try {
+    const res = await API.sendBrochureWhatsApp(
+      currentLead.leadId || leadId,
+      brochure.name,
+      brochure.driveId,
+      currentLead.customerName || '',
+      currentLead.mobileNo     || '',
+      currentLead.model        || ''
+    );
+    closeBrochureModal();
+    if (res.success) {
+      showMessage('✅ Brochure sent on WhatsApp!', 'success');
+      loadLeadDetails(); // refresh interactions
+    } else {
+      showMessage('❌ ' + (res.message || 'Failed to send brochure'), 'error');
+    }
+  } catch(e) {
+    closeBrochureModal();
+    showMessage('❌ Error: ' + e.message, 'error');
+  } finally {
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📲 Send on WhatsApp'; }
+  }
+}
