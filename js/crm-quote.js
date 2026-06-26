@@ -1231,13 +1231,13 @@ async function confirmSendBrochureFromQuote() {
     const res = await API.sendBrochureWhatsApp(leadId || '', brochure.name, brochure.driveId, custName, mobile, model);
     closeQuotBrochureModal();
     if (res.success) {
-      showMessage('✅ Brochure sent on WhatsApp!', 'success');
+      showWAToast('📖 Brochure sent on WhatsApp!', 'success');
     } else {
-      showMessage('❌ ' + (res.message || 'Failed to send brochure'), 'error');
+      showWAToast('❌ ' + (res.message || 'Failed to send brochure'), 'error');
     }
   } catch(e) {
     closeQuotBrochureModal();
-    showMessage('❌ Error: ' + e.message, 'error');
+    showWAToast('❌ Error: ' + e.message, 'error');
   } finally {
     if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📲 Send on WhatsApp'; }
   }

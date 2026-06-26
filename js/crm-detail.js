@@ -517,15 +517,32 @@ async function confirmSendBrochure() {
     );
     closeBrochureModal();
     if (res.success) {
-      showMessage('✅ Brochure sent on WhatsApp!', 'success');
+      showWAToast('📖 Brochure sent on WhatsApp!', 'success');
       loadLeadDetails(); // refresh interactions
     } else {
-      showMessage('❌ ' + (res.message || 'Failed to send brochure'), 'error');
+      showWAToast('❌ ' + (res.message || 'Failed to send brochure'), 'error');
     }
   } catch(e) {
     closeBrochureModal();
-    showMessage('❌ Error: ' + e.message, 'error');
+    showWAToast('❌ Error: ' + e.message, 'error');
   } finally {
     if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = '📲 Send on WhatsApp'; }
   }
+}
+
+function showWAToast(text, type) {
+  const el = document.getElementById('waToast');
+  if (!el) { showMessage(text, type); return; }
+  const isSuccess = type === 'success';
+  el.textContent = text;
+  el.style.background = isSuccess ? '#25D366' : '#ef5350';
+  el.style.color = 'white';
+  el.style.display = 'block';
+  el.style.opacity = '1';
+  clearTimeout(el._waTimer);
+  el._waTimer = setTimeout(function() {
+    el.style.opacity = '0';
+    el.style.transition = 'opacity 0.5s';
+    setTimeout(function() { el.style.display = 'none'; el.style.transition = ''; }, 500);
+  }, isSuccess ? 4000 : 6000);
 }
