@@ -4477,6 +4477,26 @@ function getAdminDashboard(sessionId, dateFilter) {
         fullAccessories: executiveStats[exec].fullAccessories
       })).sort((a, b) => b.completedSales - a.completedSales);
 
+    // Helper: extract clean model name from CRM_Leads variant string
+    // e.g. "iQUBE TVS iQUBE 12 (3.5 kWh)" → "iQUBE"
+    //      "JUPITER 110 JUPITER 110 DRUM ALLOY SXC" → "JUPITER 110"
+    const knownSalesModels = Object.keys(modelCounts).sort(function(a, b) { return b.length - a.length; });
+    function extractEnquiryModel(raw) {
+      const up = raw.toUpperCase().trim();
+      // 1. Try known sales models (longest first to avoid "JUPITER" matching "JUPITER 110")
+      for (let k = 0; k < knownSalesModels.length; k++) {
+        if (up.startsWith(knownSalesModels[k].toUpperCase())) return knownSalesModels[k];
+      }
+      // 2. Heuristic: find shortest 1–3 word prefix P that re-appears (possibly after "TVS ") in the rest
+      const words = raw.trim().split(/\s+/);
+      for (let n = 1; n <= Math.min(3, words.length - 1); n++) {
+        const pfx = words.slice(0, n).join(' ').toUpperCase();
+        const rest = words.slice(n).join(' ').toUpperCase();
+        if (rest.startsWith(pfx) || rest.startsWith('TVS ' + pfx)) return words.slice(0, n).join(' ');
+      }
+      return raw; // fallback: use as-is
+    }
+
     // CRM_Leads pass: Walk-In enquiry per executive + model enquiry counts (all sources)
     const crmLeadsSheet = getSheet('CRM_Leads');
     const modelEnquiries = {}; // model → { total, byExec: { exec: count } }
@@ -4510,7 +4530,7 @@ function getAdminDashboard(sessionId, dateFilter) {
 
         const clExec    = String(clr[8] || '').trim();
         const clSource  = String(clr[6] || '').toLowerCase();
-        const clModel   = String(clr[5] || '').trim();
+        const clModel   = extractEnquiryModel(String(clr[5] || '').trim());
 
         // Walk-in enquiry per executive
         if (clSource === 'walk-in' && clExec) {
