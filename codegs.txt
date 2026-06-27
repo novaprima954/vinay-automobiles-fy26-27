@@ -37,7 +37,17 @@ function doPost(e) {
 
 function handleRequest(e) {
   try {
-    const params = e.parameter || {};
+    let params = e.parameter || {};
+    // Also parse JSON body (used for large payloads like PDF base64)
+    // Sent as text/plain to avoid CORS preflight; body is still JSON string
+    if (e.postData && (e.postData.type === 'application/json' || e.postData.type === 'text/plain')) {
+      try {
+        const jsonBody = JSON.parse(e.postData.contents);
+        params = Object.assign({}, params, jsonBody);
+      } catch(jsonErr) {
+        Logger.log('JSON parse error: ' + jsonErr.toString());
+      }
+    }
     const action = params.action || '';
     
     let result = {};
@@ -112,35 +122,41 @@ function handleRequest(e) {
       case 'exportViewRecordsToCSV':
         result = exportViewRecordsToCSV(params.sessionId, params.searchBy, params.searchValue, params.dateFilter, params.month, params.fromDate, params.toDate);
         break;
-      case 'getCRMDashboard':
-        result = getCRMDashboard(params.sessionId);
+      case 'getCRMDashboard':       result = getCRMDashboard(params.sessionId);                                                      break;
+      case 'getAvailableLeads':     result = getAvailableLeads(params.sessionId);                                                    break;
+      case 'getMyLeads':            result = getMyLeads(params.sessionId, params.filterType);                                        break;
+      case 'getAllLeads':            result = getAllLeads(params.sessionId);                                                          break;
+      case 'addLead':               result = addLead(params.sessionId, JSON.parse(params.data));                                     break;
+      case 'claimLead':             result = claimLead(params.sessionId, params.leadId);                                             break;
+      case 'getLeadDetails':        result = getLeadDetails(params.sessionId, params.leadId);                                        break;
+      case 'updateLead':            result = updateLead(params.sessionId, params.leadId, JSON.parse(params.data));                   break;
+      case 'addLeadNote':           result = addLeadNote(params.sessionId, params.leadId, params.note);                              break;
+      case 'convertLeadToSale':     result = convertLeadToSale(params.sessionId, params.leadId);                                     break;
+      case 'logCRMInteraction':     result = logCRMInteraction(params.sessionId, params.leadId, params.interactionType, params.note, params.followUpDate); break;
+      case 'getCRMInteractions':    result = getCRMInteractions(params.sessionId, params.leadId);                                    break;
+      case 'assignLead':            result = assignLead(params.sessionId, params.leadId, params.executiveName);                      break;
+      case 'getCRMPipeline':        result = getCRMPipeline(params.sessionId);                                                       break;
+      case 'getCRMAnalytics':       result = getCRMAnalytics(params.sessionId, params.monthFilter);                                  break;
+      case 'findLeadByMobile':      result = findLeadByMobile(params.sessionId, params.mobile);                                      break;
+      case 'getNextQuotationNumber':result = getNextQuotationNumber(params.sessionId);                                               break;
+      case 'saveCRMQuotation':      result = saveCRMQuotation(params.sessionId, JSON.parse(params.data));                            break;
+      case 'getLeadQuotations':     result = getLeadQuotations(params.sessionId, params.leadId);                                     break;
+      case 'getQuotationByNo':      result = getQuotationByNo(params.sessionId, params.quotNo);                                      break;
+      case 'getCallsReport':          result = getCallsReport(params.sessionId, params.fromDate, params.toDate);                    break;
+      case 'getFinancierUsers':       result = getFinancierUsers(params.sessionId);                                                  break;
+      case 'getFinancierLeads':       result = getFinancierLeads(params.sessionId);                                                  break;
+      case 'getFinancierDashboard':   result = getFinancierDashboard(params.sessionId);                                              break;
+      case 'updateFinanceDetails':    result = updateFinanceDetails(params.sessionId, params.leadId, JSON.parse(params.data));       break;
+      case 'getFinancierAnalytics':   result = getFinancierAnalytics(params.sessionId);                                              break;
+      case 'searchCRMLeads':        result = searchCRMLeads(params.sessionId, params.query);                                         break;
+      case 'sendQuotationWhatsApp':
+        result = sendQuotationWhatsApp(params.sessionId, params.pdfBase64, params.fileName, params.customerName, params.customerPhone, params.quotNo, params.modelVariant, params.execName, params.execMobile);
         break;
-      case 'getAvailableLeads':
-        result = getAvailableLeads(params.sessionId);
+      case 'getBrochures':
+        result = getBrochures(params.sessionId, params.modelName);
         break;
-      case 'getMyLeads':
-        result = getMyLeads(params.sessionId);
-        break;
-      case 'getAllLeads':
-        result = getAllLeads(params.sessionId);
-        break;
-      case 'addLead':
-        result = addLead(params.sessionId, JSON.parse(params.data));
-        break;
-      case 'claimLead':
-        result = claimLead(params.sessionId, params.leadId, params.initialStatus);
-        break;
-      case 'getLeadDetails':
-        result = getLeadDetails(params.sessionId, params.leadId);
-        break;
-      case 'updateLead':
-        result = updateLead(params.sessionId, params.leadId, JSON.parse(params.data));
-        break;
-      case 'addLeadNote':
-        result = addLeadNote(params.sessionId, params.leadId, params.note);
-        break;
-      case 'convertLeadToSale':
-        result = convertLeadToSale(params.sessionId, params.leadId);
+      case 'sendBrochureWhatsApp':
+        result = sendBrochureWhatsApp(params.sessionId, params.leadId, params.brochureName, params.driveFileId, params.customerName, params.customerPhone, params.modelName);
         break;
       case 'getSalesDashboard':
         result = getSalesDashboard(params.sessionId, params.dateFilter);
@@ -234,8 +250,17 @@ function handleRequest(e) {
       case 'uploadRegistrationFile':
         result = uploadRegistrationFile(params.sessionId, params.base64Data, params.fileName, params.orderDate);
         break;
+      case 'getHSRPStatusForRecord':
+        result = getHSRPStatusForRecord(params.sessionId, params.engineNo, params.frameNo);
+        break;
       case 'getHSRPData':
         result = getHSRPData(params.sessionId);
+        break;
+      case 'getHSRPRefCustomers':
+        result = getHSRPRefCustomers(params.sessionId);
+        break;
+      case 'getHSRPHpCompanies':
+        result = getHSRPHpCompanies(params.sessionId);
         break;
       case 'downloadHSRPData':
         result = downloadHSRPData(params.sessionId);
@@ -266,7 +291,8 @@ case 'saveFinancierData':      result = saveFinancierData(params, params.session
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'savePayout':             result = savePayout(params, params.sessionId);             break;
 case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
-case 'getFinancierReport':          result = getFinancierReport(params.sessionId);                           break;
+case 'getFinancierReport':               result = getFinancierReport(params.sessionId);                                          break;
+case 'getFinancierCommissionAnalysis':   result = getFinancierCommissionAnalysis(params.sessionId, params.dateFilter);        break;
 case 'getDisbursementComparison':   result = getDisbursementComparison(params.sessionId, params.password);   break;
 case 'getVehicleMileageDashboard':
   result = getVehicleMileageDashboard(params.sessionId);
@@ -311,6 +337,12 @@ case 'getInvTransactions': result = getInvTransactions(params, params.sessionId)
 case 'cancelBooking':          result = cancelBooking(params, params.sessionId); break;
 case 'getPendingAccountCheck': result = getPendingAccountCheck(params, params.sessionId); break;
 case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);              break;
+case 'getDailyActivity':          result = getDailyActivity(params.sessionId);               break;
+case 'saveDailyActivity':         result = saveDailyActivity(params.sessionId, JSON.parse(params.data)); break;
+case 'getDailyActivityReport':    result = getDailyActivityReport(params.sessionId, params.dateFrom, params.dateTo); break;
+case 'adminUpdateDailyActivity':    result = adminUpdateDailyActivity(params.sessionId, params.date, params.executiveName, JSON.parse(params.data)); break;
+case 'adminConfirmDailyActivity':   result = adminConfirmDailyActivity(params.sessionId, params.date, params.executiveName); break;
+case 'getSalesActivitySystemCounts':result = getSalesActivitySystemCounts(params.sessionId); break;
 case 'verifySalaryPassword': result = verifySalaryPassword(params.sessionId, params.password); break;
 case 'getSalaryEmployees': result = getSalaryEmployees(params.sessionId); break;
 case 'addSalaryEmployee': result = addSalaryEmployee(params.sessionId, JSON.parse(params.data)); break;
@@ -367,9 +399,10 @@ function login(username, password) {
           id: userId,
           username: row[1],
           name: row[3],
-          role: row[4]
+          role: row[4],
+          mobile: String(row[8] || '')
         };
-        
+
         // Create session
         const sessionId = createSession(userId);
         
@@ -443,10 +476,11 @@ function validateSession(sessionId) {
               return {
                 success: true,
                 user: {
-                  id: userData[j][0],
+                  id:       userData[j][0],
                   username: userData[j][1],
-                  name: userData[j][3],
-                  role: userData[j][4]
+                  name:     userData[j][3],
+                  role:     userData[j][4],
+                  mobile:   String(userData[j][8] || '')
                 }
               };
             }
@@ -662,9 +696,10 @@ function saveSales(sessionId, salesData) {
       '',                                           // 39: AN - Accessory Receipt 1
       '',                                           // 40: AO - Accessory Extra
       new Date(),                                    // 41: AP - Timestamp
-      salesData.raincover || '',   // 61: BJ
-      salesData.buzzer || '',       // 62: BK
-      salesData.backrest || ''     // 63: BL
+      salesData.raincover || '',        // 61: BJ
+      salesData.buzzer || '',           // 62: BK
+      salesData.backrest || '',         // 63: BL
+      salesData.extendedwarranty || '', // 64: BM
     ];
     
     Logger.log('=== ARRAY POSITIONS ===');
@@ -783,6 +818,7 @@ function searchRecordsForEdit(sessionId, searchBy, searchValue, userRole, userNa
     const COL_RAIN_COVER = 61;
     const COL_BUZZER = 62;
     const COL_BACK_REST = 63;
+    const COL_EXT_WARRANTY = 64;
 
     
     // Search through data (skip header row)
@@ -848,6 +884,7 @@ function searchRecordsForEdit(sessionId, searchBy, searchValue, userRole, userNa
           raincover: row[COL_RAIN_COVER] || '',
           buzzer: row[COL_BUZZER] || '',
           backrest: row[COL_BACK_REST] || '',
+          extendedwarranty: row[COL_EXT_WARRANTY] || '',
 
         });
       }
@@ -954,6 +991,7 @@ function updateSalesRecord(sessionId, updateData) {
     sheet.getRange(targetRow, 62).setValue(updateData.raincover || '');
     sheet.getRange(targetRow, 63).setValue(updateData.buzzer || '');
     sheet.getRange(targetRow, 64).setValue(updateData.backrest || '');
+    sheet.getRange(targetRow, 65).setValue(updateData.extendedwarranty || '');
 
     
     SpreadsheetApp.flush();
@@ -1321,12 +1359,12 @@ function getRecordByReceiptNo(sessionId, receiptNo) {
             raincover: row[61] || '',
             buzzer: row[62] || '',
             backrest: row[63] || '',
-
+            extendedwarranty: row[64] || '',
           }
         };
       }
     }
-    
+
     return {
       success: false,
       message: 'Record not found'
@@ -1446,6 +1484,7 @@ function updateAccountsRecord(sessionId, updateData) {
     if (updateData.raincover !== undefined) sheet.getRange(targetRow, 62).setValue(updateData.raincover);
     if (updateData.buzzer !== undefined) sheet.getRange(targetRow, 63).setValue(updateData.buzzer);
     if (updateData.backrest !== undefined) sheet.getRange(targetRow, 64).setValue(updateData.backrest);
+    if (updateData.extendedwarranty !== undefined) sheet.getRange(targetRow, 65).setValue(updateData.extendedwarranty);
 
     
     // Accounts fields
@@ -1739,10 +1778,10 @@ function getPriceMasterDetails(sessionId, model, variant) {
             tankCoverPrice: row[11] || null,
             handleHookPrice: row[12] || null,
             helmetPrice: row[13] || null,
-            rainCoverPrice: row[14] || null,
-            buzzerPrice: row[15] || null,
-            backRestPrice: row[16] || null,
-
+            rainCoverPrice: row[15] || null,
+            buzzerPrice: row[16] || null,
+            backRestPrice: row[17] || null,
+            extendedWarrantyPrice: row[18] || null,
           }
         };
       }
@@ -1825,215 +1864,407 @@ function savePriceVerification(sessionId, receiptNo, calculatedTotal, matched, n
 // CRM FUNCTIONS
 // ==========================================
 
+var SOCIAL_SOURCES_CRM = ['Facebook', 'Instagram'];
+
+function _crmIsSocial(source) {
+  return SOCIAL_SOURCES_CRM.indexOf(String(source || '').trim()) !== -1;
+}
+
+function _crmAgingDays(createdDate) {
+  if (!createdDate) return 0;
+  var diff = new Date() - new Date(createdDate);
+  return Math.floor(diff / 86400000);
+}
+
+function _crmIsOverdue(followUpDate) {
+  if (!followUpDate) return false;
+  var fu = new Date(followUpDate); fu.setHours(0,0,0,0);
+  var today = new Date(); today.setHours(0,0,0,0);
+  return fu < today;
+}
+
+function _crmDaysOverdue(followUpDate) {
+  if (!followUpDate) return 0;
+  var fu = new Date(followUpDate); fu.setHours(0,0,0,0);
+  var today = new Date(); today.setHours(0,0,0,0);
+  return Math.max(0, Math.floor((today - fu) / 86400000));
+}
+
+function _crmRowToObj(row) {
+  return {
+    leadId:            row[0],
+    customerName:      row[1],
+    mobileNo:          row[2],
+    email:             row[3],
+    address:           row[4],
+    model:             row[5],
+    source:            row[6],
+    status:            row[7],
+    assignedTo:        row[8],
+    expectedDate:      formatDate(row[9]),
+    interactionLog:    row[10],
+    lastContact:       formatDate(row[11]),
+    followUpDate:      formatDate(row[12]),
+    createdDate:       formatDate(row[13]),
+    createdBy:         row[14],
+    updatedDate:       formatDate(row[15]),
+    lostReason:        row[16] || '',
+    // Cols R=17 (QuotNo), S=18 (reserved), T=19 (TotalAmount) — read-only, set elsewhere
+    // Finance fields start at U=20
+    financierAssigned:     String(row[20] || ''),
+    loanStatus:            String(row[21] || ''),
+    financeScheme:         String(row[22] || ''),
+    downPayment:           Number(row[23] || 0),
+    loanAmount:            Number(row[24] || 0),
+    emi:                   Number(row[25] || 0),
+    tenure:                Number(row[26] || 0),
+    financierFollowUpDate: row[27] ? formatDate(row[27]) : '',
+    punchedInAccelerator: !!(row[28] === true || row[28] === 'TRUE' || row[28] === 'true'),
+    isSocial:          _crmIsSocial(row[6]),
+    agingDays:         _crmAgingDays(row[13]),
+    isOverdue:         !!(row[12] && _crmIsOverdue(row[12]) && row[7] !== 'Converted' && row[7] !== 'Lost'),
+    daysOverdue:       (row[12] && _crmIsOverdue(row[12])) ? _crmDaysOverdue(row[12]) : 0
+  };
+}
+
+function _parseInteractions(logText) {
+  if (!logText) return [];
+  var lines = String(logText).split('\n');
+  var result = [];
+  for (var i = 0; i < lines.length; i++) {
+    var line = lines[i].trim();
+    if (!line) continue;
+    var parts = line.split('||');
+    result.push({
+      datetime: parts[0] || '',
+      type: parts[1] || '',
+      note: parts[2] || '',
+      by: parts[3] || ''
+    });
+  }
+  return result;
+}
+
+function _getQuotationsForLead(leadId) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var qs = ss.getSheetByName('CRM_Quotations');
+    if (!qs) return [];
+    var qData = qs.getDataRange().getValues();
+    var quotes = [];
+    for (var i = 1; i < qData.length; i++) {
+      if (String(qData[i][1]) === String(leadId)) {
+        quotes.push({
+          quotNo:       qData[i][0],
+          leadId:       qData[i][1],
+          customerName: qData[i][2],
+          model:        qData[i][3],
+          variant:      qData[i][4],
+          totalAmount:  qData[i][5],
+          createdDate:  formatDate(qData[i][6]),
+          createdBy:    qData[i][7],
+          quotData:     qData[i][8] || ''
+        });
+      }
+    }
+    return quotes;
+  } catch(e) { return []; }
+}
+
+/**
+ * Get a single quotation by quotation number (for reprint)
+ */
+function getQuotationByNo(sessionId, quotNo) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var qs = ss.getSheetByName('CRM_Quotations');
+    if (!qs) return { success: false, message: 'No quotations sheet' };
+
+    var qData = qs.getDataRange().getValues();
+    for (var i = 1; i < qData.length; i++) {
+      if (String(qData[i][0]) === String(quotNo)) {
+        return {
+          success: true,
+          quotation: {
+            quotNo:       qData[i][0],
+            leadId:       qData[i][1],
+            customerName: qData[i][2],
+            model:        qData[i][3],
+            variant:      qData[i][4],
+            totalAmount:  qData[i][5],
+            createdDate:  formatDate(qData[i][6]),
+            createdBy:    qData[i][7],
+            quotData:     qData[i][8] || ''
+          }
+        };
+      }
+    }
+    return { success: false, message: 'Quotation not found' };
+  } catch(e) {
+    Logger.log('Error in getQuotationByNo: ' + e.toString());
+    return { success: false, message: 'Error: ' + e.toString() };
+  }
+}
+
+/**
+ * Get calls/interactions report for a date range across all leads (admin only)
+ * fromDate / toDate in ISO format: YYYY-MM-DD
+ */
+function getCallsReport(sessionId, fromDate, toDate) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+
+    var tz = 'Asia/Kolkata';
+
+    // Build a set of date strings in DD-Mon-YYYY format to match against log entries
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    var fromD = fromDate ? new Date(fromDate) : new Date();
+    var toD   = toDate   ? new Date(toDate)   : new Date();
+    fromD.setHours(0,0,0,0);
+    toD.setHours(23,59,59,999);
+
+    // Build set of matching date strings
+    var matchDates = {};
+    var cur = new Date(fromD);
+    while (cur <= toD) {
+      var ds = String(cur.getDate()).padStart(2,'0') + '-' + months[cur.getMonth()] + '-' + cur.getFullYear();
+      matchDates[ds] = true;
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+
+    // Build quotation variant lookup: leadId → variant (from CRM_Quotations, latest entry)
+    var variantMap = {};
+    try {
+      var qSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('CRM_Quotations');
+      if (qSheet) {
+        var qData = qSheet.getDataRange().getValues();
+        for (var qi = 1; qi < qData.length; qi++) {
+          var qLeadId  = String(qData[qi][1] || '');
+          var qVariant = String(qData[qi][4] || '');
+          var qModel   = String(qData[qi][3] || '');
+          if (qLeadId) variantMap[qLeadId] = (qModel + (qVariant ? ' ' + qVariant : '')).trim();
+        }
+      }
+    } catch(e) {}
+
+    var calls = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var log = String(row[10] || '');
+      if (!log) continue;
+
+      var leadId_     = String(row[0] || '');
+      var followUpDate = row[12] ? Utilities.formatDate(new Date(row[12]), tz, 'dd-MMM-yyyy') : '';
+      var modelVariant = variantMap[leadId_] || String(row[5] || '');
+
+      var entries = log.split('\n');
+      for (var j = 0; j < entries.length; j++) {
+        var entry = entries[j].trim();
+        if (!entry) continue;
+        var datePrefix = entry.substring(0, 11);
+        if (!matchDates[datePrefix]) continue;
+
+        var parts = entry.split('||');
+        if (parts.length < 2) continue;
+        var datetime = parts[0] || '';
+        var type     = parts[1] || '';
+        var note     = parts[2] || '';
+        var by       = parts[3] || '';
+
+        calls.push({
+          leadId:              leadId_,
+          customerName:        String(row[1] || ''),
+          mobile:              String(row[2] || ''),
+          model:               modelVariant,   // now model+variant
+          assignedTo:          String(row[8] || ''),
+          followUpDate:        followUpDate,
+          type:                type,
+          note:                note,
+          by:                  by,
+          datetime:            datetime,
+          financierAssigned:   String(row[20] || ''),
+          punchedInAccelerator: !!(row[28] === true || row[28] === 'TRUE' || row[28] === 'true')
+        });
+      }
+    }
+
+    calls.sort(function(a, b) { return b.datetime.localeCompare(a.datetime); });
+    return { success: true, calls: calls };
+  } catch(e) {
+    Logger.log('Error in getCallsReport: ' + e.toString());
+    return { success: false, message: 'Error: ' + e.toString() };
+  }
+}
+
 /**
  * Get CRM Dashboard data
  */
 function getCRMDashboard(sessionId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    const user = validation.user;
-    
-    // Only admin and sales can access CRM
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
     if (user.role !== 'admin' && user.role !== 'sales') {
-      return {
-        success: false,
-        message: 'Access denied. CRM is only available to admin and sales users.'
-      };
+      return { success: false, message: 'Access denied. CRM is only available to admin and sales users.' };
     }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    
-    let myNew = 0;
-    let myHot = 0;
-    let myFollowUp = 0;
-    let available = 0;
-    let converted = 0;
-    let totalLeads = 0;
-    let urgentFollowUps = [];
-    
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    // Count leads (skip header)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const status = row[7]; // Column H: Status
-      const assignedTo = row[8]; // Column I: Assigned To
-      const followUpDate = row[12]; // Column M: Next Follow-up Date
-      
-      // Available leads (no status, not assigned)
-      if (!status || status === '') {
-        available++;
-        continue;
-      }
-      
-      // Admin sees all, sales sees only their own
-      if (user.role === 'admin' || assignedTo === user.name) {
-        totalLeads++;
 
-        if (status === 'New') myNew++;
-        if (status === 'Hot Lead') myHot++;
-        if (status === 'Converted') converted++;
-        
-        // Check for urgent follow-ups (today)
-        if (followUpDate) {
-          const followUp = new Date(followUpDate);
-          followUp.setHours(0, 0, 0, 0);
-          
-          if (followUp.getTime() === today.getTime()) {
-            myFollowUp++;
-            urgentFollowUps.push({
-              name: row[1],
-              mobile: row[2],
-              model: row[5],
-              leadId: row[0]
-            });
-          }
-        }
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    var today = new Date(); today.setHours(0,0,0,0);
+    var weekLater = new Date(today.getTime() + 7 * 86400000);
+
+    var overdueLeads = [], urgentFollowUps = [], weekFollowUpLeads = [];
+    var available = 0, converted = 0, totalLeads = 0;
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var status = row[7];
+      var assignedTo = row[8];
+      var followUpDate = row[12];
+      var isPool = !assignedTo && _crmIsSocial(row[6]);
+
+      if (isPool) { available++; continue; }
+
+      var isVisible = user.role === 'admin' || assignedTo === user.name;
+      if (!isVisible) continue;
+
+      totalLeads++;
+      if (status === 'Converted') converted++;
+
+      if (!followUpDate || status === 'Converted' || status === 'Lost') continue;
+
+      var fu = new Date(followUpDate); fu.setHours(0,0,0,0);
+      var brief = { leadId: row[0], customerName: row[1], mobileNo: row[2], model: row[5], source: row[6], assignedTo: assignedTo, status: status };
+
+      if (fu < today) {
+        overdueLeads.push(Object.assign({}, brief, { daysOverdue: _crmDaysOverdue(followUpDate) }));
+      } else if (fu.getTime() === today.getTime()) {
+        urgentFollowUps.push(brief);
+      } else if (fu <= weekLater) {
+        weekFollowUpLeads.push(Object.assign({}, brief, { followUpDate: formatDate(followUpDate) }));
       }
     }
-    
+
     return {
       success: true,
       dashboard: {
-        myNew: myNew,
-        myHot: myHot,
-        myFollowUp: myFollowUp,
+        overdueCount: overdueLeads.length,
+        urgentCount: urgentFollowUps.length,
+        weekFollowUps: weekFollowUpLeads.length,
         available: available,
         converted: converted,
         totalLeads: totalLeads,
-        urgentFollowUps: urgentFollowUps
+        overdueLeads: overdueLeads,
+        urgentFollowUps: urgentFollowUps,
+        weekFollowUpLeads: weekFollowUpLeads
       }
     };
-    
   } catch (error) {
     Logger.log('Error in getCRMDashboard: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error loading dashboard: ' + error.toString()
-    };
+    return { success: false, message: 'Error loading dashboard: ' + error.toString() };
   }
 }
 
 /**
- * Get available leads (unassigned)
+ * Get pool leads (social-source, unassigned)
  */
 function getAvailableLeads(sessionId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    // Only admin and sales can access CRM
-    const user = validation.user;
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
     if (user.role !== 'admin' && user.role !== 'sales') {
-      return {
-        success: false,
-        message: 'Access denied'
-      };
+      return { success: false, message: 'Access denied' };
     }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    const leads = [];
-    
-    // Get available leads (skip header)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const status = row[7];
-      const assignedTo = row[8];
-      
-      // Only show leads with no status and not assigned
-      if (!status || status === '') {
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var leads = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[8] && _crmIsSocial(row[6])) {
         leads.push({
           leadId: row[0],
           customerName: row[1],
           mobileNo: row[2],
-          email: row[3],
           model: row[5],
           source: row[6],
+          agingDays: _crmAgingDays(row[13]),
           createdDate: formatDate(row[13]),
           createdBy: row[14]
         });
       }
     }
-    
-    return {
-      success: true,
-      leads: leads
-    };
-    
+
+    return { success: true, leads: leads };
   } catch (error) {
     Logger.log('Error in getAvailableLeads: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error loading leads: ' + error.toString()
-    };
+    return { success: false, message: 'Error loading leads: ' + error.toString() };
   }
 }
 
 /**
  * Get my assigned leads
  */
-function getMyLeads(sessionId) {
+function getMyLeads(sessionId, filterType) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    const user = validation.user;
-    
-    // Only admin and sales can access CRM
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
     if (user.role !== 'admin' && user.role !== 'sales') {
-      return {
-        success: false,
-        message: 'Access denied'
-      };
+      return { success: false, message: 'Access denied' };
     }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    const leads = [];
-    
-    // Get my leads (skip header)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      const assignedTo = row[8];
-      const status = row[7];
-      
-      // Only show leads assigned to this user
-      if (assignedTo === user.name && status) {
-        leads.push({
-          leadId: row[0],
-          customerName: row[1],
-          mobileNo: row[2],
-          model: row[5],
-          status: status,
-          followUpDate: formatDate(row[12]),
-          lastContactDate: formatDate(row[11]),
-          notes: row[10]
-        });
-      }
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var leads = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var assignedTo = row[8];
+      var status = row[7];
+      if (!assignedTo || !status) continue;
+
+      var isMyLead = user.role === 'admin' || assignedTo === user.name;
+      if (!isMyLead) continue;
+
+      var isSocial = _crmIsSocial(row[6]);
+
+      if (filterType === 'social' && !isSocial) continue;
+      if (filterType === 'mine' && isSocial) continue;
+
+      leads.push({
+        leadId: row[0],
+        customerName: row[1],
+        mobileNo: row[2],
+        model: row[5],
+        source: row[6],
+        status: status,
+        assignedTo: assignedTo,
+        followUpDate: formatDate(row[12]),
+        lastContact: formatDate(row[11]),
+        isSocial: isSocial,
+        agingDays: _crmAgingDays(row[13]),
+        isOverdue: !!(row[12] && _crmIsOverdue(row[12]) && status !== 'Converted' && status !== 'Lost'),
+        daysOverdue: (row[12] && _crmIsOverdue(row[12])) ? _crmDaysOverdue(row[12]) : 0
+      });
     }
-    
-    return {
-      success: true,
-      leads: leads
-    };
-    
+
+    return { success: true, leads: leads };
   } catch (error) {
     Logger.log('Error in getMyLeads: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error loading leads: ' + error.toString()
-    };
+    return { success: false, message: 'Error loading leads: ' + error.toString() };
   }
 }
 
@@ -2042,417 +2273,1405 @@ function getMyLeads(sessionId) {
  */
 function getAllLeads(sessionId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    const user = validation.user;
-    
-    // Only admin can see all leads
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
     if (user.role !== 'admin') {
-      return {
-        success: false,
-        message: 'Access denied'
-      };
+      return { success: false, message: 'Access denied' };
     }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    const leads = [];
-    
-    // Get all leads (skip header)
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var leads = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var status = row[7];
       leads.push({
         leadId: row[0],
         customerName: row[1],
         mobileNo: row[2],
         model: row[5],
-        status: row[7],
-        assignedTo: row[8],
         source: row[6],
-        createdDate: formatDate(row[13])
+        status: status,
+        assignedTo: row[8],
+        isSocial: _crmIsSocial(row[6]),
+        agingDays: _crmAgingDays(row[13]),
+        isOverdue: !!(row[12] && _crmIsOverdue(row[12]) && status !== 'Converted' && status !== 'Lost'),
+        followUpDate: formatDate(row[12]),
+        lastContact: formatDate(row[11]),
+        createdDate: formatDate(row[13]),
+        createdBy: row[14]
       });
     }
-    
-    return {
-      success: true,
-      leads: leads
-    };
-    
+
+    return { success: true, leads: leads };
   } catch (error) {
     Logger.log('Error in getAllLeads: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error loading leads: ' + error.toString()
-    };
+    return { success: false, message: 'Error loading leads: ' + error.toString() };
   }
 }
 
 /**
- * Add new lead
+ * Add new lead (duplicate check + auto-assign logic)
  */
 function addLead(sessionId, data) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'sales' && user.role !== 'financier') {
+      return { success: false, message: 'Access denied' };
     }
-    
-    const user = validation.user;
-    
-    // Only admin and sales can add leads
-    if (user.role !== 'admin' && user.role !== 'sales') {
-      return {
-        success: false,
-        message: 'Access denied'
-      };
-    }
-    
-    const sheet = getSheet('CRM_Leads');
-    
-    // Generate Lead ID
-    const lastRow = sheet.getLastRow();
-    const leadNumber = lastRow; // Simple incrementing number
-    const leadId = 'LEAD' + String(leadNumber).padStart(4, '0');
-    
-    const now = new Date();
-    
-    const rowData = [
-      leadId,                           // A: Lead ID
-      data.customerName || '',          // B: Customer Name
-      data.mobileNo || '',              // C: Mobile No
-      data.email || '',                 // D: Email
-      data.address || '',               // E: Address
-      data.model || '',                 // F: Interested Model
-      data.source || '',                // G: Lead Source
-      '',                               // H: Status (blank for available)
-      '',                               // I: Assigned To (blank for available)
-      data.expectedDate || '',          // J: Expected Purchase Date
-      data.notes || '',                 // K: Notes
-      '',                               // L: Last Contact Date
-      '',                               // M: Next Follow-up Date
-      now,                              // N: Created Date
-      user.name,                        // O: Created By
-      now                               // P: Updated Date
-    ];
-    
-    sheet.appendRow(rowData);
-    
-    return {
-      success: true,
-      message: 'Lead added successfully',
-      leadId: leadId
-    };
-    
-  } catch (error) {
-    Logger.log('Error in addLead: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error adding lead: ' + error.toString()
-    };
-  }
-}
 
-/**
- * Claim an available lead
- */
-function claimLead(sessionId, leadId, initialStatus) {
-  try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    const user = validation.user;
-    
-    // Only admin and sales can claim leads
-    if (user.role !== 'admin' && user.role !== 'sales') {
-      return {
-        success: false,
-        message: 'Access denied'
-      };
-    }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    
-    // Find the lead
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      
-      if (row[0] === leadId) {
-        const currentStatus = row[7];
-        const currentAssigned = row[8];
-        
-        // Check if lead is available
-        if (currentStatus || currentAssigned) {
-          return {
-            success: false,
-            message: 'Lead already claimed by another user'
-          };
-        }
-        
-        // Claim the lead
-        const targetRow = i + 1;
-        sheet.getRange(targetRow, 8).setValue(initialStatus); // H: Status
-        sheet.getRange(targetRow, 9).setValue(user.name);     // I: Assigned To
-        sheet.getRange(targetRow, 12).setValue(new Date());   // L: Last Contact Date
-        sheet.getRange(targetRow, 16).setValue(new Date());   // P: Updated Date
-        
-        SpreadsheetApp.flush();
-        
+    var sheet = getSheet('CRM_Leads');
+    var existing = sheet.getDataRange().getValues();
+
+    var mobile = String(data.mobileNo || '').trim();
+    for (var i = 1; i < existing.length; i++) {
+      if (String(existing[i][2]).trim() === mobile) {
         return {
-          success: true,
-          message: 'Lead claimed successfully'
+          success: false,
+          isDuplicate: true,
+          existingLead: {
+            leadId: existing[i][0],
+            customerName: existing[i][1],
+            assignedTo: existing[i][8] || 'Pool',
+            status: existing[i][7] || 'Pool'
+          }
         };
       }
     }
-    
-    return {
-      success: false,
-      message: 'Lead not found'
-    };
-    
+
+    // Generate unique leadId by scanning existing max and incrementing
+    var maxLeadNum = 0;
+    for (var k = 1; k < existing.length; k++) {
+      var eid = String(existing[k][0] || '');
+      var match = eid.match(/^LEAD(\d+)$/);
+      if (match) { var n = parseInt(match[1]); if (n > maxLeadNum) maxLeadNum = n; }
+    }
+    var leadId = 'LEAD' + String(maxLeadNum + 1).padStart(4, '0');
+    var now = new Date();
+    var isSocial = _crmIsSocial(data.source);
+
+    var initStatus = isSocial ? '' : 'New';
+    var assignedTo = isSocial ? '' : user.name;
+
+    var initialLog = '';
+    if (data.notes) {
+      var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+      initialLog = ts + '||Note||' + data.notes + '||' + user.name;
+    }
+
+    var rowData = [
+      leadId,                         // 0  A  LeadID
+      data.customerName || '',         // 1  B  CustomerName
+      mobile,                          // 2  C  Mobile
+      data.email || '',                // 3  D  Email
+      data.address || '',              // 4  E  Address
+      data.model || '',                // 5  F  Model
+      data.source || '',               // 6  G  Source
+      initStatus,                      // 7  H  Status
+      assignedTo,                      // 8  I  AssignedTo
+      data.expectedDate || '',         // 9  J  ExpectedDate
+      initialLog,                      // 10 K  InteractionLog
+      '',                              // 11 L  LastContact
+      data.followUpDate || '',         // 12 M  FollowUpDate
+      now,                             // 13 N  CreatedDate
+      user.name,                       // 14 O  CreatedBy
+      now,                             // 15 P  UpdatedDate
+      '',                              // 16 Q  LostReason
+      '',                              // 17 R  QuotNo (set by saveCRMQuotation)
+      '',                              // 18 S  Reserved
+      '',                              // 19 T  TotalAmount (set by saveCRMQuotation)
+      data.financierAssigned || '',    // 20 U  FinancierAssigned ← NEW
+      '',                              // 21 V  LoanStatus
+      '',                              // 22 W  FinanceScheme
+      '',                              // 23 X  DownPayment
+      '',                              // 24 Y  LoanAmount
+      '',                              // 25 Z  EMI
+      '',                              // 26 AA Tenure
+      '',                              // 27 AB FinancierFollowUpDate
+      data.punchedInAccelerator ? true : false  // 28 AC PunchedInAccelerator
+    ];
+
+    sheet.appendRow(rowData);
+
+    return { success: true, message: 'Lead added successfully', leadId: leadId };
   } catch (error) {
-    Logger.log('Error in claimLead: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error claiming lead: ' + error.toString()
-    };
+    Logger.log('Error in addLead: ' + error.toString());
+    return { success: false, message: 'Error adding lead: ' + error.toString() };
   }
 }
 
 /**
- * Get lead details
+ * Claim a pool lead
+ */
+function claimLead(sessionId, leadId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'sales') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      if (data[i][8]) {
+        return { success: false, message: 'Lead already claimed by ' + data[i][8] };
+      }
+
+      var targetRow = i + 1;
+      var now = new Date();
+      var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+      var logEntry = ts + '||Claimed||Lead claimed from pool||' + user.name;
+      var existingLog = data[i][10] ? data[i][10] + '\n' + logEntry : logEntry;
+
+      sheet.getRange(targetRow, 8).setValue('New');
+      sheet.getRange(targetRow, 9).setValue(user.name);
+      sheet.getRange(targetRow, 11).setValue(existingLog);
+      sheet.getRange(targetRow, 12).setValue(now);
+      sheet.getRange(targetRow, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      return { success: true, message: 'Lead claimed successfully' };
+    }
+
+    return { success: false, message: 'Lead not found' };
+  } catch (error) {
+    Logger.log('Error in claimLead: ' + error.toString());
+    return { success: false, message: 'Error claiming lead: ' + error.toString() };
+  }
+}
+
+/**
+ * Get lead details with interaction history and quotations
  */
 function getLeadDetails(sessionId, leadId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      var row = data[i];
+      var assignedTo    = row[8];
+      var finAssigned   = String(row[20] || '');
+      var canView = user.role === 'admin' ||
+                    !assignedTo ||
+                    assignedTo === user.name ||
+                    (user.role === 'financier' && finAssigned === user.name);
+      if (!canView) return { success: false, message: 'Access denied' };
+
+      var lead = _crmRowToObj(row);
+      lead.interactions = _parseInteractions(row[10]);
+      lead.quotations = _getQuotationsForLead(leadId);
+
+      return { success: true, lead: lead };
     }
-    
-    const user = validation.user;
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    
-    // Find the lead
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      
-      if (row[0] === leadId) {
-        const assignedTo = row[8];
-        const status = row[7];
-        
-        // Check access (admin sees all, sales sees only their own or available)
-        if (user.role !== 'admin' && assignedTo && assignedTo !== user.name) {
-          return {
-            success: false,
-            message: 'Access denied'
-          };
-        }
-        
-        return {
-          success: true,
-          lead: {
-            leadId: row[0],
-            customerName: row[1],
-            mobileNo: row[2],
-            email: row[3],
-            address: row[4],
-            model: row[5],
-            source: row[6],
-            status: status,
-            assignedTo: assignedTo,
-            expectedDate: formatDate(row[9]),
-            notes: row[10],
-            lastContactDate: formatDate(row[11]),
-            followUpDate: formatDate(row[12]),
-            createdDate: formatDate(row[13]),
-            createdBy: row[14]
-          }
-        };
-      }
-    }
-    
-    return {
-      success: false,
-      message: 'Lead not found'
-    };
-    
+
+    return { success: false, message: 'Lead not found' };
   } catch (error) {
     Logger.log('Error in getLeadDetails: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error loading lead: ' + error.toString()
-    };
+    return { success: false, message: 'Error loading lead: ' + error.toString() };
   }
 }
 
 /**
- * Update lead
+ * Update lead fields
  */
 function updateLead(sessionId, leadId, data) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet = getSheet('CRM_Leads');
+    var sheetData = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < sheetData.length; i++) {
+      if (String(sheetData[i][0]) !== String(leadId)) continue;
+
+      var assignedTo        = sheetData[i][8];
+      var financierAssigned = String(sheetData[i][20] || '');
+      var canAccess = user.role === 'admin' ||
+                      assignedTo === user.name ||
+                      (user.role === 'financier' && financierAssigned === user.name);
+      if (!canAccess) return { success: false, message: 'Access denied' };
+
+      var targetRow = i + 1;
+      var now = new Date();
+
+      if (data.status !== undefined)            sheet.getRange(targetRow, 8).setValue(data.status);
+      if (data.assignedTo !== undefined)        sheet.getRange(targetRow, 9).setValue(data.assignedTo);
+      if (data.expectedDate !== undefined)      sheet.getRange(targetRow, 10).setValue(data.expectedDate);
+      if (data.followUpDate !== undefined)      sheet.getRange(targetRow, 13).setValue(data.followUpDate);
+      if (data.lostReason !== undefined)        sheet.getRange(targetRow, 17).setValue(data.lostReason);
+      if (data.financierAssigned !== undefined) sheet.getRange(targetRow, 21).setValue(data.financierAssigned);
+      if (data.punchedInAccelerator !== undefined) sheet.getRange(targetRow, 29).setValue(!!data.punchedInAccelerator);
+      sheet.getRange(targetRow, 12).setValue(now);
+      sheet.getRange(targetRow, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      return { success: true, message: 'Lead updated successfully' };
     }
-    
-    const user = validation.user;
-    const sheet = getSheet('CRM_Leads');
-    const sheetData = sheet.getDataRange().getValues();
-    
-    // Find the lead
-    for (let i = 1; i < sheetData.length; i++) {
-      const row = sheetData[i];
-      
-      if (row[0] === leadId) {
-        const assignedTo = row[8];
-        
-        // Check access
-        if (user.role !== 'admin' && assignedTo !== user.name) {
-          return {
-            success: false,
-            message: 'Access denied'
-          };
-        }
-        
-        const targetRow = i + 1;
-        
-        // Update fields
-        if (data.status) sheet.getRange(targetRow, 8).setValue(data.status);
-        if (data.expectedDate) sheet.getRange(targetRow, 10).setValue(data.expectedDate);
-        if (data.notes !== undefined) sheet.getRange(targetRow, 11).setValue(data.notes);
-        if (data.followUpDate) sheet.getRange(targetRow, 13).setValue(data.followUpDate);
-        
-        // Update last contact and updated date
-        sheet.getRange(targetRow, 12).setValue(new Date()); // Last Contact
-        sheet.getRange(targetRow, 16).setValue(new Date()); // Updated Date
-        
-        SpreadsheetApp.flush();
-        
-        return {
-          success: true,
-          message: 'Lead updated successfully'
-        };
-      }
-    }
-    
-    return {
-      success: false,
-      message: 'Lead not found'
-    };
-    
+
+    return { success: false, message: 'Lead not found' };
   } catch (error) {
     Logger.log('Error in updateLead: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error updating lead: ' + error.toString()
-    };
+    return { success: false, message: 'Error updating lead: ' + error.toString() };
   }
 }
 
 /**
- * Add note to lead (append to existing notes)
+ * Log a CRM interaction (structured log in col K, newest first)
+ */
+function logCRMInteraction(sessionId, leadId, interactionType, note, followUpDate) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      var assignedTo        = data[i][8];
+      var finAssigned       = String(data[i][20] || '');
+      var canLog = user.role === 'admin' ||
+                   assignedTo === user.name ||
+                   (user.role === 'financier' && finAssigned === user.name);
+      if (!canLog) return { success: false, message: 'Access denied' };
+
+      var targetRow = i + 1;
+      var now = new Date();
+      var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+      var entry = ts + '||' + interactionType + '||' + (note || '') + '||' + user.name;
+      var existingLog = data[i][10] ? entry + '\n' + data[i][10] : entry;
+
+      sheet.getRange(targetRow, 11).setValue(existingLog);
+      sheet.getRange(targetRow, 12).setValue(now);
+      // Financier follow-up → separate column (AB=28); sales follow-up → M=13
+      if (followUpDate) {
+        if (user.role === 'financier') {
+          sheet.getRange(targetRow, 28).setValue(followUpDate);  // AB: FinancierFollowUpDate
+        } else {
+          sheet.getRange(targetRow, 13).setValue(followUpDate);  // M: FollowUpDate
+        }
+      }
+
+      if (interactionType === 'Lost') {
+        sheet.getRange(targetRow, 8).setValue('Lost');
+        if (note) sheet.getRange(targetRow, 17).setValue(note);
+      }
+
+      sheet.getRange(targetRow, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      return { success: true, message: 'Interaction logged' };
+    }
+
+    return { success: false, message: 'Lead not found' };
+  } catch (error) {
+    Logger.log('Error in logCRMInteraction: ' + error.toString());
+    return { success: false, message: 'Error logging interaction: ' + error.toString() };
+  }
+}
+
+/**
+ * Get interactions for a lead
+ */
+function getCRMInteractions(sessionId, leadId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      var assignedTo = data[i][8];
+      if (user.role !== 'admin' && assignedTo && assignedTo !== user.name) {
+        return { success: false, message: 'Access denied' };
+      }
+
+      return { success: true, interactions: _parseInteractions(data[i][10]) };
+    }
+
+    return { success: false, message: 'Lead not found' };
+  } catch (error) {
+    Logger.log('Error in getCRMInteractions: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Add note to lead (wrapper for logCRMInteraction)
  */
 function addLeadNote(sessionId, leadId, note) {
+  return logCRMInteraction(sessionId, leadId, 'Note', note, null);
+}
+
+// ==========================================
+// FINANCIER FUNCTIONS
+// ==========================================
+
+/**
+ * Get all users with role='financier' (for dropdowns)
+ */
+function getFinancierUsers(sessionId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
-    }
-    
-    const user = validation.user;
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    
-    // Find the lead
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      
-      if (row[0] === leadId) {
-        const targetRow = i + 1;
-        const existingNotes = row[10] || '';
-        const timestamp = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
-        const newNote = timestamp + ' - ' + user.name + ': ' + note;
-        const updatedNotes = existingNotes ? existingNotes + '\n' + newNote : newNote;
-        
-        sheet.getRange(targetRow, 11).setValue(updatedNotes);
-        sheet.getRange(targetRow, 16).setValue(new Date());
-        
-        SpreadsheetApp.flush();
-        
-        return {
-          success: true,
-          message: 'Note added successfully'
-        };
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var userSheet = getSheet(CONFIG.SHEETS.USERS);
+    var userData  = userSheet.getDataRange().getValues();
+    var list = [];
+    for (var i = 1; i < userData.length; i++) {
+      if (userData[i][4] === 'financier' && userData[i][5] === true) {
+        list.push({ id: String(userData[i][0]), name: String(userData[i][3]), username: String(userData[i][1]) });
       }
     }
-    
-    return {
-      success: false,
-      message: 'Lead not found'
-    };
-    
-  } catch (error) {
-    Logger.log('Error in addLeadNote: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error adding note: ' + error.toString()
-    };
+    return { success: true, financiers: list };
+  } catch(e) {
+    Logger.log('getFinancierUsers: ' + e);
+    return { success: false, message: e.toString() };
   }
 }
 
 /**
- * Convert lead to sale (return lead data for pre-filling sales form)
+ * Get leads assigned to the current financier user (or all with a financier, for admin)
+ */
+function getFinancierLeads(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'financier' && user.role !== 'admin') {
+      return { success: false, message: 'Access denied' };
+    }
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+    var leads = [];
+    for (var i = 1; i < data.length; i++) {
+      var row          = data[i];
+      var finAssigned  = String(row[20] || '');
+      if (!finAssigned) continue;
+      if (user.role === 'financier' && finAssigned !== user.name) continue;
+      leads.push(_crmRowToObj(row));
+    }
+    return { success: true, leads: leads };
+  } catch(e) {
+    Logger.log('getFinancierLeads: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Dashboard data for the financier role
+ */
+function getFinancierDashboard(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'financier') return { success: false, message: 'Access denied' };
+
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+    var today = new Date(); today.setHours(0,0,0,0);
+    var weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
+    var now = new Date();
+    var thisMonth = now.getMonth(); var thisYear = now.getFullYear();
+
+    var totalEnquiry = 0, overdueCount = 0, todayCount = 0;
+    var underProcess = 0, disbursedThisMonth = 0;
+    var overdueLeads = [], todayLeads = [], weekLeads = [];
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (String(row[20] || '') !== user.name) continue;
+      totalEnquiry++;
+      var loanStatus = String(row[21] || '');
+      // Use financier's own follow-up date (col AB=27), not sales follow-up (col M=12)
+      var fuDate = row[27] ? new Date(row[27]) : null;
+      if (fuDate) fuDate.setHours(0,0,0,0);
+
+      if (loanStatus === 'Under Process' || loanStatus === 'Applied' || loanStatus === 'Approved') underProcess++;
+      if (loanStatus === 'Disbursed') {
+        var cd = row[13] ? new Date(row[13]) : null;
+        if (cd && cd.getMonth() === thisMonth && cd.getFullYear() === thisYear) disbursedThisMonth++;
+      }
+      if (fuDate && loanStatus !== 'Disbursed' && loanStatus !== 'Rejected' && loanStatus !== 'Not Interested') {
+        if (fuDate < today) { overdueCount++; overdueLeads.push(_crmRowToObj(row)); }
+        else if (fuDate.getTime() === today.getTime()) { todayCount++; todayLeads.push(_crmRowToObj(row)); }
+        else if (fuDate <= weekEnd) { weekLeads.push(_crmRowToObj(row)); }
+      }
+    }
+    return { success: true, dashboard: {
+      totalEnquiry: totalEnquiry, overdueCount: overdueCount, todayCount: todayCount,
+      underProcess: underProcess, disbursedThisMonth: disbursedThisMonth,
+      overdueLeads: overdueLeads, todayLeads: todayLeads, weekLeads: weekLeads
+    }};
+  } catch(e) {
+    Logger.log('getFinancierDashboard: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Update finance details for a lead.
+ * loanStatus='Disbursed' → auto-converts CRM lead to 'Converted'
+ */
+function updateFinanceDetails(sessionId, leadId, data) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet     = getSheet('CRM_Leads');
+    var sheetData = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < sheetData.length; i++) {
+      if (String(sheetData[i][0]) !== String(leadId)) continue;
+
+      var finAssigned = String(sheetData[i][20] || '');
+      var canEdit = user.role === 'admin' || (user.role === 'financier' && finAssigned === user.name);
+      if (!canEdit) return { success: false, message: 'Access denied' };
+
+      var r = i + 1;
+      var now = new Date();
+      if (data.loanStatus          !== undefined) sheet.getRange(r, 22).setValue(data.loanStatus);
+      if (data.financeScheme       !== undefined) sheet.getRange(r, 23).setValue(data.financeScheme);
+      if (data.downPayment         !== undefined) sheet.getRange(r, 24).setValue(Number(data.downPayment) || 0);
+      if (data.loanAmount          !== undefined) sheet.getRange(r, 25).setValue(Number(data.loanAmount)  || 0);
+      if (data.emi                 !== undefined) sheet.getRange(r, 26).setValue(Number(data.emi)         || 0);
+      if (data.tenure              !== undefined) sheet.getRange(r, 27).setValue(Number(data.tenure)      || 0);
+      if (data.financierFollowUpDate !== undefined && data.financierFollowUpDate)
+                                                   sheet.getRange(r, 28).setValue(data.financierFollowUpDate);
+
+      // Disbursed = auto-convert CRM lead
+      if (data.loanStatus === 'Disbursed') sheet.getRange(r, 8).setValue('Converted');
+
+      sheet.getRange(r, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      // Log the finance status change
+      if (data.loanStatus) {
+        var ts    = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+        var entry = ts + '||Finance: ' + data.loanStatus + '||' + (data.financeScheme || '') + '||' + user.name;
+        var existing = sheetData[i][10] ? entry + '\n' + sheetData[i][10] : entry;
+        sheet.getRange(r, 11).setValue(existing);
+        sheet.getRange(r, 12).setValue(now);
+      }
+      return { success: true, message: 'Finance details updated', autoConverted: data.loanStatus === 'Disbursed' };
+    }
+    return { success: false, message: 'Lead not found' };
+  } catch(e) {
+    Logger.log('updateFinanceDetails: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Analytics: per-financier performance + exec→financier referral matrix
+ * Admin sees all; financier sees own only.
+ */
+function getFinancierAnalytics(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'financier') {
+      return { success: false, message: 'Access denied' };
+    }
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+    var now   = new Date();
+    var thisMonth = now.getMonth(); var thisYear = now.getFullYear();
+
+    var finStats = {};    // { finName: { total, disbursed, disbursedMonth, applied, underProcess, approved, rejected } }
+    var execMatrix = {}; // { execName: { finName: count } }
+
+    for (var i = 1; i < data.length; i++) {
+      var row        = data[i];
+      var fin        = String(row[20] || '');
+      if (!fin) continue;
+      if (user.role === 'financier' && fin !== user.name) continue;
+
+      var loanSt  = String(row[21] || 'New');
+      var createdBy = String(row[14] || '');
+      var created   = row[13] ? new Date(row[13]) : null;
+
+      if (!finStats[fin]) finStats[fin] = { total:0, disbursed:0, disbursedMonth:0, applied:0, underProcess:0, approved:0, rejected:0 };
+      finStats[fin].total++;
+      if (loanSt === 'Disbursed') { finStats[fin].disbursed++; if (created && created.getMonth()===thisMonth && created.getFullYear()===thisYear) finStats[fin].disbursedMonth++; }
+      if (loanSt === 'Applied')       finStats[fin].applied++;
+      if (loanSt === 'Under Process') finStats[fin].underProcess++;
+      if (loanSt === 'Approved')      finStats[fin].approved++;
+      if (loanSt === 'Rejected')      finStats[fin].rejected++;
+
+      if (createdBy) {
+        if (!execMatrix[createdBy]) execMatrix[createdBy] = {};
+        execMatrix[createdBy][fin] = (execMatrix[createdBy][fin] || 0) + 1;
+      }
+    }
+
+    var financiers = Object.keys(finStats).map(function(n) {
+      var s = finStats[n];
+      return { financier:n, total:s.total, disbursed:s.disbursed, disbursedMonth:s.disbursedMonth,
+               applied:s.applied, underProcess:s.underProcess, approved:s.approved, rejected:s.rejected,
+               convRate: s.total > 0 ? Math.round(s.disbursed * 100 / s.total) : 0 };
+    });
+
+    var execReferrals = Object.keys(execMatrix).map(function(exec) {
+      return { executive: exec, referrals: execMatrix[exec] };
+    }).sort(function(a,b){ var ta=0,tb=0; Object.values(a.referrals).forEach(function(v){ta+=v;}); Object.values(b.referrals).forEach(function(v){tb+=v;}); return tb-ta; });
+
+    var myStats = (user.role === 'financier' && finStats[user.name]) ? finStats[user.name] : null;
+
+    return { success:true, financiers:financiers, execReferrals:execReferrals, myStats:myStats };
+  } catch(e) {
+    Logger.log('getFinancierAnalytics: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Convert lead to sale
  */
 function convertLeadToSale(sessionId, leadId) {
   try {
-    const validation = validateSession(sessionId);
-    if (!validation.success) {
-      return validation;
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      var assignedTo = data[i][8];
+      if (user.role !== 'admin' && assignedTo !== user.name) {
+        return { success: false, message: 'Access denied' };
+      }
+
+      var targetRow = i + 1;
+      var now = new Date();
+      var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+      var entry = ts + '||Converted||Lead converted to sale||' + user.name;
+      var existingLog = data[i][10] ? entry + '\n' + data[i][10] : entry;
+
+      sheet.getRange(targetRow, 8).setValue('Converted');
+      sheet.getRange(targetRow, 11).setValue(existingLog);
+      sheet.getRange(targetRow, 12).setValue(now);
+      sheet.getRange(targetRow, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      return {
+        success: true,
+        leadData: { customerName: data[i][1], mobileNo: data[i][2], model: data[i][5] }
+      };
     }
-    
-    const sheet = getSheet('CRM_Leads');
-    const data = sheet.getDataRange().getValues();
-    
-    // Find the lead
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      
-      if (row[0] === leadId) {
-        // Mark as converted
-        const targetRow = i + 1;
-        sheet.getRange(targetRow, 8).setValue('Converted');
-        sheet.getRange(targetRow, 16).setValue(new Date());
-        
-        SpreadsheetApp.flush();
-        
+
+    return { success: false, message: 'Lead not found' };
+  } catch (error) {
+    Logger.log('Error in convertLeadToSale: ' + error.toString());
+    return { success: false, message: 'Error converting lead: ' + error.toString() };
+  }
+}
+
+/**
+ * Assign lead to executive (admin only)
+ */
+function assignLead(sessionId, leadId, executiveName) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) !== String(leadId)) continue;
+
+      var targetRow = i + 1;
+      var now = new Date();
+      var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+      var entry = ts + '||Assigned||Assigned to ' + executiveName + '||' + validation.user.name;
+      var existingLog = data[i][10] ? entry + '\n' + data[i][10] : entry;
+
+      var currentStatus = data[i][7];
+      if (!currentStatus) sheet.getRange(targetRow, 8).setValue('New');
+      sheet.getRange(targetRow, 9).setValue(executiveName);
+      sheet.getRange(targetRow, 11).setValue(existingLog);
+      sheet.getRange(targetRow, 16).setValue(now);
+      SpreadsheetApp.flush();
+
+      return { success: true, message: 'Lead assigned to ' + executiveName };
+    }
+
+    return { success: false, message: 'Lead not found' };
+  } catch (error) {
+    Logger.log('Error in assignLead: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Get pipeline view — leads grouped by status
+ */
+function getCRMPipeline(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'sales') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var pipeline = { Pool: [], New: [], Contacted: [], Interested: [], Converted: [], Lost: [] };
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var status = row[7] || '';
+      var assignedTo = row[8];
+      var isPool = !assignedTo && _crmIsSocial(row[6]);
+
+      if (isPool) {
+        pipeline['Pool'].push(_crmRowToObj(row));
+        continue;
+      }
+
+      if (user.role !== 'admin' && assignedTo !== user.name) continue;
+
+      var bucket = pipeline[status];
+      if (bucket) bucket.push(_crmRowToObj(row));
+    }
+
+    return { success: true, pipeline: pipeline };
+  } catch (error) {
+    Logger.log('Error in getCRMPipeline: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * CRM Analytics (admin only)
+ */
+/**
+ * CRM Analytics — supports optional month filter (YYYY-MM) or 'all'
+ */
+function getCRMAnalytics(sessionId, monthFilter) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+
+    // Parse month filter: 'YYYY-MM' or 'all'
+    var filterYear = 0, filterMonth = -1;
+    if (monthFilter && monthFilter !== 'all') {
+      var parts = monthFilter.split('-');
+      filterYear  = parseInt(parts[0]) || 0;
+      filterMonth = parseInt(parts[1]) - 1 || -1; // 0-indexed
+    }
+
+    var bySource = {}, byExecutive = {}, lostReasons = {};
+    var totals = { total: 0, converted: 0, active: 0, lost: 0, pool: 0 };
+
+    for (var i = 1; i < data.length; i++) {
+      var row       = data[i];
+      var createdAt = row[13] ? new Date(row[13]) : null;
+
+      // Apply month filter on createdDate
+      if (filterYear > 0 && createdAt) {
+        if (createdAt.getFullYear() !== filterYear || createdAt.getMonth() !== filterMonth) continue;
+      } else if (filterYear > 0 && !createdAt) {
+        continue; // no date → skip when filtering
+      }
+
+      var source    = row[6] || 'Unknown';
+      var status    = row[7] || 'Pool';
+      var executive = row[8] || 'Unassigned';
+      var lostReason = row[16] || '';
+
+      // Totals
+      totals.total++;
+      if (status === 'Converted')  totals.converted++;
+      else if (status === 'Lost')  totals.lost++;
+      else if (!row[8])            totals.pool++;
+      else                         totals.active++;
+
+      if (!bySource[source]) bySource[source] = { total: 0, converted: 0, lost: 0, active: 0 };
+      bySource[source].total++;
+      if (status === 'Converted') bySource[source].converted++;
+      else if (status === 'Lost') bySource[source].lost++;
+      else bySource[source].active++;
+
+      if (executive !== 'Unassigned') {
+        if (!byExecutive[executive]) byExecutive[executive] = { total: 0, converted: 0, lost: 0, active: 0, overdue: 0 };
+        byExecutive[executive].total++;
+        if (status === 'Converted') byExecutive[executive].converted++;
+        else if (status === 'Lost') byExecutive[executive].lost++;
+        else {
+          byExecutive[executive].active++;
+          if (row[12] && _crmIsOverdue(row[12])) byExecutive[executive].overdue++;
+        }
+      }
+
+      if (status === 'Lost' && lostReason) {
+        lostReasons[lostReason] = (lostReasons[lostReason] || 0) + 1;
+      }
+    }
+
+    var sourceArr = Object.keys(bySource).map(function(s) {
+      var d = bySource[s];
+      return { source: s, total: d.total, converted: d.converted, lost: d.lost, active: d.active,
+               convRate: d.total > 0 ? Math.round(d.converted * 100 / d.total) : 0 };
+    }).sort(function(a,b){ return b.total - a.total; });
+
+    var execArr = Object.keys(byExecutive).map(function(e) {
+      var d = byExecutive[e];
+      return { executive: e, total: d.total, converted: d.converted, lost: d.lost, active: d.active,
+               overdue: d.overdue, convRate: d.total > 0 ? Math.round(d.converted * 100 / d.total) : 0 };
+    }).sort(function(a,b){ return b.total - a.total; });
+
+    var reasonArr = Object.keys(lostReasons).map(function(r) {
+      return { reason: r, count: lostReasons[r] };
+    }).sort(function(a, b) { return b.count - a.count; });
+
+    // Build month list from all data for dropdown (unique YYYY-MM)
+    var monthsSet = {};
+    for (var mi = 1; mi < data.length; mi++) {
+      var cd = data[mi][13] ? new Date(data[mi][13]) : null;
+      if (cd) {
+        var mk = cd.getFullYear() + '-' + String(cd.getMonth() + 1).padStart(2, '0');
+        monthsSet[mk] = true;
+      }
+    }
+    var availableMonths = Object.keys(monthsSet).sort().reverse();
+
+    return { success: true, analytics: {
+      totals: totals,
+      bySource: sourceArr, byExecutive: execArr, lostReasons: reasonArr,
+      availableMonths: availableMonths
+    }};
+  } catch (error) {
+    Logger.log('Error in getCRMAnalytics: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Find lead by mobile number
+ */
+function findLeadByMobile(sessionId, mobile) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var mob = String(mobile || '').trim();
+
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][2]).trim() === mob) {
         return {
           success: true,
-          leadData: {
-            customerName: row[1],
-            mobileNo: row[2],
-            model: row[5]
+          found: true,
+          lead: {
+            leadId:       data[i][0],
+            customerName: data[i][1],
+            mobileNo:     data[i][2],
+            email:        data[i][3] || '',
+            address:      data[i][4] || '',
+            model:        data[i][5] || '',
+            source:       data[i][6] || '',
+            status:       data[i][7] || 'Pool',
+            assignedTo:   data[i][8] || 'Pool'
           }
         };
       }
     }
-    
-    return {
-      success: false,
-      message: 'Lead not found'
-    };
-    
+
+    return { success: true, found: false };
   } catch (error) {
-    Logger.log('Error in convertLeadToSale: ' + error.toString());
-    return {
-      success: false,
-      message: 'Error converting lead: ' + error.toString()
+    Logger.log('Error in findLeadByMobile: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Get next quotation number for CRM
+ */
+function getNextQuotationNumber(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var qs = ss.getSheetByName('CRM_Quotations');
+    var num = 1;
+    if (qs) {
+      var lastRow = qs.getLastRow();
+      if (lastRow > 1) num = lastRow;
+    }
+    var quotNo = 'QT' + String(num).padStart(4, '0');
+    return { success: true, quotNo: quotNo };
+  } catch (error) {
+    Logger.log('Error in getNextQuotationNumber: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Save CRM quotation
+ */
+function saveCRMQuotation(sessionId, data) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var qs = ss.getSheetByName('CRM_Quotations');
+    if (!qs) {
+      qs = ss.insertSheet('CRM_Quotations');
+      qs.appendRow(['QuotNo','LeadID','CustomerName','Model','Variant','TotalAmount','CreatedDate','CreatedBy','QuotData']);
+    }
+
+    var now = new Date();
+    var quotData = data.quotData ? JSON.stringify(data.quotData) : '';
+    qs.appendRow([
+      data.quotNo || '',
+      data.leadId || '',
+      data.customerName || '',
+      data.model || '',
+      data.variant || '',
+      data.totalAmount || 0,
+      now,
+      user.name,
+      quotData
+    ]);
+
+    if (data.leadId) {
+      var sheet = getSheet('CRM_Leads');
+      var ldata = sheet.getDataRange().getValues();
+      for (var i = 1; i < ldata.length; i++) {
+        if (String(ldata[i][0]) !== String(data.leadId)) continue;
+        var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+        var entry = ts + '||Quotation||Quotation ' + data.quotNo + ' generated (₹' + (data.totalAmount || 0) + ')||' + user.name;
+        var existingLog = ldata[i][10] ? entry + '\n' + ldata[i][10] : entry;
+        sheet.getRange(i + 1, 11).setValue(existingLog);
+        sheet.getRange(i + 1, 16).setValue(now);
+        break;
+      }
+      SpreadsheetApp.flush();
+    }
+
+    return { success: true, message: 'Quotation saved', quotNo: data.quotNo };
+  } catch (error) {
+    Logger.log('Error in saveCRMQuotation: ' + error.toString());
+    return { success: false, message: 'Error saving quotation: ' + error.toString() };
+  }
+}
+
+/**
+ * Get quotations for a lead
+ */
+function getLeadQuotations(sessionId, leadId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    return { success: true, quotations: _getQuotationsForLead(leadId) };
+  } catch (error) {
+    Logger.log('Error in getLeadQuotations: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+/**
+ * Search CRM leads by name/mobile/model and quotations by quotNo
+ */
+function searchCRMLeads(sessionId, query) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'sales' && user.role !== 'financier') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet('CRM_Leads');
+    var data = sheet.getDataRange().getValues();
+    var q = String(query || '').toLowerCase().trim();
+    var leads = [];
+    var quotationMatches = [];
+
+    // Search leads by name/mobile/model
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      var assignedTo    = row[8];
+      var finAssigned   = String(row[20] || '');
+      // Financier sees only their assigned leads; sales see only their own
+      if (user.role === 'financier') {
+        if (finAssigned !== user.name) continue;
+      } else if (user.role !== 'admin') {
+        if (assignedTo && assignedTo !== user.name) continue;
+      }
+
+      if (String(row[1]).toLowerCase().indexOf(q) !== -1 ||
+          String(row[2]).toLowerCase().indexOf(q) !== -1 ||
+          String(row[5]).toLowerCase().indexOf(q) !== -1) {
+        leads.push({
+          leadId: row[0], customerName: row[1], mobileNo: row[2],
+          model: row[5], source: row[6], status: row[7], assignedTo: assignedTo
+        });
+      }
+    }
+
+    // Search quotations by quotNo (if query looks like QT or is 4 digits)
+    try {
+      var ss = SpreadsheetApp.getActiveSpreadsheet();
+      var qs = ss.getSheetByName('CRM_Quotations');
+      if (qs) {
+        var qData = qs.getDataRange().getValues();
+        for (var j = 1; j < qData.length; j++) {
+          var quotNo = String(qData[j][0] || '').toLowerCase();
+          if (quotNo.indexOf(q) !== -1) {
+            quotationMatches.push({
+              quotNo: qData[j][0],
+              leadId: qData[j][1],
+              customerName: qData[j][2],
+              model: qData[j][3],
+              totalAmount: qData[j][5],
+              createdDate: formatDate(qData[j][6])
+            });
+          }
+        }
+      }
+    } catch(qe) {}
+
+    return { success: true, leads: leads, quotationMatches: quotationMatches };
+  } catch (error) {
+    Logger.log('Error in searchCRMLeads: ' + error.toString());
+    return { success: false, message: 'Error: ' + error.toString() };
+  }
+}
+
+// ==========================================
+// WHATSAPP QUOTATION SENDER
+// ==========================================
+
+/**
+ * Upload PDF to Google Drive "CRM Quotations" folder and send via AiSensy.
+ * Config sheet must have rows: key=aisensy_api_key, key=aisensy_campaign_quotation
+ */
+function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo, modelVariant, execName, execMobile) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    // 1. Read API key and campaign name from Config sheet
+    const cfg      = _getMainConfig();
+    const apiKey   = cfg['aisensy_api_key'] || '';
+    const campaign = cfg['aisensy_campaign_quotation'] || '';
+    if (!apiKey)   return { success: false, message: 'AiSensy API key not set in Config sheet (row: aisensy_api_key)' };
+    if (!campaign) return { success: false, message: 'Campaign name not set in Config sheet (row: aisensy_campaign_quotation)' };
+
+    // 2. Decode PDF bytes
+    const pdfBytes = Utilities.base64Decode(pdfBase64);
+
+    // 2a. Save to Google Drive for records (ANYONE_WITH_LINK - just for archiving)
+    const folder    = _getOrCreateCRMQuotationsFolder();
+    const driveBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+    const driveFile = folder.createFile(driveBlob);
+    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const driveUrl  = 'https://drive.google.com/uc?export=download&id=' + driveFile.getId();
+
+    // 2b. Get a direct-download URL for the Drive file.
+    // uc?export=download can redirect through Google's virus-scan confirmation page
+    // → AiSensy fetches HTML instead of PDF → WhatsApp stores wrong MIME → mobile shows .bin
+    //
+    // Strategy: try three external hosts that serve files with Content-Type: application/pdf.
+    // Each logs its full response so we can diagnose which one is reachable from GAS servers.
+    // Falls back to Drive only if all three fail.
+    let fileUrl = driveUrl;
+    const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+
+    // ── Attempt 1: catbox.moe ──────────────────────────────────────────────
+    try {
+      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+      });
+      Logger.log('[catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+      const u = r.getContentText().trim();
+      if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
+    } catch(e) { Logger.log('[catbox] exception: ' + e); }
+
+    // ── Attempt 2: uguu.se (if catbox failed) ─────────────────────────────
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
+        }
+      } catch(e) { Logger.log('[uguu] exception: ' + e); }
+    }
+
+    // ── Attempt 3: tmpfiles.org (if uguu failed) ──────────────────────────
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[tmpfiles] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.status === 'success' && j.data && j.data.url) {
+            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+          }
+        }
+      } catch(e) { Logger.log('[tmpfiles] exception: ' + e); }
+    }
+
+    Logger.log('[whatsapp] final fileUrl: ' + fileUrl);
+
+    // 3. Build AiSensy payload
+    const digits  = String(customerPhone || '').replace(/\D/g, '');
+    const mobile10 = digits.length > 10 ? digits.slice(-10) : digits;
+    const destination = '91' + mobile10;
+
+    const payload = {
+      apiKey:         apiKey,
+      campaignName:   campaign,
+      destination:    destination,
+      userName:       'Vinay Automobiles',
+      // Template params (must match WhatsApp template placeholder order):
+      // 1=[customerName], 2=[model+variant], 3=[execMobile], 4=[execName]
+      templateParams: [
+        customerName          || '',
+        modelVariant          || '',
+        execMobile            || '',
+        execName              || ''
+      ],
+      media: {
+        url:      fileUrl,
+        filename: fileName
+      }
     };
+
+    // 4. Call AiSensy
+    const resp = UrlFetchApp.fetch('https://backend.aisensy.com/campaign/t1/api/v2', {
+      method:             'post',
+      contentType:        'application/json',
+      payload:            JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const code   = resp.getResponseCode();
+    const body   = resp.getContentText();
+    let parsed   = {};
+    try { parsed = JSON.parse(body); } catch(e) {}
+
+    if (code === 200 || code === 201 ||
+        (parsed && (parsed.status === 'success' || parsed.status === 'SUCCESS'))) {
+
+      // Log "WhatsApp Sent" interaction to CRM_Leads col K
+      if (quotNo) {
+        try {
+          var qs = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('CRM_Quotations');
+          if (qs) {
+            var qData = qs.getDataRange().getValues();
+            for (var qi = 1; qi < qData.length; qi++) {
+              if (String(qData[qi][0]) === String(quotNo)) {
+                var qLeadId = String(qData[qi][1] || '');
+                if (qLeadId) {
+                  logCRMInteraction(sessionId, qLeadId, 'WhatsApp Sent',
+                    'Quotation ' + quotNo + ' sent to ' + customerPhone, null);
+                }
+                break;
+              }
+            }
+          }
+        } catch(logErr) { Logger.log('WhatsApp log error: ' + logErr); }
+      }
+
+      return { success: true, destination: destination, fileUrl: fileUrl };
+    }
+    const errMsg = (parsed && (parsed.message || parsed.error)) || body || ('HTTP ' + code);
+    return { success: false, message: String(errMsg).slice(0, 300) };
+
+  } catch(e) {
+    Logger.log('sendQuotationWhatsApp error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Get brochures from CRM_Brochures sheet matching the given model name (prefix match).
+ * Sheet columns: A=BrochureName, B=DriveFileID
+ */
+function getBrochures(sessionId, modelName) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('CRM_Brochures');
+    if (!sheet) return { success: true, brochures: [] };
+
+    const rows = sheet.getDataRange().getValues();
+    const modelUpper = (modelName || '').toUpperCase().trim();
+    const brochures = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const name    = String(rows[i][0] || '').trim();
+      const driveId = String(rows[i][1] || '').trim();
+      if (!name || !driveId) continue;
+      if (!modelUpper || name.toUpperCase().startsWith(modelUpper)) {
+        brochures.push({ name: name, driveId: driveId });
+      }
+    }
+    return { success: true, brochures: brochures };
+  } catch(e) {
+    Logger.log('getBrochures error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Fetch brochure PDF from Drive by file ID, upload to temp host, send via AiSensy, log interaction.
+ * Config key required: aisensy_campaign_brochure
+ */
+function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, customerName, customerPhone, modelName) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+
+    const cfg      = _getMainConfig();
+    const apiKey   = cfg['aisensy_api_key']           || '';
+    const campaign = cfg['aisensy_campaign_brochure']  || '';
+    if (!apiKey)   return { success: false, message: 'AiSensy API key not set in Config sheet (key: aisensy_api_key)' };
+    if (!campaign) return { success: false, message: 'Brochure campaign name not set in Config sheet (key: aisensy_campaign_brochure)' };
+
+    // 1. Extract file ID — accept either a bare ID or a full Drive share URL
+    let fileId = (driveFileId || '').trim();
+    const idMatch = fileId.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch) fileId = idMatch[1];
+
+    // Fetch brochure bytes from Drive via REST API (avoids DriveApp scope issues)
+    const token     = ScriptApp.getOAuthToken();
+    const driveResp = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+    );
+    if (driveResp.getResponseCode() !== 200) {
+      return { success: false, message: 'Could not fetch brochure from Drive (HTTP ' + driveResp.getResponseCode() + '). Check the file ID and that the file exists.' };
+    }
+    const pdfBytes   = driveResp.getContent();
+    const fileName   = brochureName + '.pdf';
+    const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+
+    // 2. Try temp hosts for a direct-download URL (same chain as quotation)
+    const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+    let fileUrl = driveUrl;
+
+    try {
+      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+      });
+      Logger.log('[brochure/catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+      const u = r.getContentText().trim();
+      if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+    } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[brochure/uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+        }
+      } catch(e) { Logger.log('[brochure/uguu] exception: ' + e); }
+    }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[brochure/tmpfiles] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.status === 'success' && j.data && j.data.url)
+            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+        }
+      } catch(e) { Logger.log('[brochure/tmpfiles] exception: ' + e); }
+    }
+
+    Logger.log('[brochure] final fileUrl: ' + fileUrl);
+
+    // 3. Build AiSensy payload
+    const digits      = String(customerPhone || '').replace(/\D/g, '');
+    const mobile10    = digits.length > 10 ? digits.slice(-10) : digits;
+    const destination = '91' + mobile10;
+
+    const payload = {
+      apiKey:         apiKey,
+      campaignName:   campaign,
+      destination:    destination,
+      userName:       'Vinay Automobiles',
+      templateParams: [modelName || ''],
+      media: { url: fileUrl, filename: fileName }
+    };
+
+    // 4. Call AiSensy
+    const resp = UrlFetchApp.fetch('https://backend.aisensy.com/campaign/t1/api/v2', {
+      method: 'post', contentType: 'application/json',
+      payload: JSON.stringify(payload), muteHttpExceptions: true
+    });
+
+    const code   = resp.getResponseCode();
+    const body   = resp.getContentText();
+    let parsed   = {};
+    try { parsed = JSON.parse(body); } catch(e) {}
+
+    if (code === 200 || code === 201 ||
+        (parsed && (parsed.status === 'success' || parsed.status === 'SUCCESS'))) {
+
+      // 5. Log interaction
+      if (leadId) {
+        try {
+          logCRMInteraction(sessionId, leadId, 'Brochure Sent', brochureName + ' sent to ' + customerPhone, null);
+        } catch(logErr) { Logger.log('Brochure log error: ' + logErr); }
+      }
+      return { success: true, destination: destination, fileUrl: fileUrl };
+    }
+
+    const errMsg = (parsed && (parsed.message || parsed.error)) || body || ('HTTP ' + code);
+    return { success: false, message: String(errMsg).slice(0, 300) };
+
+  } catch(e) {
+    Logger.log('sendBrochureWhatsApp error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+function _uploadToFirebaseStorage(pdfBytes, fileName) {
+  // Try both bucket name formats (old: .appspot.com, new: .firebasestorage.app)
+  const buckets = [
+    'vinay-automobiles-fy24-25.appspot.com',
+    'vinay-automobiles-fy24-25.firebasestorage.app'
+  ];
+  const path    = 'crm-quotations/' + fileName;
+  const encoded = encodeURIComponent(path);
+  const token   = ScriptApp.getOAuthToken();
+
+  for (let i = 0; i < buckets.length; i++) {
+    const bucket = buckets[i];
+    const resp = UrlFetchApp.fetch(
+      'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o?uploadType=media&name=' + encoded,
+      {
+        method:             'POST',
+        headers:            { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/pdf' },
+        payload:            pdfBytes,
+        muteHttpExceptions: true
+      }
+    );
+
+    const code = resp.getResponseCode();
+    if (code === 200) {
+      const data = JSON.parse(resp.getContentText());
+      if (data.downloadTokens) {
+        return 'https://firebasestorage.googleapis.com/v0/b/' + bucket + '/o/' + encoded + '?alt=media&token=' + data.downloadTokens;
+      }
+    }
+    Logger.log('Bucket ' + bucket + ' failed (' + code + '): ' + resp.getContentText());
+  }
+
+  throw new Error('Firebase Storage upload failed on all buckets. Please enable Firebase Storage in the Firebase Console.');
+}
+
+function _getOrCreateCRMQuotationsFolder() {
+  // Structure: CRM Quotations / DD-MMM-YYYY (date-wise subfolders)
+  const parentName = 'CRM Quotations';
+  let parent;
+  const pf = DriveApp.getFoldersByName(parentName);
+  parent = pf.hasNext() ? pf.next() : DriveApp.createFolder(parentName);
+
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now      = new Date();
+  const dateName = String(now.getDate()).padStart(2,'0') + '-' + months[now.getMonth()] + '-' + now.getFullYear();
+
+  const sf = parent.getFoldersByName(dateName);
+  return sf.hasNext() ? sf.next() : parent.createFolder(dateName);
+}
+
+function _getMainConfig() {
+  try {
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = ss.getSheetByName('Config');
+    if (!sheet) return {};
+    const data = sheet.getDataRange().getValues();
+    if (data.length < 1) return {};
+    const cfg = {};
+
+    // Try header format: row 0 has 'key' and 'value' column labels
+    const headers = data[0].map(function(h) { return String(h || '').trim().toLowerCase(); });
+    const ki = headers.indexOf('key');
+    const vi = headers.indexOf('value');
+
+    if (ki !== -1 && vi !== -1) {
+      // Header format — data starts from row 1
+      for (let i = 1; i < data.length; i++) {
+        const k = String(data[i][ki] || '').trim();
+        const v = String(data[i][vi] || '').trim();
+        if (k) cfg[k] = v;
+      }
+    } else {
+      // Simple format — col A = key name, col B = value (all rows are data)
+      for (let i = 0; i < data.length; i++) {
+        const k = String(data[i][0] || '').trim();
+        const v = String(data[i][1] || '').trim();
+        if (k) cfg[k] = v;
+      }
+    }
+
+    return cfg;
+  } catch(e) {
+    return {};
   }
 }
 
@@ -2610,10 +3829,10 @@ function getSalesDashboard(sessionId, dateFilter) {
       matin: 0,
       tankCover: 0,
       handleHook: 0,
-      rainCover: 0, 
-      buzzer: 0, 
+      rainCover: 0,
+      buzzer: 0,
       backRest: 0,
-
+      extendedWarranty: 0,
     };
     
     // Count sales and accessories (skip header)
@@ -2654,6 +3873,7 @@ function getSalesDashboard(sessionId, dateFilter) {
           if (row[61] === 'Yes') myAccessories.rainCover++;
           if (row[62] === 'Yes') myAccessories.buzzer++;
           if (row[63] === 'Yes') myAccessories.backRest++;
+          if (row[64] === 'Yes') myAccessories.extendedWarranty++;
 
           // Pending tasks: only for retail sales (accountCheck=Yes)
           // Status stored as 'Yes' when done
@@ -2897,6 +4117,7 @@ function getAccountsDashboardView(sessionId, dateFilter) {
         if (row[61] === 'Yes') executiveAccessoryStats[executive]++;
         if (row[62] === 'Yes') executiveAccessoryStats[executive]++;
         if (row[63] === 'Yes') executiveAccessoryStats[executive]++;
+        if (row[64] === 'Yes') executiveAccessoryStats[executive]++;
 
         
       } else if (accountCheck === 'No') {
@@ -3115,10 +4336,12 @@ function getAdminDashboard(sessionId, dateFilter) {
     
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data = sheet.getDataRange().getValues();
-    
-    // Filter by date range
+
+    // Filter by booking date (col C) for general stats
     const filteredData = filterByDateRange(data, dateFilter, 2);
-    
+    // Filter by delivery date (col L) for Account Check: Yes sections
+    const deliveredData = filterByDateRange(data, dateFilter, 11);
+
     let totalBookings = filteredData.length - 1; // All rows (excluding header)
     let totalSales = 0;       // Only where Account Check = Yes
     let accountsYes = 0;
@@ -3148,19 +4371,19 @@ function getAdminDashboard(sessionId, dateFilter) {
       rainCover: 0,
       buzzer: 0,
       backRest: 0,
+      extendedWarranty: 0,
     };
 
     // Model breakdown (Account Check = Yes only)
     const modelCounts = {};
     const modelVariantCounts = {}; // "Model|||Variant" → count
 
-    // Process data (skip header)
+    // Loop 1: filter by booking date (col C) — general stats, accounts status, executive totals
     for (let i = 1; i < filteredData.length; i++) {
       const row = filteredData[i];
       const executive = row[1];
       const accountCheck = row[21];
       const accessoryFitted = row[36];
-      const model = row[5];
 
       // Accounts status
       if (accountCheck === 'Yes') {
@@ -3172,7 +4395,7 @@ function getAdminDashboard(sessionId, dateFilter) {
         accountsPending++;
       }
 
-      // Accessories status - consistent with accounts (explicit Yes/No/blank)
+      // Accessories fitted/pending/issues
       if (accessoryFitted === 'Yes') {
         accessoriesFitted++;
       } else if (accessoryFitted === 'No') {
@@ -3181,59 +4404,129 @@ function getAdminDashboard(sessionId, dateFilter) {
         accessoriesPending++;
       }
 
-      // Executive stats
+      // Executive total bookings (by booking date)
       if (!executiveStats[executive]) {
-        executiveStats[executive] = {
-          totalSales: 0,
-          completedSales: 0,
-          fullAccessories: 0
-        };
+        executiveStats[executive] = { totalSales: 0, completedSales: 0, fullAccessories: 0 };
       }
       executiveStats[executive].totalSales++;
-      if (accountCheck === 'Yes') {
-        executiveStats[executive].completedSales++;
-        // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
-        if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
-          executiveStats[executive].fullAccessories++;
-        }
+    }
+
+    // Loop 2: filter by delivery date (col L) — Account Check: Yes sections
+    // (By Executive completed, Full Accessories, Model-wise, Model+Variant, Accessories breakdown, Operator pending)
+    let deliveredTotal = 0;
+    const modelExecSales = {}; // model → { exec: count }
+    for (let i = 1; i < deliveredData.length; i++) {
+      const row = deliveredData[i];
+      if (row[21] !== 'Yes') continue; // only delivered/account-checked rows
+      const executive = row[1];
+      const model = row[5];
+      deliveredTotal++;
+
+      // Model-executive sales breakdown
+      if (model) {
+        if (!modelExecSales[model]) modelExecSales[model] = {};
+        modelExecSales[model][executive] = (modelExecSales[model][executive] || 0) + 1;
       }
 
-      // Count accessories, model, operator only when Account Check = Yes
-      if (accountCheck === 'Yes') {
-        if (row[12] === 'Yes') accessories.guard++;
-        if (row[13] === 'Yes') accessories.grip++;
-        if (row[14] === 'Yes') accessories.seatCover++;
-        if (row[15] === 'Yes') accessories.matin++;
-        if (row[16] === 'Yes') accessories.tankCover++;
-        if (row[17] === 'Yes') accessories.handleHook++;
-        if (row[18] === 'Yes') accessories.helmet++;
-        if (row[61] === 'Yes') accessories.rainCover++;
-        if (row[62] === 'Yes') accessories.buzzer++;
-        if (row[63] === 'Yes') accessories.backRest++;
-
-        // Model breakdown + variant tracking
-        if (model) {
-          modelCounts[model] = (modelCounts[model] || 0) + 1;
-          const variant = (row[6] || 'Unknown').toString().trim() || 'Unknown';
-          const mvKey = model + '|||' + variant;
-          if (!modelVariantCounts[mvKey]) modelVariantCounts[mvKey] = 0;
-          modelVariantCounts[mvKey]++;
-        }
-
-        // Operator pending for account-checked rows
-        if (row[42] !== 'Yes') dmsPending++;
-        if (row[45] !== 'Yes') insurancePending++;
-        if (row[48] !== 'Yes') vahanPending++;
+      // Executive completed sales + full accessories
+      if (!executiveStats[executive]) {
+        executiveStats[executive] = { totalSales: 0, completedSales: 0, fullAccessories: 0 };
       }
+      executiveStats[executive].completedSales++;
+      // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
+      if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
+        executiveStats[executive].fullAccessories++;
+      }
+
+      // Accessories breakdown
+      if (row[12] === 'Yes') accessories.guard++;
+      if (row[13] === 'Yes') accessories.grip++;
+      if (row[14] === 'Yes') accessories.seatCover++;
+      if (row[15] === 'Yes') accessories.matin++;
+      if (row[16] === 'Yes') accessories.tankCover++;
+      if (row[17] === 'Yes') accessories.handleHook++;
+      if (row[18] === 'Yes') accessories.helmet++;
+      if (row[61] === 'Yes') accessories.rainCover++;
+      if (row[62] === 'Yes') accessories.buzzer++;
+      if (row[63] === 'Yes') accessories.backRest++;
+      if (row[64] === 'Yes') accessories.extendedWarranty++;
+
+      // Model breakdown + variant tracking
+      if (model) {
+        modelCounts[model] = (modelCounts[model] || 0) + 1;
+        const variant = (row[6] || 'Unknown').toString().trim() || 'Unknown';
+        const mvKey = model + '|||' + variant;
+        if (!modelVariantCounts[mvKey]) modelVariantCounts[mvKey] = 0;
+        modelVariantCounts[mvKey]++;
+      }
+
+      // Operator pending
+      if (row[42] !== 'Yes') dmsPending++;
+      if (row[45] !== 'Yes') insurancePending++;
+      if (row[48] !== 'Yes') vahanPending++;
     }
 
     // Convert executive stats to sorted array (by completed sales)
-    const executiveList = Object.keys(executiveStats).map(exec => ({
-      executive: exec,
-      totalSales: executiveStats[exec].totalSales,
-      completedSales: executiveStats[exec].completedSales,
-      fullAccessories: executiveStats[exec].fullAccessories
-    })).sort((a, b) => b.completedSales - a.completedSales);
+    // Only include executives who have at least one delivery in the delivery-date filter period
+    const executiveList = Object.keys(executiveStats)
+      .filter(exec => executiveStats[exec].completedSales > 0)
+      .map(exec => ({
+        executive: exec,
+        totalSales: executiveStats[exec].totalSales,
+        completedSales: executiveStats[exec].completedSales,
+        fullAccessories: executiveStats[exec].fullAccessories
+      })).sort((a, b) => b.completedSales - a.completedSales);
+
+    // CRM_Leads pass: Walk-In enquiry per executive + model enquiry counts (all sources)
+    const crmLeadsSheet = getSheet('CRM_Leads');
+    const modelEnquiries = {}; // model → { total, byExec: { exec: count } }
+    if (crmLeadsSheet) {
+      const crmLeadsData = crmLeadsSheet.getDataRange().getValues();
+      const enquiryMap = {};
+      const todayForCrm = new Date(); todayForCrm.setHours(0, 0, 0, 0);
+      for (let i = 1; i < crmLeadsData.length; i++) {
+        const clr = crmLeadsData[i];
+        if (!clr[0]) continue;
+        const clDateRaw = clr[13];
+        if (!clDateRaw) continue;
+        const clDate = new Date(clDateRaw); clDate.setHours(0, 0, 0, 0);
+        let clInclude = false;
+        if (!dateFilter || dateFilter === 'all') {
+          clInclude = true;
+        } else if (dateFilter === 'week') {
+          const wa = new Date(todayForCrm); wa.setDate(wa.getDate() - 7);
+          clInclude = clDate >= wa && clDate <= todayForCrm;
+        } else if (dateFilter === 'month') {
+          const fd = new Date(todayForCrm.getFullYear(), todayForCrm.getMonth(), 1);
+          const ld = new Date(todayForCrm.getFullYear(), todayForCrm.getMonth() + 1, 0); ld.setHours(23,59,59,999);
+          clInclude = clDate >= fd && clDate <= ld;
+        } else if (dateFilter.indexOf('month:') === 0) {
+          const pts = dateFilter.substring(6).split('-');
+          const fd = new Date(parseInt(pts[0]), parseInt(pts[1]) - 1, 1);
+          const ld = new Date(parseInt(pts[0]), parseInt(pts[1]), 0); ld.setHours(23,59,59,999);
+          clInclude = clDate >= fd && clDate <= ld;
+        } else { clInclude = true; }
+        if (!clInclude) continue;
+
+        const clExec    = String(clr[8] || '').trim();
+        const clSource  = String(clr[6] || '').toLowerCase();
+        const clModel   = String(clr[5] || '').trim();
+
+        // Walk-in enquiry per executive
+        if (clSource === 'walk-in' && clExec) {
+          enquiryMap[clExec] = (enquiryMap[clExec] || 0) + 1;
+        }
+        // Model enquiry (all sources)
+        if (clModel) {
+          if (!modelEnquiries[clModel]) modelEnquiries[clModel] = { total: 0, byExec: {} };
+          modelEnquiries[clModel].total++;
+          if (clExec) {
+            modelEnquiries[clModel].byExec[clExec] = (modelEnquiries[clModel].byExec[clExec] || 0) + 1;
+          }
+        }
+      }
+      executiveList.forEach(function(e) { e.walkInEnquiry = enquiryMap[e.executive] || 0; });
+    }
 
     // Convert model counts to sorted array
     const modelBreakdown = Object.keys(modelCounts).map(function(m) {
@@ -3259,6 +4552,22 @@ function getAdminDashboard(sessionId, dateFilter) {
       };
     });
 
+    // Build model enquiry vs sales combined table
+    const allModelKeys = new Set([
+      ...Object.keys(modelEnquiries),
+      ...Object.keys(modelExecSales)
+    ]);
+    const modelEnquirySales = Array.from(allModelKeys).map(function(m) {
+      const enq        = modelEnquiries[m]  || { total: 0, byExec: {} };
+      const salesByExec = modelExecSales[m] || {};
+      const allExecs   = new Set([...Object.keys(enq.byExec), ...Object.keys(salesByExec)]);
+      const byExec     = Array.from(allExecs).map(function(exec) {
+        return { executive: exec, enquiries: enq.byExec[exec] || 0, sales: salesByExec[exec] || 0 };
+      }).sort(function(a, b) { return b.sales - a.sales || b.enquiries - a.enquiries; });
+      const totalSales = Object.values(salesByExec).reduce(function(s, n) { return s + n; }, 0);
+      return { model: m, enquiries: enq.total, sales: totalSales, byExec: byExec };
+    }).sort(function(a, b) { return b.sales - a.sales || b.enquiries - a.enquiries; });
+
     // Get CRM stats
     const crmSheet = getSheet('CRM_Leads');
     const crmData = crmSheet.getDataRange().getValues();
@@ -3280,7 +4589,7 @@ function getAdminDashboard(sessionId, dateFilter) {
       success: true,
       dashboard: {
         totalBookings: totalBookings,
-        totalSales: totalSales,
+        totalSales: deliveredTotal,
         accountsYes: accountsYes,
         accountsPending: accountsPending,
         accountsIssues: accountsIssues,
@@ -3288,7 +4597,7 @@ function getAdminDashboard(sessionId, dateFilter) {
         accessoriesPending: accessoriesPending,
         accessoriesIssues: accessoriesIssues,
         operatorStatus: {
-          total: totalSales,
+          total: deliveredTotal,
           dmsPending: dmsPending,
           vahanPending: vahanPending,
           insurancePending: insurancePending
@@ -3297,6 +4606,7 @@ function getAdminDashboard(sessionId, dateFilter) {
         accessories: accessories,
         modelBreakdown: modelBreakdown,
         modelVariantBreakdown: modelVariantBreakdown,
+        modelEnquirySales: modelEnquirySales,
         crmNewLeads: newLeads,
         crmHotLeads: hotLeads,
         crmConversionRate: conversionRate
@@ -3324,7 +4634,8 @@ function getDiscountAnalysis(sessionId, dateFilter) {
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const rawData = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+    // Use delivery date (col L = index 11) since discount analysis is for delivered/Account Check: Yes records
+    const filteredData = filterByDateRange(rawData, dateFilter, 11);
 
     let totalDiscount = 0;
     let dealsWithDiscount = 0;
@@ -3349,10 +4660,10 @@ function getDiscountAnalysis(sessionId, dateFilter) {
       const finalPrice = parseFloat(row[9]) || 0;
       const grossPrice = finalPrice + disc;
       let rowDateFmt = '', rowMonth = '';
-      if (row[2]) {
+      if (row[11]) {
         try {
-          rowDateFmt = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'dd-MMM-yyyy');
-          rowMonth   = Utilities.formatDate(new Date(row[2]), 'Asia/Kolkata', 'MMM yy');
+          rowDateFmt = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'dd-MMM-yyyy');
+          rowMonth   = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'MMM yy');
         } catch(e) {}
       }
 
@@ -3467,7 +4778,7 @@ function getFullAccessoriesDetail(sessionId, dateFilter) {
     if (!validation.success) return validation;
     const user = validation.user;
     let filterExecutive = null;
-    if (user.role === 'executive') {
+    if (user.role === 'executive' || user.role === 'sales') {
       filterExecutive = user.name;
     } else if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
@@ -3522,8 +4833,8 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
     if (!validation.success) return validation;
     const user = validation.user;
 
-    // Executive role: force to own name only
-    if (user.role === 'executive') {
+    // Executive / sales role: force to own name only
+    if (user.role === 'executive' || user.role === 'sales') {
       executiveName = user.name;
     } else if (user.role !== 'admin' && user.role !== 'accounts') {
       return { success: false, message: 'Access denied' };
@@ -3531,7 +4842,8 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const rawData = sheet.getDataRange().getValues();
-    const filteredData = filterByDateRange(rawData, dateFilter, 2);
+    // Filter by delivery date (col L = index 11) to match dashboard executive list
+    const filteredData = filterByDateRange(rawData, dateFilter, 11);
 
     const customers = [];
 
@@ -3547,7 +4859,9 @@ function getExecutiveSalesDetail(sessionId, executiveName, dateFilter) {
       if (row[11]) {
         try { dateStr = Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'dd-MMM-yyyy'); } catch(e) {}
       }
-      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant });
+      // Guard=row[12], Grip=row[13], SeatCover=row[14], Matin=row[15]
+      const fullAcc = (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') ? 'Y' : 'N';
+      customers.push({ date: dateStr, customerName: custName, model: model, variant: variant, fullAcc: fullAcc });
     }
 
     return { success: true, data: { executive: executiveName, customers: customers } };
@@ -3666,24 +4980,28 @@ function getStockInAnalysis(sessionId, dateFilter) {
     if (!sheet) return { success: false, message: 'InvTransactions sheet not found' };
 
     const allRows = sheet.getDataRange().getValues();
-    const rows    = filterByDateRange(allRows.slice(1), dateFilter, 1); // skip header, date=col1
+    // Pass full data (with header) — filterByDateRange always preserves data[0] as header,
+    // so passing allRows.slice(1) would cause the first real data row to be treated as header
+    // and always included regardless of date filter.
+    const filtered = filterByDateRange(allRows, dateFilter, 1); // date in col 1 (0-indexed)
 
     const skuTotals   = {}; // skuName -> total qty
     let   totalUnits  = 0;
     let   totalTxns   = 0;
 
-    rows.forEach(function(row) {
-      const type    = String(row[2] || '').trim().toUpperCase();
-      if (type !== 'STOCK_IN') return;
+    for (let i = 1; i < filtered.length; i++) { // i=1 to skip header row
+      const row  = filtered[i];
+      const type = String(row[2] || '').trim().toUpperCase();
+      if (type !== 'STOCK_IN') continue;
 
       const skuName = String(row[4] || '').trim() || 'Unknown';
       const qty     = Number(row[7]) || 0;
-      if (qty <= 0) return;
+      if (qty <= 0) continue;
 
       skuTotals[skuName] = (skuTotals[skuName] || 0) + qty;
       totalUnits += qty;
       totalTxns++;
-    });
+    }
 
     const items = Object.keys(skuTotals)
       .map(function(k) { return { skuName: k, qty: skuTotals[k] }; })
@@ -3731,10 +5049,10 @@ function getAccessoryBreakdown(sessionId, accessoryType, dateFilter) {
       'tankCover': 16,    // Column Q
       'handleHook': 17,   // Column R
       'helmet': 18,        // Column S
-      'raincover': 61, 
-      'buzzer': 62, 
+      'raincover': 61,
+      'buzzer': 62,
       'backrest': 63,
-
+      'extendedwarranty': 64,
     };
     
     const colIndex = accessoryColumns[accessoryType];
@@ -4518,9 +5836,10 @@ function getPriceMasterDetails(sessionId, model, variant) {
             tankCoverPrice: row[11] || null,
             handleHookPrice: row[12] || null,
             helmetPrice: row[13] || null,
-            rainCoverPrice: row[15] || null,   // ← MUST be here
-            buzzerPrice: row[16] || null,       // ← MUST be here
-            backRestPrice: row[17] || null      // ← MUST be here
+            rainCoverPrice: row[15] || null,
+            buzzerPrice: row[16] || null,
+            backRestPrice: row[17] || null,
+            extendedWarrantyPrice: row[18] || null,
           }
         };
       }
@@ -4650,6 +5969,10 @@ function calculatePrice(sessionId, receiptNo) {
         if (row[63] === 'Yes' && pm.backRestPrice) {
           const price = parseFloat(pm.backRestPrice); total += price;
           breakdown.accessories.push({ name: 'Back Rest', price });
+        }
+        if (row[64] === 'Yes' && pm.extendedWarrantyPrice) {
+          const price = parseFloat(pm.extendedWarrantyPrice); total += price;
+          breakdown.accessories.push({ name: 'Extended Warranty', price });
         }
 
         
@@ -4907,6 +6230,7 @@ function getViewRecordByRow(sessionId, row) {
         rainCover: rowData[61] || '',
         buzzer: rowData[62] || '',
         backRest: rowData[63] || '',
+        extendedWarranty: rowData[64] || '',
 
         
         // Operator/Status Information
@@ -5180,7 +6504,7 @@ function getAccessoryFilteredData(sessionId, month, status) {
               raincover: row[61] || '',
               buzzer: row[62] || '',
               backrest: row[63] || '',
-
+              extendedwarranty: row[64] || '',
             });
           }
         }
@@ -5352,7 +6676,7 @@ function getAccessoryRecordByRow(sessionId, row) {
         raincover: rowData[61] || '',
         buzzer: rowData[62] || '',
         backrest: rowData[63] || '',
-
+        extendedwarranty: rowData[64] || '',
       }
     };
     
@@ -5571,10 +6895,10 @@ function exportAccessoryToExcel(params) {
         record.accessoryCustomerRefused || '',
         record.accessoryReceipt1 || '',
         record.accessoryExtra || '',
-        record.raincover || '', 
-        record.buzzer || '', 
+        record.raincover || '',
+        record.buzzer || '',
         record.backrest || '',
-
+        record.extendedwarranty || '',
       ];
     });
     
@@ -5692,10 +7016,10 @@ function getMyAccessoryBreakdown(sessionId, accessoryType, dateFilter) {
       'tankcover': 16,
       'handlehook': 17,
       'helmet': 18,
-      'raincover': 61, 
-      'buzzer': 62, 
+      'raincover': 61,
+      'buzzer': 62,
       'backrest': 63,
-
+      'extendedwarranty': 64,
     };
     
     const colIndex = accessoryColumns[accessoryType];
@@ -5871,6 +7195,7 @@ function getExecutiveBreakdown(sessionId, executiveName, breakdownType, dateFilt
           if (row[61] === 'Yes') breakdownMap['Rain Cover'] = (breakdownMap['Rain Cover'] || 0) + 1;
           if (row[62] === 'Yes') breakdownMap['Buzzer'] = (breakdownMap['Buzzer'] || 0) + 1;
           if (row[63] === 'Yes') breakdownMap['Back Rest'] = (breakdownMap['Back Rest'] || 0) + 1;
+          if (row[64] === 'Yes') breakdownMap['Extended Warranty'] = (breakdownMap['Extended Warranty'] || 0) + 1;
 
         }
       }
@@ -6995,6 +8320,117 @@ function parseCSVLine(line) {
  * Get HSRP data for viewing
  * UPDATED: Format Invoice Date (date only), Order Date (date + time IST)
  */
+/**
+ * Looks up HSRP status for a single sales record.
+ * Matches by frameNo (primary); falls back to engineNo if provided.
+ * Returns: { success, status, orderDate, fitmentDate, found }
+ * Called by view.js → loadHSRPStatus()
+ */
+function getHSRPStatusForRecord(sessionId, engineNo, frameNo) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const sheet = getSheet('HSRP');
+    const data  = sheet.getDataRange().getValues();
+
+    const normFrame  = String(frameNo  || '').trim().toUpperCase();
+    const normEngine = String(engineNo || '').trim().toUpperCase();
+
+    Logger.log('HSRP lookup — frameNo: "' + normFrame + '" | engineNo: "' + normEngine + '" | HSRP rows: ' + (data.length - 1));
+
+    function fmtDate(v) {
+      if (!v) return '';
+      try {
+        if (typeof v === 'string') return v.split(' ')[0];
+        return Utilities.formatDate(new Date(v), 'Asia/Kolkata', 'dd-MMM-yyyy');
+      } catch(e) { return String(v).split(' ')[0]; }
+    }
+
+    function makeResult(row) {
+      return {
+        success:     true,
+        found:       true,
+        status:      row[3]  || '',    // col D = status
+        orderDate:   fmtDate(row[10]), // col K = orderDate
+        fitmentDate: fmtDate(row[11])  // col L = fitmentDate
+      };
+    }
+
+    let engineMatch = null;
+
+    for (let i = 1; i < data.length; i++) {
+      const row       = data[i];
+      const rowFrame  = String(row[6]  || '').trim().toUpperCase(); // col G = frameNo
+      const rowEngine = String(row[18] || '').trim().toUpperCase(); // col S = engineNo
+
+      // Frame number is the strongest match — return immediately
+      if (normFrame && rowFrame === normFrame) {
+        Logger.log('HSRP match by frameNo at row ' + (i + 1) + ' — status: ' + row[3]);
+        return makeResult(row);
+      }
+
+      // Keep engine number as a fallback (first match wins)
+      if (!engineMatch && normEngine && rowEngine === normEngine) {
+        engineMatch = row;
+      }
+    }
+
+    if (engineMatch) {
+      Logger.log('HSRP match by engineNo — status: ' + engineMatch[3]);
+      return makeResult(engineMatch);
+    }
+
+    Logger.log('HSRP: no match found for frameNo="' + normFrame + '" engineNo="' + normEngine + '"');
+    return { success: true, found: false, status: '' };
+  } catch(e) {
+    Logger.log('Error in getHSRPStatusForRecord: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+function getHSRPRefCustomers(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'operator' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+    const seen = {};
+    for (var i = 1; i < data.length; i++) {
+      var val = (data[i][8] || '').toString().trim();
+      if (val) seen[val] = true;
+    }
+    var refCustomers = Object.keys(seen).sort();
+    return { success: true, refCustomers: refCustomers };
+  } catch(e) {
+    Logger.log('getHSRPRefCustomers error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+function getHSRPHpCompanies(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    const user = validation.user;
+    if (user.role !== 'operator' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+    const sheet = getSheet('HSRP');
+    const data = sheet.getDataRange().getValues();
+    const seen = {};
+    for (var i = 1; i < data.length; i++) {
+      var val = (data[i][12] || '').toString().trim();
+      if (val) seen[val] = true;
+    }
+    var hpCompanies = Object.keys(seen).sort();
+    return { success: true, hpCompanies: hpCompanies };
+  } catch(e) {
+    Logger.log('getHSRPHpCompanies error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
 function getHSRPData(sessionId) {
   try {
     const validation = validateSession(sessionId);
@@ -7195,9 +8631,12 @@ function searchHSRPData(sessionId, searchBy, searchValue, dateFilter, customDate
         matches = row[5] && row[5].toString().toLowerCase().includes(searchValue.toLowerCase());
       } else if (searchBy === 'registrationNo') {
         matches = row[7] && row[7].toString().toLowerCase().includes(searchValue.toLowerCase());
-      } else if (searchBy === 'refCustomer') {  
-     // NEW: Search by Ref Customer (Column I, index 8)
-      matches = row[8] && row[8].toString().toLowerCase().includes(searchValue.toLowerCase());
+      } else if (searchBy === 'refCustomer') {
+        // Search by Ref Customer (Column I, index 8)
+        matches = row[8] && row[8].toString().toLowerCase().includes(searchValue.toLowerCase());
+      } else if (searchBy === 'hpCompany') {
+        // Search by HP Company (Column M, index 12)
+        matches = row[12] && row[12].toString().toLowerCase().includes(searchValue.toLowerCase());
     } else if (searchBy === 'orderDate') {
     // NEW: Search by Order Date (Column K, index 10)
     const orderDate = row[10];
@@ -8317,6 +9756,61 @@ function getFinancierReport(sessionId) {
 }
 
 /**
+ * Financier Commission Analysis — for admin dashboard.
+ * Reads Data sheet: accountCheck=Yes rows where financier is set (not Cash/blank).
+ * Aggregates per-financier: count, totalCommission (col BD=55), totalGrandTotal (col AI=34).
+ * Returns { success, data: [{ financier, count, totalCommission, totalGrandTotal, commissionPct }] }
+ */
+function getFinancierCommissionAnalysis(sessionId, dateFilter) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Admin only' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const rawData = sheet.getDataRange().getValues();
+    const filtered = filterByDateRange(rawData, dateFilter, 2); // Booking Date = col C (index 2)
+
+    const stats = {}; // financierName → { count, totalCommission, totalGrandTotal }
+
+    for (let i = 1; i < filtered.length; i++) {
+      const row = filtered[i];
+      if ((row[21] || '').toString().trim() !== 'Yes') continue; // Account Check = Yes only
+
+      const financier = (row[10] || '').toString().trim(); // col K = Financier Name
+      if (!financier) continue;
+      const fin_lower = financier.toLowerCase();
+      if (fin_lower === 'cash' || fin_lower === '-' || fin_lower === 'n/a') continue;
+
+      const commission = parseFloat(row[55]) || 0; // col BD (0-indexed 55) = Finance Commission
+      const grandTotal = parseFloat(row[34]) || 0; // col AI (0-indexed 34) = Grand Total
+
+      if (!stats[financier]) stats[financier] = { count: 0, totalCommission: 0, totalGrandTotal: 0 };
+      stats[financier].count++;
+      stats[financier].totalCommission += commission;
+      stats[financier].totalGrandTotal += grandTotal;
+    }
+
+    const data = Object.keys(stats).map(function(f) {
+      const s   = stats[f];
+      const pct = s.totalGrandTotal > 0 ? (s.totalCommission / s.totalGrandTotal) * 100 : 0;
+      return {
+        financier:       f,
+        count:           s.count,
+        totalCommission: s.totalCommission,
+        totalGrandTotal: s.totalGrandTotal,
+        commissionPct:   Math.round(pct * 100) / 100
+      };
+    }).sort(function(a, b) { return b.count - a.count; });
+
+    return { success: true, data: data };
+  } catch(e) {
+    Logger.log('getFinancierCommissionAnalysis error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
  * Disbursement Comparison Report — admin only, password protected
  * Joins Data sheet (col BI = frame, col AG = disbursed) with
  * HSRP sheet (col G = frame, col N = disbursal) by Frame Number.
@@ -8601,38 +10095,32 @@ function addFuelEntry(sessionId, data) {
     Logger.log('Liters: ' + data.liters);
     Logger.log('Cost: ' + data.cost);
     
-    // Validate inputs
-    if (!data.vehicleName || !data.newKm || !data.liters || !data.cost) {
-      return {
-        success: false,
-        message: 'All fields are required'
-      };
+    const isGenerator = data.vehicleName === 'Generator';
+
+    // Validate inputs — Generator doesn't need KM reading
+    if (!data.vehicleName || !data.liters || !data.cost) {
+      return { success: false, message: 'All fields are required' };
     }
-    
-    const newKm = parseFloat(data.newKm);
+    if (!isGenerator && !data.newKm) {
+      return { success: false, message: 'All fields are required' };
+    }
+
+    const newKm = isGenerator ? 0 : parseFloat(data.newKm);
     const liters = parseFloat(data.liters);
     const cost = parseFloat(data.cost);
-    
-    // Get last KM for this vehicle
-    const lastKmResult = getLastKmReading(sessionId, data.vehicleName);
-    if (!lastKmResult.success) {
-      return lastKmResult;
+
+    // KM / distance / mileage — skip for Generator
+    let previousKm = 0, distance = 0, mileage = 0;
+    if (!isGenerator) {
+      const lastKmResult = getLastKmReading(sessionId, data.vehicleName);
+      if (!lastKmResult.success) return lastKmResult;
+      previousKm = parseFloat(lastKmResult.lastKm) || 0;
+      distance = newKm - previousKm;
+      if (distance <= 0 && previousKm > 0) {
+        return { success: false, message: 'New KM (' + newKm + ') must be greater than Previous KM (' + previousKm + ')' };
+      }
+      mileage = distance > 0 ? (distance / liters).toFixed(2) : 0;
     }
-    
-    const previousKm = parseFloat(lastKmResult.lastKm) || 0;
-    
-    // Calculate distance
-    const distance = newKm - previousKm;
-    
-    if (distance <= 0 && previousKm > 0) {
-      return {
-        success: false,
-        message: 'New KM (' + newKm + ') must be greater than Previous KM (' + previousKm + ')'
-      };
-    }
-    
-    // Calculate mileage
-    const mileage = distance > 0 ? (distance / liters).toFixed(2) : 0;
     
     // Calculate rate per liter
     const ratePerLiter = (cost / liters).toFixed(2);
@@ -9394,9 +10882,10 @@ function getBookingForIssue(params, sessionId) {
   const COL_HANDLEHOOK  = 17;  // R - Handle Hook
   const COL_HELMET      = 18;  // S - Helmet
   const COL_ACCT_CHECK  = 21;  // V - Account Check (stored as 'Yes'/'No'/false)
-  const COL_RAINCOVER   = 61;  // BJ - Rain Cover
-  const COL_BUZZER      = 62;  // BK - Buzzer
-  const COL_BACKREST    = 63;  // BL - Back Rest
+  const COL_RAINCOVER      = 61;  // BJ - Rain Cover
+  const COL_BUZZER         = 62;  // BK - Buzzer
+  const COL_BACKREST       = 63;  // BL - Back Rest
+  const COL_EXT_WARRANTY   = 64;  // BM - Extended Warranty
 
   const sheet = getSheet(CONFIG.SHEETS.DATA);
   if (!sheet) return { success: false, message: 'Data sheet not found' };
@@ -9430,9 +10919,10 @@ function getBookingForIssue(params, sessionId) {
       tankcover:  String(row[COL_TANKCOVER]  || ''),
       handlehook: String(row[COL_HANDLEHOOK] || ''),
       helmet:     String(row[COL_HELMET]     || ''),
-      raincover:  String(row[COL_RAINCOVER]  || ''),
-      buzzer:     String(row[COL_BUZZER]     || ''),
-      backrest:   String(row[COL_BACKREST]   || '')
+      raincover:        String(row[COL_RAINCOVER]    || ''),
+      buzzer:           String(row[COL_BUZZER]       || ''),
+      backrest:         String(row[COL_BACKREST]     || ''),
+      extendedwarranty: String(row[COL_EXT_WARRANTY] || '')
     };
   }
 
@@ -10089,7 +11579,7 @@ function getMonthlySalaryReport(sessionId, month) {
     }).map(function(r) {
       return {
         recordId: r[0], type: r[1], month: fmtMonth_(r[2]), period: fmtMonth_(r[3]),
-        empCode: r[4], name: r[5],
+        empCode: String(r[4] || ''), name: String(r[5] || ''),
         paymentMode: r[7], gross: r[8]||0, presentDays: r[9]||0, netSalary: r[17]||0,
         netPay: r[22]||0, amount: r[23]||0,
         esic: r[18]||0, epf: r[19]||0, pt: r[20]||0, otherDeduction: r[21]||0,
@@ -10097,5 +11587,367 @@ function getMonthlySalaryReport(sessionId, month) {
       };
     });
     return { success: true, records: records };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+// ==========================================
+// DAILY ACTIVITY LOG FUNCTIONS
+// Schema: A=Date B=ExecutiveName C=Enquiries D=BookingsManual
+//         E=BookingsSystem F=Sales G=GoogleRatings H=TestRides
+//         I=SubmittedAt J=UpdatedAt K=ConfirmedBy L=ConfirmedAt
+// ==========================================
+
+function _ensureDailyActivitySheet() {
+  const sheet   = getSheet('Daily_Activity');
+  const headers = ['Date','ExecutiveName','Enquiries','BookingsManual','BookingsSystem',
+                   'Sales','GoogleRatings','TestRides','SubmittedAt','UpdatedAt',
+                   'ConfirmedBy','ConfirmedAt'];
+
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    sheet.getRange(1, 1, 1, headers.length)
+      .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    sheet.setFrozenRows(1);
+  } else {
+    const existHdrs = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    // Migration v1: add BookingsManual (if 9-col old schema)
+    if (existHdrs.indexOf('BookingsManual') === -1) {
+      sheet.insertColumnAfter(3);
+      sheet.getRange(1, 4).setValue('BookingsManual')
+        .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    }
+    // Migration v2: add ConfirmedBy + ConfirmedAt (if missing)
+    const fresh = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (fresh.indexOf('ConfirmedBy') === -1) {
+      const nextCol = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol).setValue('ConfirmedBy')
+        .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+      sheet.getRange(1, nextCol + 1).setValue('ConfirmedAt')
+        .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    }
+  }
+  return sheet;
+}
+
+function _getTodayBookingCount(executiveName) {
+  try {
+    const today = formatDate(new Date());
+    const data  = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
+    let count = 0;
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+      if (String(row[1] || '').trim() === executiveName && formatDate(row[2]) === today) count++;
+    }
+    return count;
+  } catch(e) { return 0; }
+}
+
+// Helper: read a row from Daily_Activity sheet into a structured object
+function _parseDailyRow(r) {
+  return {
+    date:           formatDate(r[0]),          // A
+    executiveName:  String(r[1] || '').trim(), // B
+    enquiries:      Number(r[2]) || 0,         // C
+    bookingsManual: Number(r[3]) || 0,         // D
+    bookingsSystem: Number(r[4]) || 0,         // E
+    sales:          Number(r[5]) || 0,         // F
+    googleRatings:  Number(r[6]) || 0,         // G
+    testRides:      Number(r[7]) || 0,         // H
+    // I=SubmittedAt J=UpdatedAt skipped (indices 8,9)
+    confirmedBy:    String(r[10] || ''),       // K
+    confirmedAt:    r[11] ? Utilities.formatDate(new Date(r[11]), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm') : ''  // L
+  };
+}
+
+/**
+ * Get today's activity entry for the current exec + live booking count.
+ */
+function getDailyActivity(sessionId) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    const user = v.user;
+    if (user.role !== 'sales' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const execName     = user.name;
+    const today        = formatDate(new Date());
+    const bookingsLive = _getTodayBookingCount(execName);
+
+    const sheet = _ensureDailyActivitySheet();
+    const rows  = sheet.getDataRange().getValues();
+    for (let i = 1; i < rows.length; i++) {
+      const parsed = _parseDailyRow(rows[i]);
+      if (parsed.date === today && parsed.executiveName === execName) {
+        return { success: true, entry: parsed, bookingsLive: bookingsLive };
+      }
+    }
+    return { success: true, entry: null, bookingsLive: bookingsLive };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Upsert today's activity entry for the current exec.
+ */
+function saveDailyActivity(sessionId, data) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    const user = v.user;
+    if (user.role !== 'sales' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const execName     = user.name;
+    const today        = formatDate(new Date());
+    const now          = new Date();
+    const bookingsLive = _getTodayBookingCount(execName);
+
+    const sheet = _ensureDailyActivitySheet();
+    const rows  = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < rows.length; i++) {
+      const parsed = _parseDailyRow(rows[i]);
+      if (parsed.date === today && parsed.executiveName === execName) {
+        // Cols C–H + UpdatedAt (cols 3–8 = 1-indexed 3–9, UpdatedAt = col 10)
+        sheet.getRange(i + 1, 3, 1, 8).setValues([[
+          Number(data.enquiries)     || 0,   // C Enquiries
+          Number(data.bookingsManual)|| 0,   // D BookingsManual
+          bookingsLive,                      // E BookingsSystem
+          Number(data.sales)         || 0,   // F Sales
+          Number(data.googleRatings) || 0,   // G GoogleRatings
+          Number(data.testRides)     || 0,   // H TestRides
+          rows[i][8] || now,                 // I SubmittedAt (keep original)
+          now                                // J UpdatedAt
+        ]]);
+        SpreadsheetApp.flush();
+        return { success: true, bookingsLive: bookingsLive };
+      }
+    }
+
+    // New row
+    sheet.appendRow([
+      today, execName,
+      Number(data.enquiries)     || 0,
+      Number(data.bookingsManual)|| 0,
+      bookingsLive,
+      Number(data.sales)         || 0,
+      Number(data.googleRatings) || 0,
+      Number(data.testRides)     || 0,
+      now, now
+    ]);
+    SpreadsheetApp.flush();
+    return { success: true, bookingsLive: bookingsLive };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Admin: update any exec's entry for any date (admin override).
+ */
+function adminUpdateDailyActivity(sessionId, date, executiveName, data) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const now   = new Date();
+    const sheet = _ensureDailyActivitySheet();
+    const rows  = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < rows.length; i++) {
+      const parsed = _parseDailyRow(rows[i]);
+      if (parsed.date === date && parsed.executiveName === executiveName) {
+        // Recalculate live bookings for the given date (may differ from today)
+        const bookingsLive = (date === formatDate(new Date()))
+          ? _getTodayBookingCount(executiveName)
+          : parsed.bookingsSystem; // keep historical value for past dates
+
+        sheet.getRange(i + 1, 3, 1, 8).setValues([[
+          Number(data.enquiries)     || 0,
+          Number(data.bookingsManual)|| 0,
+          bookingsLive,
+          Number(data.sales)         || 0,
+          Number(data.googleRatings) || 0,
+          Number(data.testRides)     || 0,
+          rows[i][8] || now,
+          now
+        ]]);
+        SpreadsheetApp.flush();
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'Entry not found for ' + date + ' / ' + executiveName };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Admin: daily activity report with CRM walk-in and booking comparison.
+ */
+function getDailyActivityReport(sessionId, dateFrom, dateTo) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const d    = new Date();
+    const from = dateFrom || formatDate(d);   // default: today
+    const to   = dateTo   || formatDate(d);
+
+    // ── Self-reported activity ────────────────────────────────────────────
+    const actSheet = _ensureDailyActivitySheet();
+    const actRows  = actSheet.getDataRange().getValues();
+    const actMap   = {};
+    for (let i = 1; i < actRows.length; i++) {
+      const parsed = _parseDailyRow(actRows[i]);
+      if (!parsed.date || !parsed.executiveName) continue;
+      if (parsed.date < from || parsed.date > to) continue;
+      actMap[parsed.date + '|' + parsed.executiveName] = parsed;
+    }
+
+    // ── CRM Walk-in counts (source=Walk-in case-insensitive, col 6; assignedTo col 8; createdDate col 13) ──
+    const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
+    const crmMap  = {};
+    for (let i = 1; i < crmRows.length; i++) {
+      const row = crmRows[i];
+      if (!row[0]) continue;
+      if ((String(row[6] || '')).toLowerCase() !== 'walk-in') continue;
+      const exec = String(row[8]  || '').trim();
+      const date = formatDate(row[13]);
+      if (!exec || !date || date < from || date > to) continue;
+      const key = date + '|' + exec;
+      crmMap[key] = (crmMap[key] || 0) + 1;
+    }
+
+    // ── Live booking counts from Data sheet (col C = booking date) ──────
+    // ── Live sales counts from Data sheet (col L = delivery date, col V = account check Yes) ──
+    const dataRows = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
+    const bookMap  = {};
+    const saleMap  = {};
+    for (let i = 1; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+      const exec = String(row[1] || '').trim();
+      if (!exec) continue;
+
+      // Bookings: col C (index 2) = booking date
+      const bookDate = formatDate(row[2]);
+      if (bookDate && bookDate >= from && bookDate <= to) {
+        const key = bookDate + '|' + exec;
+        bookMap[key] = (bookMap[key] || 0) + 1;
+      }
+
+      // Sales: col L (index 11) = delivery date, col V (index 21) = 'Yes'
+      const delDate = formatDate(row[11]);
+      if (delDate && delDate >= from && delDate <= to && String(row[21] || '') === 'Yes') {
+        const key = delDate + '|' + exec;
+        saleMap[key] = (saleMap[key] || 0) + 1;
+      }
+    }
+
+    // ── Merge: include rows from activity log AND CRM/Data maps ──────────
+    const allKeys = new Set([...Object.keys(actMap), ...Object.keys(crmMap), ...Object.keys(bookMap), ...Object.keys(saleMap)]);
+    const result  = [];
+    allKeys.forEach(function(key) {
+      const parts = key.split('|');
+      const date  = parts[0];
+      const exec  = parts.slice(1).join('|');
+      const act      = actMap[key] || { enquiries:0, bookingsManual:0, bookingsSystem:0, sales:0, googleRatings:0, testRides:0, confirmedBy:'', confirmedAt:'' };
+      const bookSys  = bookMap[key] || act.bookingsSystem || 0;
+      const saleSys  = saleMap[key] || 0;
+      const crmWI    = crmMap[key]  || 0;
+      result.push({
+        date:           date,
+        executiveName:  exec,
+        enquiries:      act.enquiries,
+        bookingsManual: act.bookingsManual,
+        bookingsSystem: bookSys,
+        bookingGap:     act.bookingsManual - bookSys,
+        salesManual:    act.sales,
+        salesSystem:    saleSys,
+        salesGap:       act.sales - saleSys,
+        googleRatings:  act.googleRatings,
+        testRides:      act.testRides,
+        crmWalkIns:     crmWI,
+        enquiryGap:     act.enquiries - crmWI,
+        hasActivity:    !!actMap[key],
+        confirmedBy:    act.confirmedBy || '',
+        confirmedAt:    act.confirmedAt || ''
+      });
+    });
+
+    result.sort(function(a, b) {
+      if (a.date !== b.date) return a.date > b.date ? -1 : 1;
+      return a.executiveName < b.executiveName ? -1 : 1;
+    });
+
+    return { success: true, data: result };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Admin: confirm/lock a daily activity row.
+ * Saves confirmedBy (admin name) and confirmedAt (timestamp) into cols K and L.
+ */
+function adminConfirmDailyActivity(sessionId, date, executiveName) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const now   = new Date();
+    const sheet = _ensureDailyActivitySheet();
+    const rows  = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < rows.length; i++) {
+      const parsed = _parseDailyRow(rows[i]);
+      if (parsed.date === date && parsed.executiveName === executiveName) {
+        sheet.getRange(i + 1, 11).setValue(v.user.name); // K: ConfirmedBy
+        sheet.getRange(i + 1, 12).setValue(now);          // L: ConfirmedAt
+        SpreadsheetApp.flush();
+        return {
+          success:     true,
+          confirmedBy: v.user.name,
+          confirmedAt: Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm')
+        };
+      }
+    }
+    return { success: false, message: 'Entry not found for ' + date + ' / ' + executiveName };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Sales exec: get today's system-computed booking and sales counts.
+ * Bookings : Data sheet, exec name, booking date (col C = index 2) = today, not cancelled.
+ * Sales    : Data sheet, exec name, delivery date (col L = index 11) = today,
+ *            AND account check (col V = index 21) = 'Yes'.
+ */
+function getSalesActivitySystemCounts(sessionId) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    const user = v.user;
+    if (user.role !== 'sales' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const today    = formatDate(new Date());
+    const execName = user.name;
+    const data     = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
+
+    let bookings = 0;
+    let sales    = 0;
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+      if (String(row[1] || '').trim() !== execName) continue;
+
+      // Booking: booking date (col C, index 2) = today
+      if (formatDate(row[2]) === today) bookings++;
+
+      // Sale: delivery date (col L, index 11) = today AND account check (col V, index 21) = 'Yes'
+      if (formatDate(row[11]) === today && String(row[21] || '') === 'Yes') sales++;
+    }
+
+    return { success: true, bookings: bookings, sales: sales };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
