@@ -644,6 +644,15 @@ function renderFullAccessoriesAnalysis(container, data) {
   container.innerHTML = html;
 }
 
+function toggleModelEnqRow(id, idx) {
+  var row = document.getElementById(id);
+  var arrow = document.getElementById('meq-arrow-' + idx);
+  if (!row) return;
+  var open = row.style.display !== 'none';
+  row.style.display = open ? 'none' : 'table-row';
+  if (arrow) arrow.textContent = open ? '▼' : '▲';
+}
+
 function toggleFullAccDetail(id, rowEl) {
   var detail = document.getElementById(id);
   var chevron = rowEl.querySelector('.fullAccChevron');
@@ -861,6 +870,63 @@ function renderAdminDashboard(data) {
           }).join('')}
         </div>
       `).join('')}
+    </div>
+    ` : ''}
+
+    <!-- Model Enquiry vs Sale Analysis -->
+    ${data.modelEnquirySales && data.modelEnquirySales.length > 0 ? `
+    <div class="section">
+      <div class="section-header">📊 Model Enquiry vs Sale</div>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead>
+          <tr style="background:#f0f4ff;color:#555;">
+            <th style="padding:8px 10px;text-align:left;font-weight:600;border-bottom:2px solid #e0e7ff;">Model</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Enquiries</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Sales</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Conversion</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;"></th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.modelEnquirySales.map((m, idx) => {
+            const conv = m.enquiries > 0 ? Math.round((m.sales / m.enquiries) * 100) : (m.sales > 0 ? 100 : 0);
+            const convColor = conv >= 50 ? '#22c55e' : conv >= 25 ? '#f59e0b' : '#ef4444';
+            const byExecRows = m.byExec.map(e => {
+              const ec = e.enquiries > 0 ? Math.round((e.sales / e.enquiries) * 100) : (e.sales > 0 ? 100 : 0);
+              return \`<tr style="background:#fafbff;">
+                <td style="padding:5px 10px 5px 26px;color:#667eea;font-size:12px;">↳ \${e.executive || '—'}</td>
+                <td style="padding:5px 10px;text-align:center;color:#555;font-size:12px;">\${e.enquiries}</td>
+                <td style="padding:5px 10px;text-align:center;color:#555;font-size:12px;">\${e.sales}</td>
+                <td style="padding:5px 10px;text-align:center;font-size:12px;font-weight:600;color:\${ec >= 50 ? '#22c55e' : ec >= 25 ? '#f59e0b' : '#ef4444'};">\${ec}%</td>
+                <td></td>
+              </tr>\`;
+            }).join('');
+            return \`<tr style="cursor:pointer;border-bottom:1px solid #eee;" onclick="toggleModelEnqRow('meq-\${idx}', \${idx})">
+              <td style="padding:8px 10px;font-weight:600;color:#333;">\${m.model}</td>
+              <td style="padding:8px 10px;text-align:center;color:#555;">\${m.enquiries}</td>
+              <td style="padding:8px 10px;text-align:center;font-weight:700;color:#667eea;">\${m.sales}</td>
+              <td style="padding:8px 10px;text-align:center;font-weight:700;color:\${convColor};">\${conv}%</td>
+              <td style="padding:8px 10px;text-align:center;color:#999;font-size:11px;" id="meq-arrow-\${idx}">▼</td>
+            </tr>
+            <tr id="meq-\${idx}" style="display:none;">
+              <td colspan="5" style="padding:0;">
+                <table style="width:100%;border-collapse:collapse;">
+                  <thead>
+                    <tr style="background:#f8f9ff;">
+                      <th style="padding:5px 10px 5px 26px;text-align:left;color:#888;font-weight:500;font-size:11px;">Executive</th>
+                      <th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Enquiries</th>
+                      <th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Sales</th>
+                      <th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Conv.</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>\${byExecRows}</tbody>
+                </table>
+              </td>
+            </tr>\`;
+          }).join('')}
+        </tbody>
+      </table>
     </div>
     ` : ''}
 
