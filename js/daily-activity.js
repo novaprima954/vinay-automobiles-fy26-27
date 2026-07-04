@@ -146,17 +146,21 @@ function buildReportRow(r, idx) {
         + '<br><span style="font-weight:400;color:#888">' + esc(r.confirmedAt) + '</span></div></td>'
     : '<td class="c"><button class="btn-row-confirm" onclick="confirmRow(' + idx + ')">✅ Confirm</button></td>';
 
+  const crmWiTitle  = detailTitle(r.crmWalkInDetail, 'model');
+  const bookSysTitle = detailTitle(r.bookingsSystemDetail, 'variant');
+  const saleSysTitle = detailTitle(r.salesSystemDetail, 'variant');
+
   return '<tr id="rpt-row-' + idx + '">'
     + '<td style="white-space:nowrap">' + fmtDate(r.date) + '</td>'
     + '<td><strong>' + esc(r.executiveName) + '</strong></td>'
     + '<td class="c">' + r.enquiries      + '</td>'
-    + '<td class="c">' + r.crmWalkIns     + '</td>'
+    + '<td class="c"' + (crmWiTitle ? ' title="' + crmWiTitle + '"' : '') + '>' + r.crmWalkIns     + '</td>'
     + '<td class="c gap ' + eGap.cls + '">' + eGap.txt + '</td>'
     + '<td class="c">' + r.bookingsManual + '</td>'
-    + '<td class="c">' + r.bookingsSystem + '</td>'
+    + '<td class="c"' + (bookSysTitle ? ' title="' + bookSysTitle + '"' : '') + '>' + r.bookingsSystem + '</td>'
     + '<td class="c gap ' + bGap.cls + '">' + bGap.txt + '</td>'
     + '<td class="c">' + r.salesManual    + '</td>'
-    + '<td class="c">' + r.salesSystem    + '</td>'
+    + '<td class="c"' + (saleSysTitle ? ' title="' + saleSysTitle + '"' : '') + '>' + r.salesSystem    + '</td>'
     + '<td class="c gap ' + sGap.cls + '">' + sGap.txt + '</td>'
     + '<td class="c">' + r.googleRatings  + '</td>'
     + '<td class="c">' + r.testRides      + '</td>'
@@ -255,6 +259,15 @@ function fmtDate(s) {
 
 function iso(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Builds a hover tooltip string listing customer name + model/variant for a detail array
+function detailTitle(list, variantField) {
+  if (!list || !list.length) return '';
+  return list.map(function(d) {
+    const extra = variantField === 'variant' ? [d.model, d.variant].filter(Boolean).join(' ') : d.model;
+    return d.customerName + (extra ? ' - ' + extra : '');
+  }).join('\n').replace(/"/g, '&quot;');
 }
 
 function esc(s) { return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
