@@ -11825,7 +11825,8 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
 
     // ── CRM Walk-in counts (source=Walk-in case-insensitive, col 6; assignedTo col 8; createdDate col 13) ──
     const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
-    const crmMap  = {};
+    const crmMap     = {};
+    const crmDetail  = {}; // key → [{customerName, model}]
     for (let i = 1; i < crmRows.length; i++) {
       const row = crmRows[i];
       if (!row[0]) continue;
@@ -11835,25 +11836,34 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
       if (!exec || !date || date < from || date > to) continue;
       const key = date + '|' + exec;
       crmMap[key] = (crmMap[key] || 0) + 1;
+      if (!crmDetail[key]) crmDetail[key] = [];
+      crmDetail[key].push({ customerName: String(row[1] || '').trim(), model: String(row[5] || '').trim() });
     }
 
     // ── Live booking counts from Data sheet (col C = booking date) ──────
     // ── Live sales counts from Data sheet (col L = delivery date, col V = account check Yes) ──
     const dataRows = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
-    const bookMap  = {};
-    const saleMap  = {};
+    const bookMap    = {};
+    const saleMap    = {};
+    const bookDetail = {}; // key → [{customerName, model, variant}]
+    const saleDetail = {};
     for (let i = 1; i < dataRows.length; i++) {
       const row = dataRows[i];
       if (!row[0]) continue;
       if (String(row[64] || '') === 'CANCELLED') continue;
       const exec = String(row[1] || '').trim();
       if (!exec) continue;
+      const custName = String(row[3] || '').trim();
+      const model    = String(row[5] || '').trim();
+      const variant  = String(row[6] || '').trim();
 
       // Bookings: col C (index 2) = booking date
       const bookDate = formatDate(row[2]);
       if (bookDate && bookDate >= from && bookDate <= to) {
         const key = bookDate + '|' + exec;
         bookMap[key] = (bookMap[key] || 0) + 1;
+        if (!bookDetail[key]) bookDetail[key] = [];
+        bookDetail[key].push({ customerName: custName, model: model, variant: variant });
       }
 
       // Sales: col L (index 11) = delivery date, col V (index 21) = 'Yes'
@@ -11861,6 +11871,8 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
       if (delDate && delDate >= from && delDate <= to && String(row[21] || '') === 'Yes') {
         const key = delDate + '|' + exec;
         saleMap[key] = (saleMap[key] || 0) + 1;
+        if (!saleDetail[key]) saleDetail[key] = [];
+        saleDetail[key].push({ customerName: custName, model: model, variant: variant });
       }
     }
 
@@ -11891,7 +11903,10 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
         enquiryGap:     act.enquiries - crmWI,
         hasActivity:    !!actMap[key],
         confirmedBy:    act.confirmedBy || '',
-        confirmedAt:    act.confirmedAt || ''
+        confirmedAt:    act.confirmedAt || '',
+        crmWalkInDetail:   crmDetail[key]  || [],
+        bookingsSystemDetail: bookDetail[key] || [],
+        salesSystemDetail:    saleDetail[key] || []
       });
     });
 
