@@ -89,6 +89,9 @@ function handleRequest(e) {
       case 'getRecordByReceiptNo':
         result = getRecordByReceiptNo(params.sessionId, params.receiptNo);
         break;
+      case 'getRecordsByReceiptNos':
+        result = getRecordsByReceiptNos(params.sessionId, params.receiptNos);
+        break;
       case 'updateAccountsRecord':
         result = updateAccountsRecord(params.sessionId, JSON.parse(params.data));
         break;
@@ -331,6 +334,7 @@ case 'getBookingForIssue': result = getBookingForIssue(params, params.sessionId)
 case 'invIssueToBooking':  result = invIssueToBooking(params, params.sessionId); break;
 case 'invOtcSale':         result = invOtcSale(params, params.sessionId); break;
 case 'invAdSale':          result = invAdSale(params, params.sessionId); break;
+case 'getADAccessoryStats': result = getADAccessoryStats(params, params.sessionId); break;
 case 'getIssuedItems':     result = getIssuedItems(params, params.sessionId); break;
 case 'invReturn':          result = invReturn(params, params.sessionId); break;
 case 'getInvTransactions': result = getInvTransactions(params, params.sessionId); break;
@@ -1380,6 +1384,106 @@ function getRecordByReceiptNo(sessionId, receiptNo) {
 }
 
 /**
+ * Bulk version of getRecordByReceiptNo — reads the Data sheet ONCE and returns
+ * full records for every receipt number requested, instead of one sheet-read
+ * per receipt (used by CSV export, which was previously making N sequential
+ * getRecordByReceiptNo calls).
+ */
+function getRecordsByReceiptNos(sessionId, receiptNosJson) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'accounts' && user.role !== 'sales') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    let receiptNos;
+    try {
+      receiptNos = JSON.parse(receiptNosJson);
+    } catch (e) {
+      return { success: false, message: 'Invalid receiptNos data' };
+    }
+    if (!receiptNos || !receiptNos.length) return { success: true, records: [] };
+
+    const wanted = new Set(receiptNos.map(function(r) { return String(r); }));
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data  = sheet.getDataRange().getValues();
+
+    function formatDateValue(dateValue) {
+      if (!dateValue) return '';
+      try {
+        if (typeof dateValue === 'string') return dateValue;
+        const d = new Date(dateValue);
+        if (isNaN(d.getTime())) return '';
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return year + '-' + month + '-' + day;
+      } catch (e) { return ''; }
+    }
+
+    const records = [];
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0] || !wanted.has(String(row[0]))) continue;
+
+      if (user.role === 'sales' && row[1] !== user.name) continue; // sales: own records only
+
+      records.push({
+        receiptNo: row[0],
+        executiveName: row[1],
+        bookingDate: formatDateValue(row[2]),
+        customerName: row[3],
+        mobileNo: row[4],
+        model: row[5],
+        variant: row[6],
+        colour: row[7],
+        discount: row[8],
+        finalPrice: row[9],
+        financierName: row[10],
+        deliveryDate: row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
+        guard: row[12] || '',
+        gripcover: row[13] || '',
+        seatcover: row[14] || '',
+        matin: row[15] || '',
+        tankcover: row[16] || '',
+        handlehook: row[17] || '',
+        helmet: String(row[18] || ''),
+        salesRemark: row[19],
+        accountantName: row[20],
+        accountCheck: row[21],
+        accountRemark: row[22],
+        receiptNo1: row[23],
+        receipt1Amount: row[24],
+        receiptNo2: row[25],
+        receipt2Amount: row[26],
+        receiptNo3: row[27],
+        receipt3Amount: row[28],
+        receiptNo4: row[29],
+        receipt4Amount: row[30],
+        doNumber: row[31],
+        disbursedAmount: row[32],
+        financeComm: row[55] || '',
+        engineNumber: row[59] || '',
+        frameNumber: row[60] || '',
+        raincover: row[61] || '',
+        buzzer: row[62] || '',
+        backrest: row[63] || '',
+        extendedwarranty: row[64] || '',
+      });
+    }
+
+    return { success: true, records: records };
+  } catch (error) {
+    Logger.log('Error in getRecordsByReceiptNos: ' + error.toString());
+    return { success: false, message: 'Error loading records: ' + error.toString() };
+  }
+}
+
+/**
  * Update accounts record
  * FIXED: Save finance commission to BD(56), preserve totals, preserve receipt1
  */
@@ -1458,7 +1562,12 @@ function updateAccountsRecord(sessionId, updateData) {
       sheet.getRange(targetRow, 8).setValue(updateData.colour);
       Logger.log('  Saved Colour: ' + updateData.colour);
     }
-    
+
+    if (updateData.deliveryDate !== undefined && updateData.deliveryDate !== '') {
+      sheet.getRange(targetRow, 12).setValue(updateData.deliveryDate); // L - Delivery Date
+      Logger.log('  Saved Delivery Date: ' + updateData.deliveryDate);
+    }
+
     // Editable fields
     if (updateData.discount !== undefined) {
       sheet.getRange(targetRow, 9).setValue(updateData.discount);
@@ -11013,12 +11122,29 @@ function invIssueToBooking(params, sessionId) {
     }
   } catch(e) {}
 
+  // Guard against duplicate issuance: skip any SKU already issued for this receipt
+  const txnSheet = getSheet('InvTransactions');
+  const txnData  = txnSheet.getDataRange().getValues();
+  const alreadyIssued = {}; // skuId → true
+  for (let i = 1; i < txnData.length; i++) {
+    if (String(txnData[i][2]) === 'ISSUE' && String(txnData[i][8]).trim() === String(receiptNo).trim()) {
+      alreadyIssued[String(txnData[i][3])] = true;
+    }
+  }
+
+  const skippedItems = [];
+
   // Process each item (each has its own skuId, qty, locationId)
   for (const item of items) {
     const q          = parseInt(item.qty) || 1;
     const skuId      = item.skuId;
     const locationId = item.locationId;
     if (!skuId || !locationId || !q) continue;
+
+    if (alreadyIssued[String(skuId)]) {
+      skippedItems.push(getSkuName(skuId));
+      continue; // already issued for this receipt — do not deduct again
+    }
 
     // Check and deduct stock
     const stockSheet = getSheet('InvStock');
@@ -11051,6 +11177,9 @@ function invIssueToBooking(params, sessionId) {
     );
   }
 
+  if (skippedItems.length > 0) {
+    return { success: true, message: 'Accessories issued successfully (already issued earlier, skipped: ' + skippedItems.join(', ') + ')' };
+  }
   return { success: true, message: 'Accessories issued successfully' };
 }
 
@@ -11114,6 +11243,55 @@ function invAdSale(params, sessionId) {
     }
     return { success: true };
   } catch(e) { return { success: false, message: e.message }; }
+}
+
+/**
+ * AD Accessories report — which AD (dealer) received which product, for a given month.
+ * Reads InvTransactions (Type = AD_SALE) once, groups by AD name (stored in
+ * CustomerName column) and SKU, sums quantity.
+ */
+function getADAccessoryStats(params, sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
+
+    const dateFilter = (params && params.dateFilter) || 'all';
+    let monthKey = null; // 'YYYY-MM'
+    if (dateFilter.indexOf('month:') === 0) monthKey = dateFilter.substring(6);
+
+    const sheet = getSheet('InvTransactions');
+    const data  = sheet.getDataRange().getValues();
+
+    const adMap = {}; // adName → { skuName: qty }
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (String(row[2]) !== 'AD_SALE') continue;
+
+      if (monthKey) {
+        const rowMonth = String(row[1] || '').substring(0, 7); // 'yyyy-MM-dd HH:mm' → 'yyyy-MM'
+        if (rowMonth !== monthKey) continue;
+      }
+
+      const adName  = String(row[9]  || '').trim(); // CustomerName column carries AD name for AD_SALE rows
+      const skuName = String(row[4]  || '').trim();
+      const qty     = parseInt(row[7]) || 0;
+      if (!adName) continue;
+
+      if (!adMap[adName]) adMap[adName] = {};
+      adMap[adName][skuName] = (adMap[adName][skuName] || 0) + qty;
+    }
+
+    const stats = Object.keys(adMap).sort().map(function(adName) {
+      const products = Object.keys(adMap[adName]).sort().map(function(skuName) {
+        return { skuName: skuName, qty: adMap[adName][skuName] };
+      });
+      return { adName: adName, products: products };
+    });
+
+    return { success: true, stats: stats };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
 }
 
 function getIssuedItems(params, sessionId) {
