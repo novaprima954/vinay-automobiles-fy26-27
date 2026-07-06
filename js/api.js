@@ -241,7 +241,14 @@ const API = {
   async getRecordByReceiptNo(sessionId, receiptNo) {
     return await this.call('getRecordByReceiptNo', { sessionId, receiptNo });
   },
-  
+
+  /**
+   * Get multiple full records by receipt numbers in a single sheet read (bulk export)
+   */
+  async getRecordsByReceiptNos(sessionId, receiptNos) {
+    return await this.call('getRecordsByReceiptNos', { sessionId, receiptNos: JSON.stringify(receiptNos) });
+  },
+
   /**
    * Update accounts record
    */

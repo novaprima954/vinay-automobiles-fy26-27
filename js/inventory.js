@@ -319,24 +319,38 @@ async function submitStockIn() {
     showMessage('Please fill Accessory, Location, and Quantity', 'error'); return;
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invStockIn', {
-    sessionId: invSessionId,
-    skuId, locationId, qty, date, remarks, invoiceNo
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('siSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Recording...';
+  }
 
-  if (res.success) {
-    showMessage('Stock recorded successfully', 'success');
-    await loadStock();
-    renderDashboard();
-    document.getElementById('siQty').value = '';
-    document.getElementById('siRemarks').value = '';
-    document.getElementById('siInvoiceNo').value = '';
-    document.getElementById('siSkuSearch').value = '';
-    document.getElementById('siSku').value = '';
-  } else {
-    showMessage(res.message || 'Failed to record stock', 'error');
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invStockIn', {
+      sessionId: invSessionId,
+      skuId, locationId, qty, date, remarks, invoiceNo
+    });
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('Stock recorded successfully', 'success');
+      await loadStock();
+      renderDashboard();
+      document.getElementById('siQty').value = '';
+      document.getElementById('siRemarks').value = '';
+      document.getElementById('siInvoiceNo').value = '';
+      document.getElementById('siSkuSearch').value = '';
+      document.getElementById('siSku').value = '';
+    } else {
+      showMessage(res.message || 'Failed to record stock', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '📥 Record Stock In';
+    }
   }
 }
 
@@ -1495,54 +1509,27 @@ function renderADAccessories(stats, monthVal) {
   let html = '';
   stats.forEach(function(ad) {
     html += `
-      <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:20px; overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
+      <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:16px; overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:14px 18px;">
           <span style="font-weight:700; font-size:15px;">🏪 ${escHtml(ad.adName)}</span>
-          <span style="font-size:13px; opacity:0.9;">${ad.totalVehicles} vehicle${ad.totalVehicles !== 1 ? 's' : ''} sold</span>
-        </div>`;
-
-    ad.models.forEach(function(m) {
-      html += `
-        <div style="padding:14px 18px; border-bottom:1px solid #f0f0f0;">
-          <div style="font-weight:700; font-size:13px; color:#333; margin-bottom:10px;">
-            🚗 ${escHtml(m.model)}
-            <span style="font-weight:400; color:#666; font-size:12px; margin-left:8px;">${m.vehiclesSold} sold</span>
-          </div>`;
-
-      if (m.accessories.length === 0) {
-        html += '<div style="color:#aaa; font-size:12px; padding-left:8px;">No accessories recorded</div>';
-      } else {
-        html += '<div style="overflow-x:auto;"><table style="width:100%; border-collapse:collapse; font-size:12px;">';
-        html += '<thead><tr style="background:#f8f9ff;">'
-          + '<th style="padding:7px 10px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Accessory</th>'
-          + '<th style="padding:7px 10px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Qty</th>'
-          + '<th style="padding:7px 10px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Attachment %</th>'
-          + '</tr></thead><tbody>';
-
-        m.accessories.forEach(function(acc) {
-          const pctDisplay = acc.pct !== null ? acc.pct + '%' : '—';
-          const pctColor = acc.pct === null ? '#aaa' : acc.pct >= 80 ? '#28a745' : acc.pct >= 50 ? '#fd7e14' : '#dc3545';
-          const barWidth = acc.pct !== null ? Math.min(acc.pct, 100) : 0;
-          html += `<tr style="border-bottom:1px solid #f5f5f5;">
-            <td style="padding:7px 10px; color:#333;">${escHtml(acc.name)}</td>
-            <td style="padding:7px 10px; text-align:center; font-weight:600;">${acc.qty}</td>
-            <td style="padding:7px 10px; text-align:center;">
-              <div style="display:flex; align-items:center; gap:8px; justify-content:center;">
-                <div style="width:60px; height:6px; background:#eee; border-radius:3px; overflow:hidden;">
-                  <div style="width:${barWidth}%; height:100%; background:${pctColor}; border-radius:3px;"></div>
-                </div>
-                <span style="font-weight:700; color:${pctColor}; min-width:36px;">${pctDisplay}</span>
-              </div>
-            </td>
-          </tr>`;
-        });
-
-        html += '</tbody></table></div>';
-      }
-      html += '</div>';
-    });
-
-    html += '</div>';
+        </div>
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:13px;">
+            <thead><tr style="background:#f8f9ff;">
+              <th style="padding:8px 14px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Product</th>
+              <th style="padding:8px 14px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Qty Received</th>
+            </tr></thead>
+            <tbody>
+              ${ad.products.map(function(p) {
+                return '<tr style="border-bottom:1px solid #f5f5f5;">'
+                  + '<td style="padding:8px 14px; color:#333;">' + escHtml(p.skuName) + '</td>'
+                  + '<td style="padding:8px 14px; text-align:center; font-weight:700; color:#667eea;">' + p.qty + '</td>'
+                  + '</tr>';
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>`;
   });
 
   content.innerHTML = html;

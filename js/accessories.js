@@ -455,7 +455,8 @@ function displayResults(results) {
     row.onclick = function() { loadRecordDetails(record.row); };
     
     const accessoryStatus = record.accessoryFitted === 'Yes' ? 'Complete' :
-                           record.accessoryFitted === 'No' ? 'Partially Complete' : 'Not Started';
+                           record.accessoryFitted === 'No' ? (record.accessoryPending ? 'Pending: ' + record.accessoryPending : 'Partially Complete') :
+                           'Not Started';
     
     row.insertCell(0).textContent = record.receiptNo || '';
     row.insertCell(1).textContent = record.customerName || '';

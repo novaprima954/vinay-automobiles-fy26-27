@@ -426,12 +426,12 @@ async function populateDetails(record) {
   document.getElementById('protectedModel').textContent = record.model || '-';
   document.getElementById('protectedVariant').textContent = record.variant || '-';
   document.getElementById('protectedColour').textContent = record.colour || '-';
-  document.getElementById('protectedDeliveryDate').textContent = record.deliveryDate || '-';
   document.getElementById('protectedSalesRemark').textContent = record.salesRemark || 'N/A';
 
-  // Editable engine/frame inputs (accounts can approve/correct these)
+  // Editable engine/frame/delivery-date inputs (accounts can approve/correct these)
   document.getElementById('editEngineNumber').value = record.engineNumber || '';
   document.getElementById('editFrameNumber').value  = record.frameNumber  || '';
+  document.getElementById('editDeliveryDate').value = record.deliveryDate || '';
   
   // Editable sales fields
   document.getElementById('discount').value = record.discount || '';
@@ -830,9 +830,10 @@ async function handleUpdate(e) {
     }
   }
   
-  // Attach engine/frame from the editable inputs
-  data.engineNumber = (document.getElementById('editEngineNumber').value || '').trim();
-  data.frameNumber  = (document.getElementById('editFrameNumber').value  || '').trim();
+  // Attach engine/frame/delivery-date from the editable inputs
+  data.engineNumber  = (document.getElementById('editEngineNumber').value  || '').trim();
+  data.frameNumber   = (document.getElementById('editFrameNumber').value   || '').trim();
+  data.deliveryDate  = (document.getElementById('editDeliveryDate').value  || '').trim();
 
   console.log('💾 Preparing account record update:');
   console.log('   Receipt No:', data.receiptNo);
@@ -853,6 +854,8 @@ function showApprovalModal() {
   const data = window._pendingSaveData || {};
   document.getElementById('modalEngineNumber').value = data.engineNumber || '';
   document.getElementById('modalFrameNumber').value  = data.frameNumber  || '';
+  const modalDelivery = document.getElementById('modalDeliveryDate');
+  if (modalDelivery) modalDelivery.value = data.deliveryDate || '';
   const modal = document.getElementById('approvalModal');
   modal.style.display = 'flex';
 }
@@ -873,14 +876,18 @@ async function confirmApprovalAndSave() {
   if (!data) return;
 
   // Read the (possibly edited) values from the modal
-  const approvedEngine = (document.getElementById('modalEngineNumber').value || '').trim();
-  const approvedFrame  = (document.getElementById('modalFrameNumber').value  || '').trim();
+  const approvedEngine   = (document.getElementById('modalEngineNumber').value || '').trim();
+  const approvedFrame    = (document.getElementById('modalFrameNumber').value  || '').trim();
+  const modalDeliveryEl  = document.getElementById('modalDeliveryDate');
+  const approvedDelivery = modalDeliveryEl ? (modalDeliveryEl.value || '').trim() : data.deliveryDate;
 
   // Write approved values back to the form inputs and to data
   document.getElementById('editEngineNumber').value = approvedEngine;
   document.getElementById('editFrameNumber').value  = approvedFrame;
-  data.engineNumber = approvedEngine;
-  data.frameNumber  = approvedFrame;
+  document.getElementById('editDeliveryDate').value = approvedDelivery;
+  data.engineNumber  = approvedEngine;
+  data.frameNumber   = approvedFrame;
+  data.deliveryDate  = approvedDelivery;
 
   // Close modal
   document.getElementById('approvalModal').style.display = 'none';
@@ -1314,21 +1321,13 @@ async function exportToExcel() {
   filename += '.csv';
   
   console.log('Exporting', window.lastSearchResults.length, 'search results');
-  
-  // Fetch full records for each result
-  const fullRecords = [];
-  for (let i = 0; i < window.lastSearchResults.length; i++) {
-    const receiptNo = window.lastSearchResults[i].receiptNo;
-    try {
-      const fullRecord = await API.getRecordByReceiptNo(sessionId, receiptNo);
-      if (fullRecord.success && fullRecord.record) {
-        fullRecords.push(fullRecord.record);
-      }
-    } catch (err) {
-      console.log('Could not get full record for:', receiptNo);
-    }
-  }
-  
+
+  // Fetch all full records in a single bulk call (one sheet read on the backend)
+  const receiptNos = window.lastSearchResults.map(function(r) { return r.receiptNo; });
+  showMessage('Preparing export…', 'info');
+  const bulk = await API.getRecordsByReceiptNos(sessionId, receiptNos);
+  const fullRecords = (bulk.success && bulk.records) ? bulk.records : [];
+
   if (fullRecords.length > 0) {
     exportResultsToCSV(fullRecords, filename);
   } else {
@@ -1350,20 +1349,11 @@ async function exportCardData(status) {
     const response = await API.getAccountsByStatus(sessionId, month, status);
     
     if (response.success && response.results) {
-      // Get full record data for each receipt
-      const fullRecords = [];
-      for (let i = 0; i < response.results.length; i++) {
-        const receiptNo = response.results[i].receiptNo;
-        try {
-          const fullRecord = await API.getRecordByReceiptNo(sessionId, receiptNo);
-          if (fullRecord.success && fullRecord.record) {
-            fullRecords.push(fullRecord.record);
-          }
-        } catch (err) {
-          console.log('Could not get full record for:', receiptNo);
-        }
-      }
-      
+      // Get full record data for all receipts in a single bulk call
+      const receiptNos = response.results.map(function(r) { return r.receiptNo; });
+      const bulk = await API.getRecordsByReceiptNos(sessionId, receiptNos);
+      const fullRecords = (bulk.success && bulk.records) ? bulk.records : [];
+
       if (fullRecords.length > 0) {
         const filename = 'Accounts_' + status.toUpperCase() + '_' + month + '.csv';
         exportResultsToCSV(fullRecords, filename);
