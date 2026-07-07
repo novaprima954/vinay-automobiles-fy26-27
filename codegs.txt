@@ -294,7 +294,7 @@ case 'saveFinancierData':      result = saveFinancierData(params, params.session
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'savePayout':             result = savePayout(params, params.sessionId);             break;
 case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
-case 'getFinancierReport':               result = getFinancierReport(params.sessionId, params.month);                            break;
+case 'getFinancierReport':               result = getFinancierReport(params.sessionId, params.months);                           break;
 case 'getFinancierCommissionAnalysis':   result = getFinancierCommissionAnalysis(params.sessionId, params.dateFilter);        break;
 case 'getDisbursementComparison':   result = getDisbursementComparison(params.sessionId, params.password);   break;
 case 'getVehicleMileageDashboard':
@@ -9839,14 +9839,18 @@ function getPayouts(params, sessionId) {
  * Financier Report: aggregate HSRP disbursal + payout by HP Company
  * Returns per-financier: count, totalDisbursed, totalPayout, percentage
  */
-function getFinancierReport(sessionId, month) {
+function getFinancierReport(sessionId, months) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
     const user = validation.user;
     if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
 
-    const monthFilter = (month || '').toString().trim(); // 'yyyy-MM', or '' / 'all' for all months
+    // months: comma-separated list of 'yyyy-MM', or '' / 'all' for no filter (all months)
+    const monthsStr = (months || '').toString().trim();
+    const monthSet = (monthsStr && monthsStr !== 'all')
+      ? new Set(monthsStr.split(',').map(function(m) { return m.trim(); }).filter(Boolean))
+      : null;
 
     // --- Aggregate from HSRP sheet (col C = Invoice Date, col M = HP Company, col N = Disbursal Amount) ---
     const hsrpSheet = getSheet('HSRP');
@@ -9857,12 +9861,12 @@ function getFinancierReport(sessionId, month) {
       const row = hsrpData[i];
       if (!row[1]) continue; // skip rows without invoice no
 
-      if (monthFilter && monthFilter !== 'all') {
+      if (monthSet) {
         const invoiceDate = row[2];
         if (!invoiceDate) continue;
         let rowMonth = '';
         try { rowMonth = Utilities.formatDate(new Date(invoiceDate), Session.getScriptTimeZone(), 'yyyy-MM'); } catch(e) { continue; }
-        if (rowMonth !== monthFilter) continue;
+        if (!monthSet.has(rowMonth)) continue;
       }
 
       const hp = String(row[12] || '').trim();
@@ -9887,14 +9891,14 @@ function getFinancierReport(sessionId, month) {
       if (!row[0]) continue;
       if (String(row[0]).toLowerCase() === 'payoutid') continue;
 
-      if (monthFilter && monthFilter !== 'all') {
+      if (monthSet) {
         let rowMonth = '';
         if (row[4] instanceof Date) {
           rowMonth = Utilities.formatDate(row[4], Session.getScriptTimeZone(), 'yyyy-MM');
         } else {
           rowMonth = String(row[4] || '').trim().substring(0, 7);
         }
-        if (rowMonth !== monthFilter) continue;
+        if (!monthSet.has(rowMonth)) continue;
       }
 
       const hp  = String(row[7] || '').trim(); // col H: HPCompany
