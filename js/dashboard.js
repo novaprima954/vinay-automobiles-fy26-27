@@ -882,6 +882,7 @@ function renderAdminDashboard(data) {
           <tr style="background:#f0f4ff;color:#555;">
             <th style="padding:8px 10px;text-align:left;font-weight:600;border-bottom:2px solid #e0e7ff;">Model</th>
             <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Enquiries</th>
+            <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Bookings</th>
             <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Sales</th>
             <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;">Conversion</th>
             <th style="padding:8px 10px;text-align:center;font-weight:600;border-bottom:2px solid #e0e7ff;"></th>
@@ -897,6 +898,7 @@ function renderAdminDashboard(data) {
               return '<tr style="background:#fafbff;">' +
                 '<td style="padding:5px 10px 5px 26px;color:#667eea;font-size:12px;">↳ ' + (e.executive || '—') + '</td>' +
                 '<td style="padding:5px 10px;text-align:center;color:#555;font-size:12px;">' + e.enquiries + '</td>' +
+                '<td style="padding:5px 10px;text-align:center;color:#555;font-size:12px;">' + e.bookings + '</td>' +
                 '<td style="padding:5px 10px;text-align:center;color:#555;font-size:12px;">' + e.sales + '</td>' +
                 '<td style="padding:5px 10px;text-align:center;font-size:12px;font-weight:600;color:' + ecColor + ';">' + ec + '%</td>' +
                 '<td></td></tr>';
@@ -904,16 +906,18 @@ function renderAdminDashboard(data) {
             return '<tr style="cursor:pointer;border-bottom:1px solid #eee;" onclick="toggleModelEnqRow(\'meq-' + idx + '\',' + idx + ')">' +
               '<td style="padding:8px 10px;font-weight:600;color:#333;">' + m.model + '</td>' +
               '<td style="padding:8px 10px;text-align:center;color:#555;">' + m.enquiries + '</td>' +
+              '<td style="padding:8px 10px;text-align:center;color:#555;">' + m.bookings + '</td>' +
               '<td style="padding:8px 10px;text-align:center;font-weight:700;color:#667eea;">' + m.sales + '</td>' +
               '<td style="padding:8px 10px;text-align:center;font-weight:700;color:' + convColor + ';">' + conv + '%</td>' +
               '<td style="padding:8px 10px;text-align:center;color:#999;font-size:11px;" id="meq-arrow-' + idx + '">▼</td>' +
               '</tr>' +
               '<tr id="meq-' + idx + '" style="display:none;">' +
-              '<td colspan="5" style="padding:0;">' +
+              '<td colspan="6" style="padding:0;">' +
               '<table style="width:100%;border-collapse:collapse;">' +
               '<thead><tr style="background:#f8f9ff;">' +
               '<th style="padding:5px 10px 5px 26px;text-align:left;color:#888;font-weight:500;font-size:11px;">Executive</th>' +
               '<th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Enquiries</th>' +
+              '<th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Bookings</th>' +
               '<th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Sales</th>' +
               '<th style="padding:5px 10px;text-align:center;color:#888;font-weight:500;font-size:11px;">Conv.</th>' +
               '<th></th></tr></thead>' +
