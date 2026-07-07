@@ -4488,12 +4488,21 @@ function getAdminDashboard(sessionId, dateFilter) {
     const modelCounts = {};
     const modelVariantCounts = {}; // "Model|||Variant" → count
 
+    // Model-executive booking breakdown (Loop 1, by booking date — used in Model Enquiry vs Sale)
+    const modelExecBookings = {}; // model → { exec: count }
+
     // Loop 1: filter by booking date (col C) — general stats, accounts status, executive totals
     for (let i = 1; i < filteredData.length; i++) {
       const row = filteredData[i];
       const executive = row[1];
+      const model = row[5];
       const accountCheck = row[21];
       const accessoryFitted = row[36];
+
+      if (model) {
+        if (!modelExecBookings[model]) modelExecBookings[model] = {};
+        modelExecBookings[model][executive] = (modelExecBookings[model][executive] || 0) + 1;
+      }
 
       // Accounts status
       if (accountCheck === 'Yes') {
@@ -4685,18 +4694,26 @@ function getAdminDashboard(sessionId, dateFilter) {
     // Build model enquiry vs sales combined table
     const allModelKeys = new Set([
       ...Object.keys(modelEnquiries),
-      ...Object.keys(modelExecSales)
+      ...Object.keys(modelExecSales),
+      ...Object.keys(modelExecBookings)
     ]);
     const modelEnquirySales = Array.from(allModelKeys).map(function(m) {
-      const enq        = modelEnquiries[m]  || { total: 0, byExec: {} };
-      const salesByExec = modelExecSales[m] || {};
-      const allExecs   = new Set([...Object.keys(enq.byExec), ...Object.keys(salesByExec)]);
-      const byExec     = Array.from(allExecs).map(function(exec) {
-        return { executive: exec, enquiries: enq.byExec[exec] || 0, sales: salesByExec[exec] || 0 };
-      }).sort(function(a, b) { return b.sales - a.sales || b.enquiries - a.enquiries; });
-      const totalSales = Object.values(salesByExec).reduce(function(s, n) { return s + n; }, 0);
-      return { model: m, enquiries: enq.total, sales: totalSales, byExec: byExec };
-    }).sort(function(a, b) { return b.sales - a.sales || b.enquiries - a.enquiries; });
+      const enq          = modelEnquiries[m]     || { total: 0, byExec: {} };
+      const salesByExec   = modelExecSales[m]    || {};
+      const bookingsByExec = modelExecBookings[m] || {};
+      const allExecs = new Set([...Object.keys(enq.byExec), ...Object.keys(salesByExec), ...Object.keys(bookingsByExec)]);
+      const byExec = Array.from(allExecs).map(function(exec) {
+        return {
+          executive: exec,
+          enquiries: enq.byExec[exec] || 0,
+          bookings:  bookingsByExec[exec] || 0,
+          sales:     salesByExec[exec] || 0
+        };
+      }).sort(function(a, b) { return b.sales - a.sales || b.bookings - a.bookings || b.enquiries - a.enquiries; });
+      const totalSales    = Object.values(salesByExec).reduce(function(s, n) { return s + n; }, 0);
+      const totalBookings = Object.values(bookingsByExec).reduce(function(s, n) { return s + n; }, 0);
+      return { model: m, enquiries: enq.total, bookings: totalBookings, sales: totalSales, byExec: byExec };
+    }).sort(function(a, b) { return b.sales - a.sales || b.bookings - a.bookings || b.enquiries - a.enquiries; });
 
     // Get CRM stats
     const crmSheet = getSheet('CRM_Leads');
