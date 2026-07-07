@@ -652,8 +652,16 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <h3 style="margin:0;color:#333;font-size:17px;font-weight:700;">&#127970; Financier Details</h3>
           <div style="display:flex;align-items:center;gap:8px;">
-            <input type="month" id="reportMonthFilter" onchange="loadFinancierReport()" style="padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
-            <button class="btn" onclick="clearReportMonthFilter()" style="font-size:13px;padding:8px 12px;background:#f0f0f0;color:#555;">All Months</button>
+            <div id="reportMonthMultiselect" style="position:relative;">
+              <button type="button" onclick="toggleReportMonthDropdown()" id="reportMonthToggleBtn"
+                style="padding:7px 12px;border:1px solid #ddd;border-radius:6px;font-size:13px;background:white;cursor:pointer;display:flex;align-items:center;gap:6px;color:#333;min-width:130px;justify-content:space-between;">
+                <span id="reportMonthToggleLabel">All Months</span>
+                <span style="font-size:10px;color:#999;">&#9660;</span>
+              </button>
+              <div id="reportMonthDropdownPanel" style="display:none;position:absolute;top:calc(100% + 4px);right:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);z-index:50;max-height:280px;overflow-y:auto;min-width:180px;padding:6px 0;">
+                <!-- populated by JS -->
+              </div>
+            </div>
             <button class="btn btn-primary" onclick="loadFinancierReport()" style="font-size:13px;padding:8px 16px;">&#8635; Refresh</button>
           </div>
         </div>

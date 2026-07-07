@@ -495,6 +495,78 @@ function onReportsTabOpen() {
   if (disbSection) disbSection.style.display = role === 'admin' ? 'block' : 'none';
 }
 
+// ── Month multiselect dropdown for Financier Details report ──────────────────
+
+let selectedReportMonths = []; // [] = All Months
+
+function _buildReportMonthOptions() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    months.push({ value: value, label: label });
+  }
+  return months;
+}
+
+function initReportMonthDropdown() {
+  const panel = document.getElementById('reportMonthDropdownPanel');
+  if (!panel || panel.dataset.built) return;
+  panel.dataset.built = '1';
+
+  const months = _buildReportMonthOptions();
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#333;border-bottom:1px solid #eee;margin-bottom:2px;">' +
+    '<input type="checkbox" id="reportMonthAll" checked onchange="onReportMonthAllChange()"> All Months</label>';
+  html += months.map(function(m) {
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#444;">' +
+      '<input type="checkbox" class="report-month-cb" value="' + m.value + '" onchange="onReportMonthCbChange()"> ' + m.label + '</label>';
+  }).join('');
+  panel.innerHTML = html;
+}
+
+function toggleReportMonthDropdown() {
+  initReportMonthDropdown();
+  const panel = document.getElementById('reportMonthDropdownPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const container = document.getElementById('reportMonthMultiselect');
+  const panel = document.getElementById('reportMonthDropdownPanel');
+  if (container && panel && panel.style.display === 'block' && !container.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+function onReportMonthAllChange() {
+  const allCb = document.getElementById('reportMonthAll');
+  if (allCb.checked) {
+    document.querySelectorAll('.report-month-cb').forEach(function(cb) { cb.checked = false; });
+  }
+  _applyReportMonthSelection();
+}
+
+function onReportMonthCbChange() {
+  const checked = Array.from(document.querySelectorAll('.report-month-cb')).filter(function(cb) { return cb.checked; });
+  document.getElementById('reportMonthAll').checked = checked.length === 0;
+  _applyReportMonthSelection();
+}
+
+function _applyReportMonthSelection() {
+  const checked = Array.from(document.querySelectorAll('.report-month-cb')).filter(function(cb) { return cb.checked; });
+  selectedReportMonths = checked.map(function(cb) { return cb.value; });
+
+  const labelEl = document.getElementById('reportMonthToggleLabel');
+  if (labelEl) {
+    labelEl.textContent = selectedReportMonths.length === 0 ? 'All Months' :
+      (selectedReportMonths.length === 1 ? checked[0].parentElement.textContent.trim() : selectedReportMonths.length + ' months selected');
+  }
+  loadFinancierReport();
+}
+
 async function loadFinancierReport() {
   const session = SessionManager.getSession();
   if (!session) { window.location.href = 'index.html'; return; }
@@ -504,9 +576,8 @@ async function loadFinancierReport() {
   document.getElementById('reportDetailPanel').style.display = 'none';
 
   try {
-    const monthEl = document.getElementById('reportMonthFilter');
-    const month = monthEl ? monthEl.value : '';
-    const res = await API.call('getFinancierReport', { sessionId: session.sessionId, month: month });
+    const months = selectedReportMonths.join(',');
+    const res = await API.call('getFinancierReport', { sessionId: session.sessionId, months: months });
     if (res.success) {
       reportData = res.report || [];
       renderReportList(reportData);
@@ -518,11 +589,6 @@ async function loadFinancierReport() {
   }
 }
 
-function clearReportMonthFilter() {
-  const monthEl = document.getElementById('reportMonthFilter');
-  if (monthEl) monthEl.value = '';
-  loadFinancierReport();
-}
 
 function renderReportList(data) {
   const listEl = document.getElementById('reportFinancierList');
