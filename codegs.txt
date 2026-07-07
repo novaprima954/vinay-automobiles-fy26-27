@@ -12148,29 +12148,46 @@ function getMonthlyEngagementReport(sessionId, month) {
       engagementByExec[parsed.executiveName].testRides     += parsed.testRides;
     }
 
+    // ── Enquiries per executive: CRM_Leads, Walk-in source, created date in month ──
+    const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
+    const enquiriesByExec = {};
+    for (let i = 1; i < crmRows.length; i++) {
+      const row = crmRows[i];
+      if (!row[0]) continue;
+      if ((String(row[6] || '')).toLowerCase() !== 'walk-in') continue;
+      const exec = String(row[8] || '').trim();
+      if (!exec) continue;
+      const createdDate = formatDate(row[13]);
+      if (!createdDate || createdDate.substring(0, 7) !== month) continue;
+      enquiriesByExec[exec] = (enquiriesByExec[exec] || 0) + 1;
+    }
+
     // ── Combine ──
-    const allExecs = new Set([...Object.keys(salesByExec), ...Object.keys(engagementByExec)]);
+    const allExecs = new Set([...Object.keys(salesByExec), ...Object.keys(engagementByExec), ...Object.keys(enquiriesByExec)]);
     const rows = Array.from(allExecs).map(function(exec) {
-      const sales = salesByExec[exec] || 0;
-      const eng   = engagementByExec[exec] || { googleReviews: 0, testRides: 0 };
+      const sales     = salesByExec[exec] || 0;
+      const enquiries = enquiriesByExec[exec] || 0;
+      const eng       = engagementByExec[exec] || { googleReviews: 0, testRides: 0 };
       return {
         executive:       exec,
         sales:            sales,
+        enquiries:        enquiries,
         googleReviews:    eng.googleReviews,
         testRides:        eng.testRides,
-        googlePercent:    sales > 0 ? Math.round((eng.googleReviews / sales) * 100) : 0,
-        testRidePercent:  sales > 0 ? Math.round((eng.testRides     / sales) * 100) : 0
+        googlePercent:    sales     > 0 ? Math.round((eng.googleReviews / sales)     * 100) : 0,
+        testRidePercent:  enquiries > 0 ? Math.round((eng.testRides     / enquiries) * 100) : 0
       };
     }).sort(function(a, b) { return b.sales - a.sales; });
 
     const totals = rows.reduce(function(acc, r) {
       acc.sales         += r.sales;
+      acc.enquiries     += r.enquiries;
       acc.googleReviews += r.googleReviews;
       acc.testRides     += r.testRides;
       return acc;
-    }, { sales: 0, googleReviews: 0, testRides: 0 });
-    totals.googlePercent   = totals.sales > 0 ? Math.round((totals.googleReviews / totals.sales) * 100) : 0;
-    totals.testRidePercent = totals.sales > 0 ? Math.round((totals.testRides     / totals.sales) * 100) : 0;
+    }, { sales: 0, enquiries: 0, googleReviews: 0, testRides: 0 });
+    totals.googlePercent   = totals.sales     > 0 ? Math.round((totals.googleReviews / totals.sales)     * 100) : 0;
+    totals.testRidePercent = totals.enquiries > 0 ? Math.round((totals.testRides     / totals.enquiries) * 100) : 0;
 
     return { success: true, rows: rows, totals: totals };
   } catch (e) {
