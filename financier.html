@@ -651,7 +651,11 @@
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:12px;">
           <h3 style="margin:0;color:#333;font-size:17px;font-weight:700;">&#127970; Financier Details</h3>
-          <button class="btn btn-primary" onclick="loadFinancierReport()" style="font-size:13px;padding:8px 16px;">&#8635; Refresh</button>
+          <div style="display:flex;align-items:center;gap:8px;">
+            <input type="month" id="reportMonthFilter" onchange="loadFinancierReport()" style="padding:7px 10px;border:1px solid #ddd;border-radius:6px;font-size:13px;">
+            <button class="btn" onclick="clearReportMonthFilter()" style="font-size:13px;padding:8px 12px;background:#f0f0f0;color:#555;">All Months</button>
+            <button class="btn btn-primary" onclick="loadFinancierReport()" style="font-size:13px;padding:8px 16px;">&#8635; Refresh</button>
+          </div>
         </div>
         <div id="reportFinancierList" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;">
           <div style="color:#999;font-size:13px;grid-column:1/-1;">Select the Reports tab to load data.</div>

@@ -504,7 +504,9 @@ async function loadFinancierReport() {
   document.getElementById('reportDetailPanel').style.display = 'none';
 
   try {
-    const res = await API.call('getFinancierReport', { sessionId: session.sessionId });
+    const monthEl = document.getElementById('reportMonthFilter');
+    const month = monthEl ? monthEl.value : '';
+    const res = await API.call('getFinancierReport', { sessionId: session.sessionId, month: month });
     if (res.success) {
       reportData = res.report || [];
       renderReportList(reportData);
@@ -514,6 +516,12 @@ async function loadFinancierReport() {
   } catch (err) {
     listEl.innerHTML = '<div style="color:#dc3545;font-size:13px;grid-column:1/-1;">Error: ' + err.message + '</div>';
   }
+}
+
+function clearReportMonthFilter() {
+  const monthEl = document.getElementById('reportMonthFilter');
+  if (monthEl) monthEl.value = '';
+  loadFinancierReport();
 }
 
 function renderReportList(data) {
@@ -567,11 +575,16 @@ function showReportDetail(idx) {
       refEl.innerHTML = '<span style="color:#999;font-size:13px;">No ref customer data</span>';
     } else {
       refEl.innerHTML = keys.map(function(k) {
+        const entry = breakdown[k];
+        const count = (entry && typeof entry === 'object') ? entry.count : entry;
+        const disbursed = (entry && typeof entry === 'object') ? entry.totalDisbursed : null;
         return '<div style="display:flex;justify-content:space-between;align-items:center;' +
           'padding:8px 14px;margin:4px 0;background:#f8f9fa;border-radius:8px;border-left:4px solid #667eea;">' +
           '<span style="font-size:13px;font-weight:600;color:#333;">' + k + '</span>' +
+          '<div style="display:flex;align-items:center;gap:8px;">' +
+          (disbursed != null ? '<span style="font-size:12px;font-weight:600;color:#166534;">' + formatCurrency(disbursed) + '</span>' : '') +
           '<span style="font-size:14px;font-weight:700;color:#667eea;background:#eef0fd;' +
-          'padding:2px 10px;border-radius:20px;">' + breakdown[k] + '</span></div>';
+          'padding:2px 10px;border-radius:20px;">' + count + '</span></div></div>';
       }).join('');
     }
   }
