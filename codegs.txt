@@ -294,7 +294,7 @@ case 'saveFinancierData':      result = saveFinancierData(params, params.session
 case 'batchSaveFinancierData': result = batchSaveFinancierData(params, params.sessionId); break;
 case 'savePayout':             result = savePayout(params, params.sessionId);             break;
 case 'getPayouts':             result = getPayouts(params, params.sessionId);             break;
-case 'getFinancierReport':               result = getFinancierReport(params.sessionId);                                          break;
+case 'getFinancierReport':               result = getFinancierReport(params.sessionId, params.month);                            break;
 case 'getFinancierCommissionAnalysis':   result = getFinancierCommissionAnalysis(params.sessionId, params.dateFilter);        break;
 case 'getDisbursementComparison':   result = getDisbursementComparison(params.sessionId, params.password);   break;
 case 'getVehicleMileageDashboard':
@@ -9767,6 +9767,10 @@ function savePayout(params, sessionId) {
       hpCompany     || ''
     ]);
 
+    // Force PayoutMonth cell to plain text so Sheets doesn't auto-convert "yyyy-MM" into a Date
+    const newRow = sheet.getLastRow();
+    sheet.getRange(newRow, 5).setNumberFormat('@').setValue(payoutMonth || '');
+
     return { success: true, message: 'Payout saved successfully' };
   } catch(e) { return { success: false, message: e.message }; }
 }
@@ -9793,9 +9797,17 @@ function getPayouts(params, sessionId) {
       // Skip header
       if (String(row[0]).toLowerCase() === 'payoutid') continue;
 
+      // PayoutMonth: sheet may hold a real Date (auto-parsed from a "yyyy-MM" string by
+      // Google Sheets) or a plain string — normalize to 'yyyy-MM' either way.
+      let payoutMonth = '';
+      if (row[4] instanceof Date) {
+        payoutMonth = Utilities.formatDate(row[4], Session.getScriptTimeZone(), 'yyyy-MM');
+      } else {
+        payoutMonth = String(row[4] || '').trim().substring(0, 7);
+      }
+
       // Month filter
-      const rowMonth = String(row[4] || '').trim();
-      if (month && !rowMonth.startsWith(month)) continue;
+      if (month && payoutMonth !== month) continue;
 
       // Format created date
       let createdDate = '';
@@ -9810,7 +9822,7 @@ function getPayouts(params, sessionId) {
         createdDate:   createdDate,
         invoiceAmount: row[2] !== '' && row[2] !== null && row[2] !== undefined ? row[2] : '',
         payoutAmount:  row[3] !== '' && row[3] !== null && row[3] !== undefined ? row[3] : '',
-        payoutMonth:   row[4] || '',
+        payoutMonth:   payoutMonth,
         notes:         row[5] || '',
         enteredBy:     row[6] || '',
         hpCompany:     row[7] || ''
@@ -9827,32 +9839,46 @@ function getPayouts(params, sessionId) {
  * Financier Report: aggregate HSRP disbursal + payout by HP Company
  * Returns per-financier: count, totalDisbursed, totalPayout, percentage
  */
-function getFinancierReport(sessionId) {
+function getFinancierReport(sessionId, month) {
   try {
     const validation = validateSession(sessionId);
     if (!validation.success) return { success: false, message: validation.message || 'Session expired' };
     const user = validation.user;
     if (user.role !== 'admin' && user.role !== 'accounts') return { success: false, message: 'Access denied' };
 
-    // --- Aggregate from HSRP sheet (col M = HP Company, col N = Disbursal Amount) ---
+    const monthFilter = (month || '').toString().trim(); // 'yyyy-MM', or '' / 'all' for all months
+
+    // --- Aggregate from HSRP sheet (col C = Invoice Date, col M = HP Company, col N = Disbursal Amount) ---
     const hsrpSheet = getSheet('HSRP');
     const hsrpData  = hsrpSheet.getDataRange().getValues();
-    const stats = {}; // { hpCompany: { count, totalDisbursed, totalPayout } }
+    const stats = {}; // { hpCompany: { count, totalDisbursed, totalPayout, refBreakdown: { refCust: { count, totalDisbursed } } } }
 
     for (let i = 1; i < hsrpData.length; i++) {
       const row = hsrpData[i];
       if (!row[1]) continue; // skip rows without invoice no
+
+      if (monthFilter && monthFilter !== 'all') {
+        const invoiceDate = row[2];
+        if (!invoiceDate) continue;
+        let rowMonth = '';
+        try { rowMonth = Utilities.formatDate(new Date(invoiceDate), Session.getScriptTimeZone(), 'yyyy-MM'); } catch(e) { continue; }
+        if (rowMonth !== monthFilter) continue;
+      }
+
       const hp = String(row[12] || '').trim();
       if (!hp) continue;
       if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0, refBreakdown: {} };
       stats[hp].count++;
       const disb = parseFloat(row[13]);
-      if (!isNaN(disb)) stats[hp].totalDisbursed += disb;
+      const disbVal = isNaN(disb) ? 0 : disb;
+      stats[hp].totalDisbursed += disbVal;
       const refCust = String(row[8] || '').trim() || 'Unknown'; // col I: Ref Customer
-      stats[hp].refBreakdown[refCust] = (stats[hp].refBreakdown[refCust] || 0) + 1;
+      if (!stats[hp].refBreakdown[refCust]) stats[hp].refBreakdown[refCust] = { count: 0, totalDisbursed: 0 };
+      stats[hp].refBreakdown[refCust].count++;
+      stats[hp].refBreakdown[refCust].totalDisbursed += disbVal;
     }
 
-    // --- Aggregate from financierpayout sheet (col H = HPCompany, col D = PayoutAmount) ---
+    // --- Aggregate from financierpayout sheet (col H = HPCompany, col D = PayoutAmount, col E = PayoutMonth) ---
     const paySheet = getSheet('financierpayout');
     const payData  = paySheet.getDataRange().getValues();
 
@@ -9860,9 +9886,20 @@ function getFinancierReport(sessionId) {
       const row = payData[i];
       if (!row[0]) continue;
       if (String(row[0]).toLowerCase() === 'payoutid') continue;
+
+      if (monthFilter && monthFilter !== 'all') {
+        let rowMonth = '';
+        if (row[4] instanceof Date) {
+          rowMonth = Utilities.formatDate(row[4], Session.getScriptTimeZone(), 'yyyy-MM');
+        } else {
+          rowMonth = String(row[4] || '').trim().substring(0, 7);
+        }
+        if (rowMonth !== monthFilter) continue;
+      }
+
       const hp  = String(row[7] || '').trim(); // col H: HPCompany
       if (!hp) continue;
-      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0 };
+      if (!stats[hp]) stats[hp] = { count: 0, totalDisbursed: 0, totalPayout: 0, refBreakdown: {} };
       const payout = parseFloat(row[3]); // col D: PayoutAmount
       if (!isNaN(payout)) stats[hp].totalPayout += payout;
     }
@@ -9871,13 +9908,20 @@ function getFinancierReport(sessionId) {
     const result = Object.keys(stats).sort().map(function(hp) {
       const s = stats[hp];
       const pct = s.totalDisbursed > 0 ? ((s.totalPayout / s.totalDisbursed) * 100).toFixed(1) : '0.0';
+      const refBreakdown = {};
+      Object.keys(s.refBreakdown).forEach(function(refCust) {
+        refBreakdown[refCust] = {
+          count:          s.refBreakdown[refCust].count,
+          totalDisbursed: s.refBreakdown[refCust].totalDisbursed
+        };
+      });
       return {
         hpCompany:      hp,
         count:          s.count,
         totalDisbursed: s.totalDisbursed,
         totalPayout:    s.totalPayout,
         percentage:     parseFloat(pct),
-        refBreakdown:   s.refBreakdown
+        refBreakdown:   refBreakdown
       };
     });
 
