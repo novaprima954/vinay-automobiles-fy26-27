@@ -344,6 +344,7 @@ case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);    
 case 'getDailyActivity':          result = getDailyActivity(params.sessionId);               break;
 case 'saveDailyActivity':         result = saveDailyActivity(params.sessionId, JSON.parse(params.data)); break;
 case 'getDailyActivityReport':    result = getDailyActivityReport(params.sessionId, params.dateFrom, params.dateTo); break;
+case 'getMonthlyEngagementReport': result = getMonthlyEngagementReport(params.sessionId, params.month); break;
 case 'adminUpdateDailyActivity':    result = adminUpdateDailyActivity(params.sessionId, params.date, params.executiveName, JSON.parse(params.data)); break;
 case 'adminConfirmDailyActivity':   result = adminConfirmDailyActivity(params.sessionId, params.date, params.executiveName); break;
 case 'getSalesActivitySystemCounts':result = getSalesActivitySystemCounts(params.sessionId); break;
@@ -12004,7 +12005,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
     // ── CRM Walk-in counts (source=Walk-in case-insensitive, col 6; assignedTo col 8; createdDate col 13) ──
     const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
     const crmMap     = {};
-    const crmDetail  = {}; // key → [{customerName, model}]
+    const crmDetail  = {}; // key → [{customerName, mobileNo, model}]
     for (let i = 1; i < crmRows.length; i++) {
       const row = crmRows[i];
       if (!row[0]) continue;
@@ -12015,7 +12016,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
       const key = date + '|' + exec;
       crmMap[key] = (crmMap[key] || 0) + 1;
       if (!crmDetail[key]) crmDetail[key] = [];
-      crmDetail[key].push({ customerName: String(row[1] || '').trim(), model: String(row[5] || '').trim() });
+      crmDetail[key].push({ customerName: String(row[1] || '').trim(), mobileNo: String(row[2] || '').trim(), model: String(row[5] || '').trim() });
     }
 
     // ── Live booking counts from Data sheet (col C = booking date) ──────
@@ -12023,7 +12024,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
     const dataRows = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
     const bookMap    = {};
     const saleMap    = {};
-    const bookDetail = {}; // key → [{customerName, model, variant}]
+    const bookDetail = {}; // key → [{customerName, mobileNo, model, variant, financierName}]
     const saleDetail = {};
     for (let i = 1; i < dataRows.length; i++) {
       const row = dataRows[i];
@@ -12031,9 +12032,11 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
       if (String(row[64] || '') === 'CANCELLED') continue;
       const exec = String(row[1] || '').trim();
       if (!exec) continue;
-      const custName = String(row[3] || '').trim();
-      const model    = String(row[5] || '').trim();
-      const variant  = String(row[6] || '').trim();
+      const custName     = String(row[3]  || '').trim();
+      const mobileNo     = String(row[4]  || '').trim();
+      const model        = String(row[5]  || '').trim();
+      const variant      = String(row[6]  || '').trim();
+      const financierName = String(row[10] || '').trim();
 
       // Bookings: col C (index 2) = booking date
       const bookDate = formatDate(row[2]);
@@ -12041,7 +12044,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
         const key = bookDate + '|' + exec;
         bookMap[key] = (bookMap[key] || 0) + 1;
         if (!bookDetail[key]) bookDetail[key] = [];
-        bookDetail[key].push({ customerName: custName, model: model, variant: variant });
+        bookDetail[key].push({ customerName: custName, mobileNo: mobileNo, model: model, variant: variant, financierName: financierName });
       }
 
       // Sales: col L (index 11) = delivery date, col V (index 21) = 'Yes'
@@ -12050,7 +12053,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
         const key = delDate + '|' + exec;
         saleMap[key] = (saleMap[key] || 0) + 1;
         if (!saleDetail[key]) saleDetail[key] = [];
-        saleDetail[key].push({ customerName: custName, model: model, variant: variant });
+        saleDetail[key].push({ customerName: custName, mobileNo: mobileNo, model: model, variant: variant, financierName: financierName });
       }
     }
 
@@ -12095,6 +12098,84 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
 
     return { success: true, data: result };
   } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Admin: monthly engagement report — total sales (delivery date in month,
+ * account check Yes) vs. total Google reviews and test rides logged that
+ * month, with per-executive breakdown and conversion percentages.
+ */
+function getMonthlyEngagementReport(sessionId, month) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const [year, monthNum] = (month || '').split('-');
+    if (!year || !monthNum) return { success: false, message: 'Invalid month' };
+
+    // ── Sales per executive: Data sheet, delivery date (col L) in month, account check (col V) = Yes ──
+    const dataRows = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
+    const salesByExec = {};
+    for (let i = 1; i < dataRows.length; i++) {
+      const row = dataRows[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+      const deliveryDate = row[11];
+      if (!deliveryDate) continue;
+      const d = new Date(deliveryDate);
+      if (isNaN(d.getTime())) continue;
+      if (d.getFullYear() != year || (d.getMonth() + 1) != monthNum) continue;
+      if (String(row[21] || '') !== 'Yes') continue;
+      const exec = String(row[1] || '').trim();
+      if (!exec) continue;
+      salesByExec[exec] = (salesByExec[exec] || 0) + 1;
+    }
+
+    // ── Google reviews + test rides per executive: Daily_Activity sheet, date in month ──
+    const actSheet = _ensureDailyActivitySheet();
+    const actRows  = actSheet.getDataRange().getValues();
+    const engagementByExec = {}; // exec → { googleReviews, testRides }
+    for (let i = 1; i < actRows.length; i++) {
+      const parsed = _parseDailyRow(actRows[i]);
+      if (!parsed.date || !parsed.executiveName) continue;
+      const rowMonth = parsed.date.substring(0, 7); // 'yyyy-MM'
+      if (rowMonth !== month) continue;
+      if (!engagementByExec[parsed.executiveName]) {
+        engagementByExec[parsed.executiveName] = { googleReviews: 0, testRides: 0 };
+      }
+      engagementByExec[parsed.executiveName].googleReviews += parsed.googleRatings;
+      engagementByExec[parsed.executiveName].testRides     += parsed.testRides;
+    }
+
+    // ── Combine ──
+    const allExecs = new Set([...Object.keys(salesByExec), ...Object.keys(engagementByExec)]);
+    const rows = Array.from(allExecs).map(function(exec) {
+      const sales = salesByExec[exec] || 0;
+      const eng   = engagementByExec[exec] || { googleReviews: 0, testRides: 0 };
+      return {
+        executive:       exec,
+        sales:            sales,
+        googleReviews:    eng.googleReviews,
+        testRides:        eng.testRides,
+        googlePercent:    sales > 0 ? Math.round((eng.googleReviews / sales) * 100) : 0,
+        testRidePercent:  sales > 0 ? Math.round((eng.testRides     / sales) * 100) : 0
+      };
+    }).sort(function(a, b) { return b.sales - a.sales; });
+
+    const totals = rows.reduce(function(acc, r) {
+      acc.sales         += r.sales;
+      acc.googleReviews += r.googleReviews;
+      acc.testRides     += r.testRides;
+      return acc;
+    }, { sales: 0, googleReviews: 0, testRides: 0 });
+    totals.googlePercent   = totals.sales > 0 ? Math.round((totals.googleReviews / totals.sales) * 100) : 0;
+    totals.testRidePercent = totals.sales > 0 ? Math.round((totals.testRides     / totals.sales) * 100) : 0;
+
+    return { success: true, rows: rows, totals: totals };
+  } catch (e) {
+    return { success: false, message: e.toString() };
+  }
 }
 
 /**
