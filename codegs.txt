@@ -12155,6 +12155,8 @@ function getMonthlyEngagementReport(sessionId, month) {
       const row = crmRows[i];
       if (!row[0]) continue;
       if ((String(row[6] || '')).toLowerCase() !== 'walk-in') continue;
+      const punchedInAccelerator = !!(row[28] === true || row[28] === 'TRUE' || row[28] === 'true');
+      if (!punchedInAccelerator) continue;
       const exec = String(row[8] || '').trim();
       if (!exec) continue;
       const createdDate = formatDate(row[13]);
