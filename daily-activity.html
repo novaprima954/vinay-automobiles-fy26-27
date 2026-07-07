@@ -237,9 +237,9 @@
                   <th class="th-group c" rowspan="2">✅ Confirm</th>
                 </tr>
                 <tr>
-                  <th class="c" title="Self-reported enquiries">Self</th>
-                  <th class="c" title="CRM Walk-in leads logged">CRM WI</th>
-                  <th class="c" title="Enquiries minus CRM Walk-ins">Gap</th>
+                  <th class="c" title="Self-reported enquiries">Manual</th>
+                  <th class="c" title="CRM Walk-in leads logged">System</th>
+                  <th class="c" title="Manual minus System">Gap</th>
                   <th class="c" title="Self-reported booking count">Manual</th>
                   <th class="c" title="Bookings in Data sheet">System</th>
                   <th class="c" title="Manual minus System">Gap</th>
@@ -256,10 +256,58 @@
           <div id="rpt-empty" style="display:none" class="empty-state">📭 No activity data for this period.</div>
 
           <div class="legend">
-            <strong>Enquiry Gap</strong> = Self − CRM Walk-ins &nbsp;·&nbsp;
+            <strong>Enquiry Gap</strong> = Manual − System &nbsp;·&nbsp;
             <strong>Booking/Sales Gap</strong> = Manual − System &nbsp;·&nbsp;
             <strong>Sales System</strong> = delivery date today + account check ✓ &nbsp;·&nbsp;
             ▲ = unaccounted &nbsp;·&nbsp; ▼ = more in system &nbsp;·&nbsp; ✓ = matched
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Monthly Engagement report ─────────────────────────────────── -->
+      <div class="section-card">
+        <div class="section-title">
+          📈 Monthly Engagement (Google Reviews &amp; Test Rides)
+        </div>
+        <div class="section-body">
+
+          <div class="filter-row">
+            <div class="filter-group">
+              <span class="filter-label">Month</span>
+              <input type="month" class="filter-input" id="eng-month">
+            </div>
+            <div class="filter-group">
+              <span class="filter-label">Executive</span>
+              <select class="filter-input" id="eng-exec-filter" onchange="renderEngagementTable()">
+                <option value="">All Executives</option>
+              </select>
+            </div>
+            <button class="btn-apply" onclick="loadEngagementReport()">Apply</button>
+          </div>
+
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Executive</th>
+                  <th class="c">🛵 Sales</th>
+                  <th class="c">⭐ Google Reviews</th>
+                  <th class="c">% Google</th>
+                  <th class="c">🏍️ Test Rides</th>
+                  <th class="c">% Test Ride</th>
+                </tr>
+              </thead>
+              <tbody id="eng-body">
+                <tr><td colspan="6" class="empty-state">Select a month and click Apply.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="eng-empty" style="display:none" class="empty-state">📭 No sales data for this month.</div>
+
+          <div class="legend">
+            <strong>% Google</strong> = Google Reviews ÷ Sales &nbsp;·&nbsp;
+            <strong>% Test Ride</strong> = Test Rides ÷ Sales &nbsp;·&nbsp;
+            <strong>Sales</strong> = delivery date in month + account check ✓
           </div>
         </div>
       </div>

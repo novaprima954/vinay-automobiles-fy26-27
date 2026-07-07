@@ -1177,6 +1177,10 @@ const API = {
     return await this.call('getDailyActivityReport', { sessionId: SessionManager.getSessionId(), dateFrom, dateTo });
   },
 
+  async getMonthlyEngagementReport(month) {
+    return await this.call('getMonthlyEngagementReport', { sessionId: SessionManager.getSessionId(), month });
+  },
+
   async adminUpdateDailyActivity(date, executiveName, data) {
     return await this.call('adminUpdateDailyActivity', {
       sessionId: SessionManager.getSessionId(), date, executiveName, data: JSON.stringify(data)

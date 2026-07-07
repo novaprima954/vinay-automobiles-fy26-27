@@ -33,6 +33,13 @@ document.addEventListener('DOMContentLoaded', async function () {
     document.getElementById('adminSection').style.display = 'block';
     setDefaultDates();
     loadAdminReport();
+
+    const engMonthEl = document.getElementById('eng-month');
+    if (engMonthEl) {
+      const now = new Date();
+      engMonthEl.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    }
+    loadEngagementReport();
   }
 
   await loadTodayEntry();
@@ -242,6 +249,82 @@ async function confirmRow(idx) {
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
 }
 
+// ── Monthly Engagement report ──────────────────────────────────────────────────
+
+let _engagementCache = { rows: [], totals: null };
+
+async function loadEngagementReport() {
+  const month = document.getElementById('eng-month').value;
+  if (!month) { showMsg('Select a month', 'error'); return; }
+
+  const tbody = document.getElementById('eng-body');
+  const empty = document.getElementById('eng-empty');
+  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const res = await API.getMonthlyEngagementReport(month);
+    if (!res.success) { showMsg('Failed: ' + res.message, 'error'); return; }
+
+    _engagementCache = { rows: res.rows || [], totals: res.totals || null };
+
+    // Populate executive filter dropdown
+    const filterEl = document.getElementById('eng-exec-filter');
+    const prevSelection = filterEl.value;
+    filterEl.innerHTML = '<option value="">All Executives</option>' +
+      _engagementCache.rows.map(function(r) {
+        return '<option value="' + esc(r.executive) + '">' + esc(r.executive) + '</option>';
+      }).join('');
+    filterEl.value = prevSelection && _engagementCache.rows.some(function(r) { return r.executive === prevSelection; })
+      ? prevSelection : '';
+
+    if (!_engagementCache.rows.length) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+    renderEngagementTable();
+  } catch (e) { showMsg('Error: ' + e.message, 'error'); }
+}
+
+function renderEngagementTable() {
+  const tbody = document.getElementById('eng-body');
+  const selectedExec = document.getElementById('eng-exec-filter').value;
+
+  const rows = selectedExec
+    ? _engagementCache.rows.filter(function(r) { return r.executive === selectedExec; })
+    : _engagementCache.rows;
+
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No data for this executive.</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = rows.map(function(r) {
+    return '<tr>'
+      + '<td><strong>' + esc(r.executive) + '</strong></td>'
+      + '<td class="c">' + r.sales + '</td>'
+      + '<td class="c">' + r.googleReviews + '</td>'
+      + '<td class="c">' + r.googlePercent + '%</td>'
+      + '<td class="c">' + r.testRides + '</td>'
+      + '<td class="c">' + r.testRidePercent + '%</td>'
+      + '</tr>';
+  }).join('');
+
+  // Show combined totals row only when viewing all executives
+  if (!selectedExec && _engagementCache.totals) {
+    const t = _engagementCache.totals;
+    tbody.innerHTML += '<tr style="font-weight:700;background:#f5f7fa;">'
+      + '<td>TOTAL</td>'
+      + '<td class="c">' + t.sales + '</td>'
+      + '<td class="c">' + t.googleReviews + '</td>'
+      + '<td class="c">' + t.googlePercent + '%</td>'
+      + '<td class="c">' + t.testRides + '</td>'
+      + '<td class="c">' + t.testRidePercent + '%</td>'
+      + '</tr>';
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function gapHtml(gap) {
@@ -261,12 +344,14 @@ function iso(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
 }
 
-// Builds a hover tooltip string listing customer name + model/variant for a detail array
+// Builds a hover tooltip string listing customer name, mobile, model/variant (+ financier for bookings/sales)
 function detailTitle(list, variantField) {
   if (!list || !list.length) return '';
   return list.map(function(d) {
     const extra = variantField === 'variant' ? [d.model, d.variant].filter(Boolean).join(' ') : d.model;
-    return d.customerName + (extra ? ' - ' + extra : '');
+    const parts = [d.customerName, d.mobileNo].filter(Boolean).join(' - ');
+    const finPart = d.financierName ? ' [' + d.financierName + ']' : '';
+    return parts + (extra ? ' - ' + extra : '') + finPart;
   }).join('\n').replace(/"/g, '&quot;');
 }
 
