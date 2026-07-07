@@ -259,7 +259,7 @@ async function loadEngagementReport() {
 
   const tbody = document.getElementById('eng-body');
   const empty = document.getElementById('eng-empty');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:20px;color:#888">Loading…</td></tr>';
   empty.style.display = 'none';
 
   try {
@@ -296,13 +296,14 @@ function renderEngagementTable() {
     : _engagementCache.rows;
 
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-state">No data for this executive.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No data for this executive.</td></tr>';
     return;
   }
 
   tbody.innerHTML = rows.map(function(r) {
     return '<tr>'
       + '<td><strong>' + esc(r.executive) + '</strong></td>'
+      + '<td class="c">' + r.enquiries + '</td>'
       + '<td class="c">' + r.sales + '</td>'
       + '<td class="c">' + r.googleReviews + '</td>'
       + '<td class="c">' + r.googlePercent + '%</td>'
@@ -316,6 +317,7 @@ function renderEngagementTable() {
     const t = _engagementCache.totals;
     tbody.innerHTML += '<tr style="font-weight:700;background:#f5f7fa;">'
       + '<td>TOTAL</td>'
+      + '<td class="c">' + t.enquiries + '</td>'
       + '<td class="c">' + t.sales + '</td>'
       + '<td class="c">' + t.googleReviews + '</td>'
       + '<td class="c">' + t.googlePercent + '%</td>'
