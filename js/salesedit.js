@@ -1011,13 +1011,24 @@ function confirmCancelBooking() {
   const receiptNo = document.getElementById('selectedReceiptNo').value;
   if (!receiptNo) return;
   document.getElementById('cancelReceiptNoDisplay').textContent = receiptNo;
+  document.getElementById('cancelReasonInput').value = '';
   document.getElementById('cancelModal').style.display = 'flex';
 }
 
 async function executeCancelBooking() {
-  document.getElementById('cancelModal').style.display = 'none';
   const receiptNo = document.getElementById('selectedReceiptNo').value;
   if (!receiptNo) return;
+
+  const reasonEl = document.getElementById('cancelReasonInput');
+  const reason = (reasonEl.value || '').trim();
+  if (!reason) {
+    reasonEl.style.borderColor = '#dc3545';
+    reasonEl.focus();
+    showMessage('⚠️ Please enter a reason for cancellation', 'error');
+    return;
+  }
+
+  document.getElementById('cancelModal').style.display = 'none';
 
   const btn = document.getElementById('cancelBookingBtn');
   btn.disabled = true;
@@ -1026,7 +1037,8 @@ async function executeCancelBooking() {
   try {
     const res = await API.call('cancelBooking', {
       sessionId: SessionManager.getSessionId(),
-      receiptNo
+      receiptNo,
+      reason
     });
     if (res.success) {
       showMessage('✅ Booking ' + receiptNo + ' has been cancelled', 'success');
