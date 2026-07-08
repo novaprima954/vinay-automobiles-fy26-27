@@ -146,11 +146,12 @@ function handleRequest(e) {
       case 'getLeadQuotations':     result = getLeadQuotations(params.sessionId, params.leadId);                                     break;
       case 'getQuotationByNo':      result = getQuotationByNo(params.sessionId, params.quotNo);                                      break;
       case 'getCallsReport':          result = getCallsReport(params.sessionId, params.fromDate, params.toDate);                    break;
+      case 'getExecutiveWiseAnalysis': result = getExecutiveWiseAnalysis(params.sessionId, params.fromDate, params.toDate, params.enquiryTypes); break;
       case 'getFinancierUsers':       result = getFinancierUsers(params.sessionId);                                                  break;
       case 'getFinancierLeads':       result = getFinancierLeads(params.sessionId);                                                  break;
       case 'getFinancierDashboard':   result = getFinancierDashboard(params.sessionId);                                              break;
       case 'updateFinanceDetails':    result = updateFinanceDetails(params.sessionId, params.leadId, JSON.parse(params.data));       break;
-      case 'getFinancierAnalytics':   result = getFinancierAnalytics(params.sessionId);                                              break;
+      case 'getFinancierAnalytics':   result = getFinancierAnalytics(params.sessionId, params.months);                              break;
       case 'searchCRMLeads':        result = searchCRMLeads(params.sessionId, params.query);                                         break;
       case 'sendQuotationWhatsApp':
         result = sendQuotationWhatsApp(params.sessionId, params.pdfBase64, params.fileName, params.customerName, params.customerPhone, params.quotNo, params.modelVariant, params.execName, params.execMobile);
@@ -2216,6 +2217,111 @@ function getCallsReport(sessionId, fromDate, toDate) {
 }
 
 /**
+ * Executive-wise Analysis (CRM admin): total enquiries, total calls, total brochure sends,
+ * total quotations, and total conversions per executive — filtered by date range and
+ * (optionally) enquiry/source type.
+ * fromDate/toDate: 'yyyy-MM-dd'. enquiryTypes: comma-separated list of source values, or '' / 'all'.
+ */
+function getExecutiveWiseAnalysis(sessionId, fromDate, toDate, enquiryTypes) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    if (validation.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    var tz = 'Asia/Kolkata';
+    var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+    var fromD = fromDate ? new Date(fromDate) : new Date(2000, 0, 1);
+    var toD   = toDate   ? new Date(toDate)   : new Date();
+    fromD.setHours(0,0,0,0);
+    toD.setHours(23,59,59,999);
+
+    // Set of interaction-log date prefixes ('dd-MMM-yyyy') that fall within the range
+    var matchDates = {};
+    var cur = new Date(fromD);
+    while (cur <= toD) {
+      var ds = String(cur.getDate()).padStart(2,'0') + '-' + months[cur.getMonth()] + '-' + cur.getFullYear();
+      matchDates[ds] = true;
+      cur.setDate(cur.getDate() + 1);
+    }
+
+    var typesStr = (enquiryTypes || '').toString().trim();
+    var typeSet = (typesStr && typesStr !== 'all')
+      ? new Set(typesStr.split(',').map(function(t) { return t.trim(); }).filter(Boolean))
+      : null;
+
+    var sheet = getSheet('CRM_Leads');
+    var data  = sheet.getDataRange().getValues();
+
+    var stats = {}; // exec → { totalEnquiry, totalCalls, totalBrochure, totalQuotation, totalConversion }
+    function ensure(exec) {
+      if (!stats[exec]) stats[exec] = { totalEnquiry: 0, totalCalls: 0, totalBrochure: 0, totalQuotation: 0, totalConversion: 0 };
+      return stats[exec];
+    }
+
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[0]) continue;
+
+      var source = String(row[6] || '').trim() || 'Unknown';
+      if (typeSet && !typeSet.has(source)) continue;
+
+      var exec      = String(row[8] || '').trim();
+      var status    = String(row[7] || '');
+      var createdAt = row[13] ? new Date(row[13]) : null;
+
+      // Enquiry + conversion counts: by assignedTo executive, filtered by createdDate in range
+      if (exec && createdAt && !isNaN(createdAt.getTime()) && createdAt >= fromD && createdAt <= toD) {
+        var s = ensure(exec);
+        s.totalEnquiry++;
+        if (status === 'Converted') s.totalConversion++;
+      }
+
+      // Calls / Brochure / Quotation counts: from interaction log, by the user who performed the action,
+      // filtered by the entry's own date (not the lead's createdDate)
+      var log = String(row[10] || '');
+      if (!log) continue;
+      var entries = log.split('\n');
+      for (var j = 0; j < entries.length; j++) {
+        var entry = entries[j].trim();
+        if (!entry) continue;
+        var datePrefix = entry.substring(0, 11);
+        if (!matchDates[datePrefix]) continue;
+
+        var parts = entry.split('||');
+        if (parts.length < 2) continue;
+        var type = String(parts[1] || '').toLowerCase();
+        var by   = String(parts[3] || '').trim();
+        if (!by) continue;
+
+        var es = ensure(by);
+        if (type.indexOf('called') !== -1)    es.totalCalls++;
+        if (type.indexOf('brochure') !== -1)  es.totalBrochure++;
+        if (type.indexOf('quotation') !== -1) es.totalQuotation++;
+      }
+    }
+
+    var result = Object.keys(stats).sort().map(function(exec) {
+      var s = stats[exec];
+      return {
+        executive:       exec,
+        totalEnquiry:    s.totalEnquiry,
+        totalCalls:      s.totalCalls,
+        totalBrochure:   s.totalBrochure,
+        totalQuotation:  s.totalQuotation,
+        totalConversion: s.totalConversion,
+        conversionRate:  s.totalEnquiry > 0 ? Math.round(s.totalConversion * 100 / s.totalEnquiry) : 0
+      };
+    }).sort(function(a, b) { return b.totalEnquiry - a.totalEnquiry; });
+
+    return { success: true, data: result };
+  } catch(e) {
+    Logger.log('Error in getExecutiveWiseAnalysis: ' + e.toString());
+    return { success: false, message: 'Error: ' + e.toString() };
+  }
+}
+
+/**
  * Get CRM Dashboard data
  */
 function getCRMDashboard(sessionId) {
@@ -2901,7 +3007,7 @@ function updateFinanceDetails(sessionId, leadId, data) {
  * Analytics: per-financier performance + exec→financier referral matrix
  * Admin sees all; financier sees own only.
  */
-function getFinancierAnalytics(sessionId) {
+function getFinancierAnalytics(sessionId, months) {
   try {
     var validation = validateSession(sessionId);
     if (!validation.success) return validation;
@@ -2913,6 +3019,12 @@ function getFinancierAnalytics(sessionId) {
     var data  = sheet.getDataRange().getValues();
     var now   = new Date();
     var thisMonth = now.getMonth(); var thisYear = now.getFullYear();
+
+    // months: comma-separated list of 'yyyy-MM', or '' / 'all' for no filter (all months)
+    var monthsStr = (months || '').toString().trim();
+    var monthSet = (monthsStr && monthsStr !== 'all')
+      ? new Set(monthsStr.split(',').map(function(m) { return m.trim(); }).filter(Boolean))
+      : null;
 
     var finStats = {};    // { finName: { total, disbursed, disbursedMonth, applied, underProcess, approved, rejected } }
     var execMatrix = {}; // { execName: { finName: count } }
@@ -2926,6 +3038,12 @@ function getFinancierAnalytics(sessionId) {
       var loanSt  = String(row[21] || 'New');
       var createdBy = String(row[14] || '');
       var created   = row[13] ? new Date(row[13]) : null;
+
+      if (monthSet) {
+        if (!created || isNaN(created.getTime())) continue;
+        var rowMonth = Utilities.formatDate(created, Session.getScriptTimeZone(), 'yyyy-MM');
+        if (!monthSet.has(rowMonth)) continue;
+      }
 
       if (!finStats[fin]) finStats[fin] = { total:0, disbursed:0, disbursedMonth:0, applied:0, underProcess:0, approved:0, rejected:0 };
       finStats[fin].total++;
