@@ -11624,6 +11624,9 @@ function cancelBooking(params, sessionId) {
     const receiptNo = (params.receiptNo || '').toString().trim();
     if (!receiptNo) return { success: false, message: 'Receipt number required' };
 
+    const reason = (params.reason || '').toString().trim();
+    if (!reason) return { success: false, message: 'Cancellation reason is required' };
+
     const dataSheet = getSheet(CONFIG.SHEETS.DATA);
     const data      = dataSheet.getDataRange().getValues();
 
@@ -11640,17 +11643,24 @@ function cancelBooking(params, sessionId) {
       let cancelSheet = ss.getSheetByName('Cancel');
       if (!cancelSheet) {
         cancelSheet = ss.insertSheet('Cancel');
-        // Copy header row from Data sheet + two extra columns
+        // Copy header row from Data sheet + extra columns
         const headerRow = data[0].slice();
-        headerRow.push('CancelledBy', 'CancelledOn');
+        headerRow.push('CancelledBy', 'CancelledOn', 'CancelReason');
         cancelSheet.appendRow(headerRow);
+      } else {
+        // Migration: add CancelReason header if this sheet predates the reason field
+        const existingHeaders = cancelSheet.getRange(1, 1, 1, cancelSheet.getLastColumn()).getValues()[0];
+        if (existingHeaders.indexOf('CancelReason') === -1) {
+          cancelSheet.getRange(1, cancelSheet.getLastColumn() + 1).setValue('CancelReason');
+        }
       }
 
       // Build cancel row: all Data columns + metadata
       const cancelRow = data[i].slice();
       cancelRow.push(
         user.name || user.username,
-        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
+        Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+        reason
       );
       cancelSheet.appendRow(cancelRow);
 
