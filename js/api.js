@@ -538,9 +538,9 @@ const API = {
     const sessionId = SessionManager.getSessionId();
     return await this.call('updateFinanceDetails', { sessionId, leadId, data: JSON.stringify(data) });
   },
-  async getFinancierAnalytics() {
+  async getFinancierAnalytics(months) {
     const sessionId = SessionManager.getSessionId();
-    return await this.call('getFinancierAnalytics', { sessionId });
+    return await this.call('getFinancierAnalytics', { sessionId, months: months || '' });
   },
 
   /**
@@ -557,6 +557,14 @@ const API = {
   async getCallsReport(fromDate, toDate) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('getCallsReport', { sessionId, fromDate, toDate });
+  },
+
+  /**
+   * Executive-wise Analysis: total enquiry/calls/brochure/quotation/conversion per executive (admin only)
+   */
+  async getExecutiveWiseAnalysis(fromDate, toDate, enquiryTypes) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getExecutiveWiseAnalysis', { sessionId, fromDate, toDate, enquiryTypes: enquiryTypes || '' });
   },
 
   /**

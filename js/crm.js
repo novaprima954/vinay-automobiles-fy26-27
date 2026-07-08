@@ -102,7 +102,7 @@ function switchTab(tab) {
     if (currentUser.role === 'financier') loadFinancierLeads();
     else loadMyLeads();
   }
-  if (tab === 'allLeads' && currentUser.role !== 'financier') loadAllLeads();
+  // All Leads is load-on-demand (see the "Load List" button in the tab) — no auto-load here.
   if (tab === 'admin') {
     if (currentUser.role === 'admin') loadAdmin();
     else if (currentUser.role === 'financier') {
@@ -702,6 +702,77 @@ async function submitAssignFinancier() {
 
 // ── Financier Analytics (admin + financier) ──
 
+// Month multiselect dropdown (All Months + checkbox list, mirrors js/financier.js pattern)
+let selectedFinAnalyticsMonths = []; // [] = All Months
+
+function _buildFinAnalyticsMonthOptions() {
+  const months = [];
+  const now = new Date();
+  for (let i = 0; i < 24; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const label = d.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    months.push({ value, label });
+  }
+  return months;
+}
+
+function initFinAnalyticsMonthDropdown() {
+  const panel = document.getElementById('finAnalyticsMonthDropdownPanel');
+  if (!panel || panel.dataset.built) return;
+  panel.dataset.built = '1';
+
+  const months = _buildFinAnalyticsMonthOptions();
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#333;border-bottom:1px solid #eee;margin-bottom:2px;">' +
+    '<input type="checkbox" id="finAnalyticsMonthAll" checked onchange="onFinAnalyticsMonthAllChange()"> All Months</label>';
+  html += months.map(m =>
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#444;">' +
+    '<input type="checkbox" class="fin-analytics-month-cb" value="' + m.value + '" onchange="onFinAnalyticsMonthCbChange()"> ' + m.label + '</label>'
+  ).join('');
+  panel.innerHTML = html;
+}
+
+function toggleFinAnalyticsMonthDropdown() {
+  initFinAnalyticsMonthDropdown();
+  const panel = document.getElementById('finAnalyticsMonthDropdownPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const container = document.getElementById('finAnalyticsMonthMultiselect');
+  const panel = document.getElementById('finAnalyticsMonthDropdownPanel');
+  if (container && panel && panel.style.display === 'block' && !container.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+function onFinAnalyticsMonthAllChange() {
+  const allCb = document.getElementById('finAnalyticsMonthAll');
+  if (allCb.checked) {
+    document.querySelectorAll('.fin-analytics-month-cb').forEach(cb => cb.checked = false);
+  }
+  _applyFinAnalyticsMonthSelection();
+}
+
+function onFinAnalyticsMonthCbChange() {
+  const checked = Array.from(document.querySelectorAll('.fin-analytics-month-cb')).filter(cb => cb.checked);
+  document.getElementById('finAnalyticsMonthAll').checked = checked.length === 0;
+  _applyFinAnalyticsMonthSelection();
+}
+
+function _applyFinAnalyticsMonthSelection() {
+  const checked = Array.from(document.querySelectorAll('.fin-analytics-month-cb')).filter(cb => cb.checked);
+  selectedFinAnalyticsMonths = checked.map(cb => cb.value);
+
+  const labelEl = document.getElementById('finAnalyticsMonthToggleLabel');
+  if (labelEl) {
+    labelEl.textContent = selectedFinAnalyticsMonths.length === 0 ? 'All Months' :
+      (selectedFinAnalyticsMonths.length === 1 ? checked[0].parentElement.textContent.trim() : selectedFinAnalyticsMonths.length + ' months selected');
+  }
+  loadFinancierAnalytics();
+}
+
 async function loadFinancierAnalytics() {
   const container = document.getElementById('finAnalyticsContent');
   const btn = document.getElementById('finAnalyticsRefreshBtn');
@@ -709,7 +780,7 @@ async function loadFinancierAnalytics() {
   container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading...</div></div>';
   if (btn) btn.disabled = true;
   try {
-    const r = await API.getFinancierAnalytics();
+    const r = await API.getFinancierAnalytics(selectedFinAnalyticsMonths.join(','));
     if (btn) btn.disabled = false;
     if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
 
@@ -761,6 +832,108 @@ async function loadFinancierAnalytics() {
   } catch(e) {
     if (btn) btn.disabled = false;
     container.innerHTML = errorHtml('Error loading analytics');
+  }
+}
+
+// ── Executive-wise Analysis (admin) ──
+
+const ENQUIRY_TYPE_OPTIONS = ['Walk-in', 'Phone Call', 'Social Media', 'Referral', 'Website', 'Other'];
+let selectedExecAnalysisTypes = []; // [] = All Enquiry Types
+
+function initExecAnalysisTypeDropdown() {
+  const panel = document.getElementById('execAnalysisTypeDropdownPanel');
+  if (!panel || panel.dataset.built) return;
+  panel.dataset.built = '1';
+
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#333;border-bottom:1px solid #eee;margin-bottom:2px;">' +
+    '<input type="checkbox" id="execAnalysisTypeAll" checked onchange="onExecAnalysisTypeAllChange()"> All Enquiry Types</label>';
+  html += ENQUIRY_TYPE_OPTIONS.map(t =>
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#444;">' +
+    '<input type="checkbox" class="exec-analysis-type-cb" value="' + t + '" onchange="onExecAnalysisTypeCbChange()"> ' + t + '</label>'
+  ).join('');
+  panel.innerHTML = html;
+}
+
+function toggleExecAnalysisTypeDropdown() {
+  initExecAnalysisTypeDropdown();
+  const panel = document.getElementById('execAnalysisTypeDropdownPanel');
+  if (!panel) return;
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const container = document.getElementById('execAnalysisTypeMultiselect');
+  const panel = document.getElementById('execAnalysisTypeDropdownPanel');
+  if (container && panel && panel.style.display === 'block' && !container.contains(e.target)) {
+    panel.style.display = 'none';
+  }
+});
+
+function onExecAnalysisTypeAllChange() {
+  const allCb = document.getElementById('execAnalysisTypeAll');
+  if (allCb.checked) {
+    document.querySelectorAll('.exec-analysis-type-cb').forEach(cb => cb.checked = false);
+  }
+  _applyExecAnalysisTypeSelection();
+}
+
+function onExecAnalysisTypeCbChange() {
+  const checked = Array.from(document.querySelectorAll('.exec-analysis-type-cb')).filter(cb => cb.checked);
+  document.getElementById('execAnalysisTypeAll').checked = checked.length === 0;
+  _applyExecAnalysisTypeSelection();
+}
+
+function _applyExecAnalysisTypeSelection() {
+  const checked = Array.from(document.querySelectorAll('.exec-analysis-type-cb')).filter(cb => cb.checked);
+  selectedExecAnalysisTypes = checked.map(cb => cb.value);
+
+  const labelEl = document.getElementById('execAnalysisTypeToggleLabel');
+  if (labelEl) {
+    labelEl.textContent = selectedExecAnalysisTypes.length === 0 ? 'All Enquiry Types' :
+      (selectedExecAnalysisTypes.length === 1 ? selectedExecAnalysisTypes[0] : selectedExecAnalysisTypes.length + ' types selected');
+  }
+}
+
+async function loadExecutiveWiseAnalysis() {
+  const container = document.getElementById('execAnalysisContent');
+  const btn = document.getElementById('execAnalysisBtn');
+  if (!container) return;
+
+  const fromDate = (document.getElementById('execAnalysisFromDate') || {}).value || '';
+  const toDate   = (document.getElementById('execAnalysisToDate')   || {}).value || '';
+
+  container.innerHTML = '<div class="loading" style="padding:20px;"><div class="spinner"></div><div>Loading...</div></div>';
+  if (btn) btn.disabled = true;
+
+  try {
+    const r = await API.getExecutiveWiseAnalysis(fromDate, toDate, selectedExecAnalysisTypes.join(','));
+    if (btn) btn.disabled = false;
+    if (!r.success) { container.innerHTML = errorHtml(r.message); return; }
+
+    const rows = r.data || [];
+    if (rows.length === 0) {
+      container.innerHTML = '<div style="padding:20px;color:#aaa;text-align:center;">No data for this period</div>';
+      return;
+    }
+
+    container.innerHTML = `<div class="analytics-card">
+      <table class="analytics-table">
+        <thead><tr>
+          <th>Executive</th><th>Enquiry</th><th>Calls</th><th>Brochure</th><th>Quotation</th><th>Conversion</th><th>Conv%</th>
+        </tr></thead>
+        <tbody>${rows.map(row => `<tr>
+          <td style="font-weight:700;">${esc(row.executive)}</td>
+          <td>${row.totalEnquiry}</td>
+          <td>${row.totalCalls}</td>
+          <td>${row.totalBrochure}</td>
+          <td>${row.totalQuotation}</td>
+          <td><span style="color:#388E3C;font-weight:800;">${row.totalConversion}</span></td>
+          <td><span class="conv-rate">${row.conversionRate}%</span></td>
+        </tr>`).join('')}</tbody>
+      </table></div>`;
+  } catch(e) {
+    if (btn) btn.disabled = false;
+    container.innerHTML = errorHtml('Error loading executive analysis');
   }
 }
 
@@ -865,6 +1038,17 @@ function applyAllLeadsFilters() {
     });
   }
   if (currentAllLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentAllLeadsSearch));
+
+  const sortEl = document.getElementById('allLeadsSort');
+  const sortBy = sortEl ? sortEl.value : 'createdDesc';
+  leads = leads.slice().sort((a, b) => {
+    if (sortBy === 'createdAsc')  return (a.createdDate || '').localeCompare(b.createdDate || '');
+    if (sortBy === 'createdDesc') return (b.createdDate || '').localeCompare(a.createdDate || '');
+    if (sortBy === 'nameAsc')     return (a.customerName || '').localeCompare(b.customerName || '');
+    if (sortBy === 'nameDesc')    return (b.customerName || '').localeCompare(a.customerName || '');
+    if (sortBy === 'agingDesc')   return (b.agingDays || 0) - (a.agingDays || 0);
+    return 0;
+  });
 
   allLeadsFiltered = leads;
   renderAllLeads();
@@ -1218,6 +1402,7 @@ function applyCallsFilters() {
       const t = (c.type || '').toLowerCase();
       if (typeFilter === 'called')     return t.includes('called');
       if (typeFilter === 'whatsapp')   return t.includes('whatsapp');
+      if (typeFilter === 'brochure')   return t.includes('brochure');
       if (typeFilter === 'quotation')  return t.includes('quotation');
       if (typeFilter === 'finance')    return t.includes('finance');
       if (typeFilter === 'visit')      return t.includes('visit') || t.includes('showroom');
