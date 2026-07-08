@@ -12199,7 +12199,7 @@ function getDailyActivityReport(sessionId, dateFrom, dateTo) {
       const key = date + '|' + exec;
       crmMap[key] = (crmMap[key] || 0) + 1;
       if (!crmDetail[key]) crmDetail[key] = [];
-      crmDetail[key].push({ customerName: String(row[1] || '').trim(), mobileNo: String(row[2] || '').trim(), model: String(row[5] || '').trim() });
+      crmDetail[key].push({ customerName: String(row[1] || '').trim(), mobileNo: String(row[2] || '').trim(), model: String(row[5] || '').trim(), financierName: String(row[20] || '').trim() });
     }
 
     // ── Live booking counts from Data sheet (col C = booking date) ──────
