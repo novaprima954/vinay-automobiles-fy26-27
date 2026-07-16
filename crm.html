@@ -446,7 +446,7 @@
     </div>
     <div style="padding:6px 16px 4px;">
       <input type="search" id="myLeadsSearch" placeholder="🔍 Search customer name…"
-        oninput="filterMyLeadsByName()"
+        oninput="filterMyLeadsByName()" onkeyup="filterMyLeadsByName()" onsearch="filterMyLeadsByName()"
         style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
         onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
     </div>
@@ -939,6 +939,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
-<script src="js/crm.js?v=8"></script>
+<script src="js/crm.js?v=9"></script>
 </body>
 </html>

@@ -223,9 +223,11 @@ function filterFollowupsByName() {
 
 function _nameMatch(lead, query) {
   if (!query) return true;
-  const q = query.toLowerCase().trim();
-  return (lead.customerName || '').toLowerCase().includes(q) ||
-         (lead.mobileNo || '').includes(q);
+  const q = String(query).toLowerCase().trim();
+  if (!q) return true;
+  const name  = String(lead.customerName || '').toLowerCase();
+  const phone = String(lead.mobileNo || '');
+  return name.includes(q) || phone.includes(q);
 }
 
 function renderFollowups(filter) {
@@ -411,6 +413,9 @@ function applyMyLeadsFilters() {
   }
 
   if (currentMyLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentMyLeadsSearch));
+
+  // Newest leads first
+  leads = leads.slice().sort((a, b) => (b.createdDate || '').localeCompare(a.createdDate || ''));
 
   myLeadsFiltered = leads;
   renderMyLeads();
