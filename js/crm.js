@@ -1377,43 +1377,37 @@ async function loadAdmin() {
   container.innerHTML = '';
 
   try {
-    const [leadsResp, analyticsResp] = await Promise.all([
-      API.getAllLeads(),
-      API.getCRMAnalytics()
-    ]);
+    const analyticsResp = await API.getCRMAnalytics();
 
     loading.style.display = 'none';
 
-    // Build executive list for assign
-    if (leadsResp.success) {
-      const execSet = new Set();
-      (leadsResp.leads || []).forEach(l => { if (l.assignedTo) execSet.add(l.assignedTo); });
-      allExecutives = Array.from(execSet);
+    // Build executive list for assign (from analytics, no full-leads fetch needed here)
+    if (analyticsResp.success && analyticsResp.analytics.byExecutive) {
+      allExecutives = analyticsResp.analytics.byExecutive.map(e => e.executive);
     }
 
     let html = '';
 
-    // All Leads table (collapsed by status)
-    if (leadsResp.success) {
-      const leads = leadsResp.leads || [];
-      const statusOrder = ['New','Contacted','Interested','Converted','Lost',''];
-      const grouped = {};
-      statusOrder.forEach(s => grouped[s] = []);
-      leads.forEach(l => {
-        const st = l.status || '';
-        if (grouped[st]) grouped[st].push(l);
-        else grouped[''].push(l);
-      });
-
-      html += `<div style="padding:12px 16px 8px;font-size:14px;font-weight:800;color:#333;">All Leads (${leads.length})</div>`;
-      statusOrder.forEach(st => {
-        const group = grouped[st] || [];
-        if (group.length === 0) return;
-        const label = st || 'Pool';
-        html += `<div style="padding:6px 16px;font-size:12px;font-weight:700;color:#999;text-transform:uppercase;letter-spacing:0.5px;">${label} (${group.length})</div>`;
-        html += group.map(l => adminLeadCardHtml(l)).join('');
-      });
-    }
+    // All Leads — load-on-demand (avoids fetching/rendering the entire CRM_Leads sheet on every admin tab open)
+    html += `<div style="padding:12px 16px 8px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div style="font-size:14px;font-weight:800;color:#333;">All Leads</div>
+        <button onclick="loadAdminLeadsList()" id="adminLeadsLoadBtn"
+          style="background:#f0f4ff;color:#667eea;border:2px solid #667eea;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer;">
+          📋 Load List
+        </button>
+      </div>
+      <div class="filter-row" id="adminLeadsStatusFilter" style="display:none;">
+        <div class="filter-chip active" onclick="setAdminLeadsStatusFilter('all',this)">All</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('New',this)">New</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('Contacted',this)">Contacted</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('Interested',this)">Interested</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('Converted',this)">✅ Converted</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('Lost',this)">❌ Lost</div>
+        <div class="filter-chip" onclick="setAdminLeadsStatusFilter('Pool',this)">Pool</div>
+      </div>
+      <div id="adminLeadsListContent"></div>
+    </div>`;
 
     // Analytics
     if (analyticsResp.success) {
@@ -1473,6 +1467,77 @@ async function loadAdmin() {
 async function loadAdminFinancierAnalytics() {
   // Called lazily when admin clicks the Financier Analytics section
   await loadFinancierAnalytics();
+}
+
+// ── Admin tab: "All Leads" list (load-on-demand, with status filter) ──
+
+let _adminLeadsAll = [];
+let _adminLeadsStatusFilter = 'all';
+
+async function loadAdminLeadsList() {
+  const btn = document.getElementById('adminLeadsLoadBtn');
+  const listEl = document.getElementById('adminLeadsListContent');
+  const filterRow = document.getElementById('adminLeadsStatusFilter');
+  if (!listEl) return;
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Loading…';
+  listEl.innerHTML = '<div style="padding:16px;color:#999;font-size:13px;text-align:center;">Loading…</div>';
+
+  try {
+    const r = await API.getAllLeads();
+    btn.disabled = false;
+    btn.textContent = '🔄 Refresh';
+
+    if (!r.success) { listEl.innerHTML = errorHtml(r.message); return; }
+
+    _adminLeadsAll = r.leads || [];
+    _adminLeadsStatusFilter = 'all';
+    if (filterRow) {
+      filterRow.style.display = '';
+      filterRow.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+      const firstChip = filterRow.querySelector('.filter-chip');
+      if (firstChip) firstChip.classList.add('active');
+    }
+
+    // Refresh executive list for assign, now that the full lead set is available
+    const execSet = new Set();
+    _adminLeadsAll.forEach(l => { if (l.assignedTo) execSet.add(l.assignedTo); });
+    if (execSet.size > 0) allExecutives = Array.from(execSet);
+
+    renderAdminLeadsList();
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🔄 Refresh';
+    listEl.innerHTML = errorHtml('Error loading leads');
+  }
+}
+
+function setAdminLeadsStatusFilter(filter, el) {
+  _adminLeadsStatusFilter = filter;
+  const filterRow = document.getElementById('adminLeadsStatusFilter');
+  if (filterRow) {
+    filterRow.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+    el.classList.add('active');
+  }
+  renderAdminLeadsList();
+}
+
+function renderAdminLeadsList() {
+  const listEl = document.getElementById('adminLeadsListContent');
+  if (!listEl) return;
+
+  const leads = _adminLeadsStatusFilter === 'all'
+    ? _adminLeadsAll
+    : _adminLeadsAll.filter(l => (l.status || 'Pool') === _adminLeadsStatusFilter);
+
+  if (leads.length === 0) {
+    listEl.innerHTML = '<div style="padding:16px;color:#999;font-size:13px;text-align:center;">No leads match this filter</div>';
+    return;
+  }
+
+  listEl.innerHTML = `<div style="padding:6px 0;font-size:12px;color:#888;">Showing ${leads.length} of ${_adminLeadsAll.length} leads</div>` +
+    leads.map(l => adminLeadCardHtml(l)).join('');
 }
 
 function adminLeadCardHtml(lead) {
@@ -1641,10 +1706,11 @@ function applyCallsFilters() {
   if (typeFilter) {
     calls = calls.filter(c => {
       const t = (c.type || '').toLowerCase();
-      if (typeFilter === 'called')     return t.includes('called');
-      if (typeFilter === 'whatsapp')   return t.includes('whatsapp');
-      if (typeFilter === 'brochure')   return t.includes('brochure');
-      if (typeFilter === 'quotation')  return t.includes('quotation');
+      if (typeFilter === 'called')       return t.includes('called');
+      if (typeFilter === 'whatsapp')     return t.includes('whatsapp') && !t.includes('bulk');
+      if (typeFilter === 'bulkwhatsapp') return t.includes('bulk') && t.includes('whatsapp');
+      if (typeFilter === 'brochure')     return t.includes('brochure');
+      if (typeFilter === 'quotation')    return t.includes('quotation');
       if (typeFilter === 'finance')    return t.includes('finance');
       if (typeFilter === 'visit')      return t.includes('visit') || t.includes('showroom');
       return true;
