@@ -1862,7 +1862,7 @@ function renderLeadDetail(lead) {
     <div class="detail-section">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div class="detail-section-title">🏦 Finance Details</div>
-        ${(isOwner || isFinancier) && lead.financierAssigned ? `<button class="btn-act" style="padding:5px 12px;font-size:12px;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;cursor:pointer;font-weight:700;"
+        ${(isAdmin || isFinancier) && lead.financierAssigned ? `<button class="btn-act" style="padding:5px 12px;font-size:12px;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;cursor:pointer;font-weight:700;"
           onclick="openFinanceSheet('${lead.leadId}')">✏️ Update</button>` : ''}
       </div>
       ${lead.financierAssigned ? `<div class="detail-row"><span class="detail-label">Financier</span><span class="detail-value" style="font-weight:800;">${esc(lead.financierAssigned)}</span></div>` : ''}
@@ -1875,11 +1875,12 @@ function renderLeadDetail(lead) {
       ${lead.financierFollowUpDate      ? `<div class="detail-row"><span class="detail-label" style="color:#11998e;">📅 Follow-up</span><span class="detail-value" style="color:#11998e;font-weight:700;">${esc(lead.financierFollowUpDate)}</span></div>` : ''}
     </div>` : '';
 
-  // Assign financier button (for sales exec on leads without financier yet)
-  const assignFinBtn = (isAdmin || lead.assignedTo === currentUser.name) && !lead.financierAssigned ? `
+  // Assign financier button — always available to the owning sales exec (admin has its own
+  // always-visible button above; this lets the sales exec assign AND later reassign the financier)
+  const assignFinBtn = !isAdmin && currentUser.role === 'sales' && lead.assignedTo === currentUser.name ? `
     <div style="padding:0 18px 10px;">
       <button class="btn-act" style="width:100%;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;"
-        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 Assign Financier</button>
+        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 ${lead.financierAssigned ? 'Reassign' : 'Assign'} Financier</button>
     </div>` : '';
 
   document.getElementById('detailSheetBody').innerHTML = `
