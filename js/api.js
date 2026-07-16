@@ -608,7 +608,27 @@ const API = {
       sessionId, leadId: leadId || '', brochureName, driveFileId, customerName, customerPhone, modelName: modelName || ''
     });
   },
-  
+
+  async getBulkWhatsAppFilterOptions() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getBulkWhatsAppFilterOptions', { sessionId });
+  },
+
+  async getBulkWhatsAppTemplates() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getBulkWhatsAppTemplates', { sessionId });
+  },
+
+  async getBulkWhatsAppCandidates(filters) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getBulkWhatsAppCandidates', Object.assign({ sessionId }, filters));
+  },
+
+  async sendBulkWhatsAppBatch(leadIds, templateKey) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('sendBulkWhatsAppBatch', { sessionId, leadIds: JSON.stringify(leadIds), templateKey });
+  },
+
   /**
    * Get Dashboard Data
    */

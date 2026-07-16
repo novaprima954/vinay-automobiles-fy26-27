@@ -431,6 +431,12 @@
       <div class="filter-chip" data-ftype="mine" onclick="setMyLeadsFilter('mine',this)">👤 My Added <span class="chip-count" id="cnt_mine">0</span></div>
       <div class="filter-chip" data-ftype="social" onclick="setMyLeadsFilter('social',this)">📱 Social <span class="chip-count" id="cnt_social">0</span></div>
     </div>
+    <div style="padding:6px 16px 0;">
+      <button onclick="openBulkWaModal()"
+        style="width:100%;background:linear-gradient(135deg,#25D366,#128C7E);color:white;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+        📢 Bulk WhatsApp
+      </button>
+    </div>
     <div class="filter-row" id="myLeadsStatusFilter">
       <div class="filter-chip active" data-st="all" onclick="filterMyLeadsByStatus('all',this)">All</div>
       <div class="filter-chip" data-st="New" onclick="filterMyLeadsByStatus('New',this)">New</div>
@@ -845,6 +851,88 @@
     </button>
   </div>
 
+</div>
+
+<!-- ═══ BULK WHATSAPP MODAL ═══ -->
+<div id="bulkWaModal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:9999;overflow-y:auto;">
+  <div style="background:white;max-width:520px;margin:20px auto;border-radius:14px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,0.3);">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+      <h3 style="margin:0;color:#333;font-size:17px;font-weight:700;">📢 Bulk WhatsApp</h3>
+      <button onclick="closeBulkWaModal()" style="background:none;border:1px solid #ddd;border-radius:6px;padding:5px 12px;cursor:pointer;color:#666;font-size:13px;">✕ Close</button>
+    </div>
+
+    <!-- Filters -->
+    <div style="display:flex;gap:8px;margin-bottom:8px;">
+      <div style="flex:1;">
+        <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px;">From</label>
+        <input type="date" id="bulkWaFromDate" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+      </div>
+      <div style="flex:1;">
+        <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px;">To</label>
+        <input type="date" id="bulkWaToDate" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;">
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+      <div id="bulkWaModelMultiselect" style="position:relative;flex:1;min-width:140px;">
+        <button type="button" onclick="toggleBulkWaModelDropdown()" id="bulkWaModelToggleBtn"
+          style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;background:white;cursor:pointer;display:flex;align-items:center;gap:6px;color:#333;justify-content:space-between;">
+          <span id="bulkWaModelToggleLabel">All Models</span>
+          <span style="font-size:10px;color:#999;">&#9660;</span>
+        </button>
+        <div id="bulkWaModelDropdownPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);z-index:60;max-height:220px;overflow-y:auto;min-width:170px;padding:6px 0;"></div>
+      </div>
+      <div id="bulkWaSourceMultiselect" style="position:relative;flex:1;min-width:140px;">
+        <button type="button" onclick="toggleBulkWaSourceDropdown()" id="bulkWaSourceToggleBtn"
+          style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;background:white;cursor:pointer;display:flex;align-items:center;gap:6px;color:#333;justify-content:space-between;">
+          <span id="bulkWaSourceToggleLabel">All Sources</span>
+          <span style="font-size:10px;color:#999;">&#9660;</span>
+        </button>
+        <div id="bulkWaSourceDropdownPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);z-index:60;max-height:220px;overflow-y:auto;min-width:170px;padding:6px 0;"></div>
+      </div>
+    </div>
+
+    <label style="display:flex;align-items:center;gap:8px;padding:8px 2px;cursor:pointer;font-size:13px;font-weight:600;color:#444;margin-bottom:8px;">
+      <input type="checkbox" id="bulkWaNotPurchased"> Not Purchased Only (excludes Converted)
+    </label>
+
+    <button onclick="findBulkWaCandidates()" id="bulkWaFindBtn"
+      style="width:100%;padding:11px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:12px;">
+      🔍 Find Customers
+    </button>
+
+    <div id="bulkWaResultsSection" style="display:none;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:13px;color:#555;font-weight:600;"><span id="bulkWaMatchCount">0</span> customers matched</span>
+        <label style="font-size:12px;color:#667eea;cursor:pointer;font-weight:600;">
+          <input type="checkbox" id="bulkWaSelectAll" checked onchange="toggleBulkWaSelectAll()"> Select All
+        </label>
+      </div>
+      <div id="bulkWaCustomerList" style="max-height:220px;overflow-y:auto;border:1px solid #eee;border-radius:8px;margin-bottom:12px;"></div>
+
+      <div style="margin-bottom:12px;">
+        <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px;">Message Template</label>
+        <select id="bulkWaTemplateSelect" style="width:100%;padding:9px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;">
+          <option value="">-- Select Template --</option>
+        </select>
+      </div>
+
+      <button onclick="sendBulkWaMessages()" id="bulkWaSendBtn"
+        style="width:100%;padding:12px;background:linear-gradient(135deg,#25D366,#128C7E);color:white;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;">
+        📤 Send WhatsApp to Selected
+      </button>
+
+      <div id="bulkWaProgress" style="margin-top:12px;display:none;">
+        <div style="background:#f0f4ff;border-radius:8px;padding:10px 12px;font-size:13px;color:#444;">
+          <div id="bulkWaProgressText">Sending…</div>
+          <div style="background:#e0e0e0;border-radius:6px;height:8px;margin-top:8px;overflow:hidden;">
+            <div id="bulkWaProgressBar" style="background:#25D366;height:100%;width:0%;transition:width 0.3s;"></div>
+          </div>
+        </div>
+      </div>
+      <div id="bulkWaResultSummary" style="margin-top:10px;font-size:13px;"></div>
+    </div>
+  </div>
 </div>
 
 <script src="js/config.js"></script>

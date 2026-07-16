@@ -51,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async function() {
 
   // Financier role — adjust UI and load their dashboard
   if (currentUser.role === 'financier') {
+    const bulkWaBtn = document.querySelector('#myLeadsTab button[onclick="openBulkWaModal()"]');
+    if (bulkWaBtn) bulkWaBtn.parentElement.style.display = 'none';
     _setupFinancierUI();
     await loadFinancierDashboard();
     return;
@@ -935,6 +937,245 @@ async function loadExecutiveWiseAnalysis() {
     if (btn) btn.disabled = false;
     container.innerHTML = errorHtml('Error loading executive analysis');
   }
+}
+
+// ── Bulk WhatsApp (My Leads) ──
+
+const BULK_WA_SOURCE_OPTIONS = ['Walk-in', 'Phone Call', 'Social Media', 'Referral', 'Website', 'Other'];
+let selectedBulkWaModels = [];   // [] = All Models
+let selectedBulkWaSources = [];  // [] = All Sources
+let bulkWaCandidates = [];       // full matched list from last search
+let bulkWaModelOptions = [];     // distinct models loaded from backend
+
+function openBulkWaModal() {
+  document.getElementById('bulkWaModal').style.display = 'block';
+  document.getElementById('bulkWaResultsSection').style.display = 'none';
+  document.getElementById('bulkWaResultSummary').innerHTML = '';
+  initBulkWaModelDropdown();
+  initBulkWaSourceDropdown();
+  loadBulkWaTemplates();
+}
+
+function closeBulkWaModal() {
+  document.getElementById('bulkWaModal').style.display = 'none';
+}
+
+async function initBulkWaModelDropdown() {
+  const panel = document.getElementById('bulkWaModelDropdownPanel');
+  if (!panel || panel.dataset.built) return;
+  panel.dataset.built = '1';
+
+  panel.innerHTML = '<div style="padding:10px 14px;color:#999;font-size:12px;">Loading…</div>';
+  try {
+    const r = await API.getBulkWhatsAppFilterOptions();
+    bulkWaModelOptions = (r.success && r.models) ? r.models : [];
+  } catch(e) { bulkWaModelOptions = []; }
+
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#333;border-bottom:1px solid #eee;margin-bottom:2px;">' +
+    '<input type="checkbox" id="bulkWaModelAll" checked onchange="onBulkWaModelAllChange()"> All Models</label>';
+  html += bulkWaModelOptions.map(m =>
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#444;">' +
+    '<input type="checkbox" class="bulk-wa-model-cb" value="' + esc(m) + '" onchange="onBulkWaModelCbChange()"> ' + esc(m) + '</label>'
+  ).join('');
+  panel.innerHTML = html;
+}
+
+function initBulkWaSourceDropdown() {
+  const panel = document.getElementById('bulkWaSourceDropdownPanel');
+  if (!panel || panel.dataset.built) return;
+  panel.dataset.built = '1';
+
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:700;color:#333;border-bottom:1px solid #eee;margin-bottom:2px;">' +
+    '<input type="checkbox" id="bulkWaSourceAll" checked onchange="onBulkWaSourceAllChange()"> All Sources</label>';
+  html += BULK_WA_SOURCE_OPTIONS.map(s =>
+    '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;font-size:13px;color:#444;">' +
+    '<input type="checkbox" class="bulk-wa-source-cb" value="' + s + '" onchange="onBulkWaSourceCbChange()"> ' + s + '</label>'
+  ).join('');
+  panel.innerHTML = html;
+}
+
+function toggleBulkWaModelDropdown() {
+  const panel = document.getElementById('bulkWaModelDropdownPanel');
+  if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function toggleBulkWaSourceDropdown() {
+  const panel = document.getElementById('bulkWaSourceDropdownPanel');
+  if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+document.addEventListener('click', function(e) {
+  const mCont = document.getElementById('bulkWaModelMultiselect');
+  const mPanel = document.getElementById('bulkWaModelDropdownPanel');
+  if (mCont && mPanel && mPanel.style.display === 'block' && !mCont.contains(e.target)) mPanel.style.display = 'none';
+
+  const sCont = document.getElementById('bulkWaSourceMultiselect');
+  const sPanel = document.getElementById('bulkWaSourceDropdownPanel');
+  if (sCont && sPanel && sPanel.style.display === 'block' && !sCont.contains(e.target)) sPanel.style.display = 'none';
+});
+
+function onBulkWaModelAllChange() {
+  const allCb = document.getElementById('bulkWaModelAll');
+  if (allCb.checked) document.querySelectorAll('.bulk-wa-model-cb').forEach(cb => cb.checked = false);
+  _applyBulkWaModelSelection();
+}
+
+function onBulkWaModelCbChange() {
+  const checked = Array.from(document.querySelectorAll('.bulk-wa-model-cb')).filter(cb => cb.checked);
+  document.getElementById('bulkWaModelAll').checked = checked.length === 0;
+  _applyBulkWaModelSelection();
+}
+
+function _applyBulkWaModelSelection() {
+  const checked = Array.from(document.querySelectorAll('.bulk-wa-model-cb')).filter(cb => cb.checked);
+  selectedBulkWaModels = checked.map(cb => cb.value);
+  const labelEl = document.getElementById('bulkWaModelToggleLabel');
+  if (labelEl) {
+    labelEl.textContent = selectedBulkWaModels.length === 0 ? 'All Models' :
+      (selectedBulkWaModels.length === 1 ? selectedBulkWaModels[0] : selectedBulkWaModels.length + ' models selected');
+  }
+}
+
+function onBulkWaSourceAllChange() {
+  const allCb = document.getElementById('bulkWaSourceAll');
+  if (allCb.checked) document.querySelectorAll('.bulk-wa-source-cb').forEach(cb => cb.checked = false);
+  _applyBulkWaSourceSelection();
+}
+
+function onBulkWaSourceCbChange() {
+  const checked = Array.from(document.querySelectorAll('.bulk-wa-source-cb')).filter(cb => cb.checked);
+  document.getElementById('bulkWaSourceAll').checked = checked.length === 0;
+  _applyBulkWaSourceSelection();
+}
+
+function _applyBulkWaSourceSelection() {
+  const checked = Array.from(document.querySelectorAll('.bulk-wa-source-cb')).filter(cb => cb.checked);
+  selectedBulkWaSources = checked.map(cb => cb.value);
+  const labelEl = document.getElementById('bulkWaSourceToggleLabel');
+  if (labelEl) {
+    labelEl.textContent = selectedBulkWaSources.length === 0 ? 'All Sources' :
+      (selectedBulkWaSources.length === 1 ? selectedBulkWaSources[0] : selectedBulkWaSources.length + ' sources selected');
+  }
+}
+
+async function loadBulkWaTemplates() {
+  const sel = document.getElementById('bulkWaTemplateSelect');
+  if (!sel) return;
+  try {
+    const r = await API.getBulkWhatsAppTemplates();
+    const templates = (r.success && r.templates) ? r.templates : [];
+    sel.innerHTML = '<option value="">-- Select Template --</option>' +
+      templates.map(t => '<option value="' + t.templateKey + '">' + esc(t.label) + '</option>').join('');
+  } catch(e) {
+    sel.innerHTML = '<option value="">-- Select Template --</option>';
+  }
+}
+
+async function findBulkWaCandidates() {
+  const btn = document.getElementById('bulkWaFindBtn');
+  const fromDate = document.getElementById('bulkWaFromDate').value;
+  const toDate   = document.getElementById('bulkWaToDate').value;
+  const notPurchased = document.getElementById('bulkWaNotPurchased').checked ? 'yes' : '';
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Searching…';
+
+  try {
+    const r = await API.getBulkWhatsAppCandidates({
+      fromDate, toDate,
+      models:  selectedBulkWaModels.join(',')  || 'all',
+      sources: selectedBulkWaSources.join(',') || 'all',
+      notPurchased
+    });
+    btn.disabled = false;
+    btn.textContent = '🔍 Find Customers';
+
+    if (!r.success) { showMessage(r.message || 'Search failed', 'error'); return; }
+
+    bulkWaCandidates = r.leads || [];
+    document.getElementById('bulkWaResultsSection').style.display = 'block';
+    document.getElementById('bulkWaMatchCount').textContent = bulkWaCandidates.length;
+    document.getElementById('bulkWaSelectAll').checked = true;
+    document.getElementById('bulkWaResultSummary').innerHTML = '';
+    document.getElementById('bulkWaProgress').style.display = 'none';
+
+    const listEl = document.getElementById('bulkWaCustomerList');
+    if (bulkWaCandidates.length === 0) {
+      listEl.innerHTML = '<div style="padding:16px;color:#999;font-size:13px;text-align:center;">No customers match this filter</div>';
+      return;
+    }
+    listEl.innerHTML = bulkWaCandidates.map((c, idx) =>
+      '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f3f3f3;cursor:pointer;font-size:13px;">' +
+      '<input type="checkbox" class="bulk-wa-cust-cb" value="' + idx + '" checked>' +
+      '<span style="flex:1;"><strong>' + esc(c.customerName) + '</strong><br>' +
+      '<span style="color:#888;font-size:11px;">' + esc(c.mobileNo) + ' · ' + esc(c.model || '—') + ' · ' + esc(c.assignedTo || 'Pool') + '</span></span>' +
+      '</label>'
+    ).join('');
+  } catch(e) {
+    btn.disabled = false;
+    btn.textContent = '🔍 Find Customers';
+    showMessage('Search failed', 'error');
+  }
+}
+
+function toggleBulkWaSelectAll() {
+  const checked = document.getElementById('bulkWaSelectAll').checked;
+  document.querySelectorAll('.bulk-wa-cust-cb').forEach(cb => cb.checked = checked);
+}
+
+async function sendBulkWaMessages() {
+  const templateKey = document.getElementById('bulkWaTemplateSelect').value;
+  if (!templateKey) { showMessage('Please select a message template', 'error'); return; }
+
+  const selectedIdx = Array.from(document.querySelectorAll('.bulk-wa-cust-cb')).filter(cb => cb.checked).map(cb => parseInt(cb.value));
+  if (selectedIdx.length === 0) { showMessage('Select at least one customer', 'error'); return; }
+
+  const selectedLeads = selectedIdx.map(i => bulkWaCandidates[i]);
+  const leadIds = selectedLeads.map(l => l.leadId);
+
+  const sendBtn = document.getElementById('bulkWaSendBtn');
+  sendBtn.disabled = true;
+  sendBtn.textContent = '⏳ Sending…';
+
+  const progressEl = document.getElementById('bulkWaProgress');
+  const progressText = document.getElementById('bulkWaProgressText');
+  const progressBar = document.getElementById('bulkWaProgressBar');
+  progressEl.style.display = 'block';
+
+  const BATCH_SIZE = 20;
+  let sentCount = 0, failCount = 0;
+  const failedNames = [];
+
+  for (let i = 0; i < leadIds.length; i += BATCH_SIZE) {
+    const batch = leadIds.slice(i, i + BATCH_SIZE);
+    progressText.textContent = 'Sending ' + Math.min(i + BATCH_SIZE, leadIds.length) + ' of ' + leadIds.length + '…';
+    progressBar.style.width = Math.round((i / leadIds.length) * 100) + '%';
+
+    try {
+      const r = await API.sendBulkWhatsAppBatch(batch, templateKey);
+      if (r.success && r.results) {
+        r.results.forEach(res => {
+          if (res.success) sentCount++;
+          else { failCount++; failedNames.push(res.customerName || res.leadId); }
+        });
+      } else {
+        failCount += batch.length;
+      }
+    } catch(e) {
+      failCount += batch.length;
+    }
+  }
+
+  progressBar.style.width = '100%';
+  progressText.textContent = 'Done';
+  sendBtn.disabled = false;
+  sendBtn.textContent = '📤 Send WhatsApp to Selected';
+
+  const summaryEl = document.getElementById('bulkWaResultSummary');
+  summaryEl.innerHTML =
+    '<div style="color:#166534;font-weight:700;">✅ Sent: ' + sentCount + '</div>' +
+    (failCount > 0 ? '<div style="color:#dc3545;font-weight:700;margin-top:4px;">❌ Failed: ' + failCount +
+      (failedNames.length ? ' (' + failedNames.slice(0, 5).map(esc).join(', ') + (failedNames.length > 5 ? '…' : '') + ')' : '') + '</div>' : '');
 }
 
 // ── ALL LEADS TAB ──────────────────────────
