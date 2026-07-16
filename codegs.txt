@@ -162,6 +162,18 @@ function handleRequest(e) {
       case 'sendBrochureWhatsApp':
         result = sendBrochureWhatsApp(params.sessionId, params.leadId, params.brochureName, params.driveFileId, params.customerName, params.customerPhone, params.modelName);
         break;
+      case 'getBulkWhatsAppFilterOptions':
+        result = getBulkWhatsAppFilterOptions(params.sessionId);
+        break;
+      case 'getBulkWhatsAppTemplates':
+        result = getBulkWhatsAppTemplates(params.sessionId);
+        break;
+      case 'getBulkWhatsAppCandidates':
+        result = getBulkWhatsAppCandidates(params.sessionId, params);
+        break;
+      case 'sendBulkWhatsAppBatch':
+        result = sendBulkWhatsAppBatch(params.sessionId, params.leadIds, params.templateKey);
+        break;
       case 'getSalesDashboard':
         result = getSalesDashboard(params.sessionId, params.dateFilter);
         break;
@@ -3813,6 +3825,273 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
 
   } catch(e) {
     Logger.log('sendBrochureWhatsApp error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Bulk WhatsApp — CRM feature letting admin/sales filter leads (date range, model,
+ * not-purchased, source) and send a bulk image-header WhatsApp template to the
+ * matched customers. Config keys required per template slot (1-3):
+ *   aisensy_campaign_bulk1 / aisensy_bulk1_image / aisensy_bulk1_label
+ *   aisensy_campaign_bulk2 / aisensy_bulk2_image / aisensy_bulk2_label
+ *   aisensy_campaign_bulk3 / aisensy_bulk3_image / aisensy_bulk3_label
+ * Template placeholder order: 1=customerName, 2=model, 3=execName, 4=execMobile
+ */
+
+/** Distinct model list for the Bulk WhatsApp filter panel. */
+function getBulkWhatsAppFilterOptions(sessionId) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    if (v.user.role !== 'admin' && v.user.role !== 'sales') return { success: false, message: 'Access denied' };
+
+    const rows = getSheet('CRM_Leads').getDataRange().getValues();
+    const modelSet = new Set();
+    for (let i = 1; i < rows.length; i++) {
+      const m = String(rows[i][5] || '').trim();
+      if (m) modelSet.add(m);
+    }
+    return { success: true, models: Array.from(modelSet).sort() };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/** Available bulk templates (only slots with both a campaign name and image configured). */
+function getBulkWhatsAppTemplates(sessionId) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    if (v.user.role !== 'admin' && v.user.role !== 'sales') return { success: false, message: 'Access denied' };
+
+    const cfg = _getMainConfig();
+    const templates = [];
+    for (let i = 1; i <= 3; i++) {
+      const campaign = (cfg['aisensy_campaign_bulk' + i] || '').trim();
+      const image    = (cfg['aisensy_bulk' + i + '_image'] || '').trim();
+      const label    = (cfg['aisensy_bulk' + i + '_label'] || ('Template ' + i)).trim();
+      if (campaign && image) templates.push({ templateKey: 'bulk' + i, label: label });
+    }
+    return { success: true, templates: templates };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Preview list: leads matching the filter (not sent yet).
+ * params: fromDate, toDate ('yyyy-MM-dd'), models (comma list or 'all'/''),
+ *         sources (comma list or 'all'/''), notPurchased ('yes' or '')
+ */
+function getBulkWhatsAppCandidates(sessionId, params) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    const user = v.user;
+    if (user.role !== 'admin' && user.role !== 'sales') return { success: false, message: 'Access denied' };
+
+    const fromDate = params.fromDate ? new Date(params.fromDate) : null;
+    const toDate   = params.toDate   ? new Date(params.toDate)   : null;
+    if (fromDate) fromDate.setHours(0, 0, 0, 0);
+    if (toDate)   toDate.setHours(23, 59, 59, 999);
+
+    const modelsStr = (params.models || '').toString().trim();
+    const modelSet  = (modelsStr && modelsStr !== 'all') ? new Set(modelsStr.split(',').map(function(m) { return m.trim(); })) : null;
+
+    const sourcesStr = (params.sources || '').toString().trim();
+    const sourceSet  = (sourcesStr && sourcesStr !== 'all') ? new Set(sourcesStr.split(',').map(function(s) { return s.trim(); })) : null;
+
+    const notPurchased = params.notPurchased === 'yes';
+
+    const rows = getSheet('CRM_Leads').getDataRange().getValues();
+    const leads = [];
+
+    for (let i = 1; i < rows.length; i++) {
+      const row = rows[i];
+      if (!row[0]) continue;
+
+      const assignedTo = String(row[8] || '').trim();
+      if (user.role === 'sales' && assignedTo !== user.name) continue;
+
+      const model  = String(row[5] || '').trim();
+      const source = String(row[6] || '').trim();
+      const status = String(row[7] || 'Pool');
+      const mobile = String(row[2] || '').trim();
+      if (!mobile) continue;
+
+      if (modelSet && !modelSet.has(model)) continue;
+      if (sourceSet && !sourceSet.has(source)) continue;
+      if (notPurchased && status === 'Converted') continue;
+
+      const createdAt = row[13] ? new Date(row[13]) : null;
+      if (fromDate || toDate) {
+        if (!createdAt || isNaN(createdAt.getTime())) continue;
+        if (fromDate && createdAt < fromDate) continue;
+        if (toDate   && createdAt > toDate)   continue;
+      }
+
+      leads.push({
+        leadId:       String(row[0]),
+        customerName: String(row[1] || '').trim(),
+        mobileNo:     mobile,
+        model:        model,
+        source:       source,
+        status:       status,
+        assignedTo:   assignedTo,
+        createdDate:  createdAt ? Utilities.formatDate(createdAt, Session.getScriptTimeZone(), 'yyyy-MM-dd') : ''
+      });
+    }
+
+    return { success: true, leads: leads };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Send the bulk WhatsApp image template to a batch of leadIds.
+ * Frontend calls this repeatedly in small batches (e.g. 20-25 leadIds per call)
+ * to stay well under the Apps Script execution time limit.
+ */
+function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    const user = v.user;
+    if (user.role !== 'admin' && user.role !== 'sales') return { success: false, message: 'Access denied' };
+
+    let leadIds;
+    try { leadIds = JSON.parse(leadIdsJson); } catch(e) { return { success: false, message: 'Invalid leadIds data' }; }
+    if (!leadIds || !leadIds.length) return { success: false, message: 'No leads provided' };
+
+    const cfg      = _getMainConfig();
+    const apiKey   = cfg['aisensy_api_key'] || '';
+    const campaign = cfg['aisensy_campaign_' + templateKey] || '';
+    const imageRef = cfg['aisensy_' + templateKey + '_image'] || '';
+    if (!apiKey)   return { success: false, message: 'AiSensy API key not set in Config sheet (key: aisensy_api_key)' };
+    if (!campaign) return { success: false, message: 'Campaign name not set in Config sheet (key: aisensy_campaign_' + templateKey + ')' };
+    if (!imageRef) return { success: false, message: 'Header image not set in Config sheet (key: aisensy_' + templateKey + '_image)' };
+
+    // Resolve + upload the header image once per batch (shared by every recipient in this call)
+    let fileId = imageRef.trim();
+    const idMatch = fileId.match(/\/d\/([a-zA-Z0-9_-]+)/);
+    if (idMatch) fileId = idMatch[1];
+
+    const token = ScriptApp.getOAuthToken();
+    const metaResp = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=name,mimeType',
+      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+    );
+    let mimeType = 'image/jpeg';
+    let fileName = 'promo.jpg';
+    if (metaResp.getResponseCode() === 200) {
+      const meta = JSON.parse(metaResp.getContentText());
+      mimeType = meta.mimeType || mimeType;
+      fileName = meta.name || fileName;
+    }
+
+    const imgResp = UrlFetchApp.fetch(
+      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+    );
+    if (imgResp.getResponseCode() !== 200) {
+      return { success: false, message: 'Could not fetch header image from Drive (HTTP ' + imgResp.getResponseCode() + ')' };
+    }
+    const imgBytes   = imgResp.getContent();
+    const uploadBlob = Utilities.newBlob(imgBytes, mimeType, fileName);
+
+    const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+    let fileUrl = driveUrl;
+    try {
+      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+      });
+      const u = r.getContentText().trim();
+      if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+    } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        });
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+        }
+      } catch(e) { Logger.log('[bulk-wa/uguu] exception: ' + e); }
+    }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
+          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
+        });
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.status === 'success' && j.data && j.data.url)
+            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+        }
+      } catch(e) { Logger.log('[bulk-wa/tmpfiles] exception: ' + e); }
+    }
+
+    // Build executive name → mobile lookup (Users sheet: Name=col D, Mobile=col I)
+    const usersRows = getSheet(CONFIG.SHEETS.USERS).getDataRange().getValues();
+    const execMobileMap = {};
+    for (let i = 1; i < usersRows.length; i++) {
+      const nm = String(usersRows[i][3] || '').trim();
+      if (nm) execMobileMap[nm] = String(usersRows[i][8] || '').trim();
+    }
+
+    const leadIdSet = new Set(leadIds.map(function(id) { return String(id); }));
+    const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
+
+    const results = [];
+    for (let i = 1; i < crmRows.length; i++) {
+      const row = crmRows[i];
+      const leadId = String(row[0] || '');
+      if (!leadId || !leadIdSet.has(leadId)) continue;
+
+      const customerName = String(row[1] || '').trim();
+      const mobile        = String(row[2] || '').trim();
+      const model          = String(row[5] || '').trim();
+      const assignedTo     = String(row[8] || '').trim();
+
+      const execName   = assignedTo || user.name;
+      const execMobile = execMobileMap[execName] || user.mobile || '';
+
+      const digits      = mobile.replace(/\D/g, '');
+      const mobile10     = digits.length > 10 ? digits.slice(-10) : digits;
+      const destination = '91' + mobile10;
+
+      const payload = {
+        apiKey:         apiKey,
+        campaignName:   campaign,
+        destination:    destination,
+        userName:       'Vinay Automobiles',
+        templateParams: [customerName, model, execName, execMobile],
+        media:          { url: fileUrl, filename: fileName }
+      };
+
+      try {
+        const resp = UrlFetchApp.fetch('https://backend.aisensy.com/campaign/t1/api/v2', {
+          method: 'post', contentType: 'application/json',
+          payload: JSON.stringify(payload), muteHttpExceptions: true
+        });
+        const code = resp.getResponseCode();
+        let parsed = {};
+        try { parsed = JSON.parse(resp.getContentText()); } catch(e) {}
+
+        if (code === 200 || code === 201 || (parsed && (parsed.status === 'success' || parsed.status === 'SUCCESS'))) {
+          try { logCRMInteraction(sessionId, leadId, 'Bulk WhatsApp Sent', 'Sent to ' + mobile, null); } catch(logErr) {}
+          results.push({ leadId: leadId, customerName: customerName, success: true });
+        } else {
+          const errMsg = (parsed && (parsed.message || parsed.error)) || ('HTTP ' + code);
+          results.push({ leadId: leadId, customerName: customerName, success: false, message: String(errMsg).slice(0, 200) });
+        }
+      } catch(sendErr) {
+        results.push({ leadId: leadId, customerName: customerName, success: false, message: sendErr.toString() });
+      }
+    }
+
+    return { success: true, results: results };
+  } catch(e) {
+    Logger.log('sendBulkWhatsAppBatch error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
 }
