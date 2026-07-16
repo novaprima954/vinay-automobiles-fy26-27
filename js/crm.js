@@ -1875,12 +1875,14 @@ function renderLeadDetail(lead) {
       ${lead.financierFollowUpDate      ? `<div class="detail-row"><span class="detail-label" style="color:#11998e;">📅 Follow-up</span><span class="detail-value" style="color:#11998e;font-weight:700;">${esc(lead.financierFollowUpDate)}</span></div>` : ''}
     </div>` : '';
 
-  // Assign financier button — always available to the owning sales exec (admin has its own
-  // always-visible button above; this lets the sales exec assign AND later reassign the financier)
-  const assignFinBtn = !isAdmin && currentUser.role === 'sales' && lead.assignedTo === currentUser.name ? `
+  // Assign financier button — shown to the owning sales exec only when no real financier is
+  // assigned yet (blank, or 'No Finance' picked at quotation time — that should still allow
+  // assigning a real financier later). Hidden once a real financier is assigned, same as before.
+  const noRealFinancier = !lead.financierAssigned || lead.financierAssigned === 'No Finance';
+  const assignFinBtn = !isAdmin && currentUser.role === 'sales' && lead.assignedTo === currentUser.name && noRealFinancier ? `
     <div style="padding:0 18px 10px;">
       <button class="btn-act" style="width:100%;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;padding:10px;font-size:13px;font-weight:700;cursor:pointer;"
-        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 ${lead.financierAssigned ? 'Reassign' : 'Assign'} Financier</button>
+        onclick="openAssignFinancierSheet('${lead.leadId}')">🏦 Assign Financier</button>
     </div>` : '';
 
   document.getElementById('detailSheetBody').innerHTML = `
