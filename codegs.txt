@@ -3968,68 +3968,85 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
     if (!campaign) return { success: false, message: 'Campaign name not set in Config sheet (key: aisensy_campaign_' + templateKey + ')' };
     if (!imageRef) return { success: false, message: 'Header image not set in Config sheet (key: aisensy_' + templateKey + '_image)' };
 
-    // Resolve + upload the header image once per batch (shared by every recipient in this call)
-    let fileId = imageRef.trim();
-    const idMatch = fileId.match(/\/d\/([a-zA-Z0-9_-]+)/);
-    if (idMatch) fileId = idMatch[1];
+    // Resolve the header image once per batch (shared by every recipient in this call).
+    // aisensy_{templateKey}_image may be either:
+    //   (a) a Google Drive file ID / share link — fetched via Drive API, then re-uploaded to a
+    //       temp image host (catbox/uguu/tmpfiles) since Drive links don't hotlink reliably, or
+    //   (b) an already-public direct URL (catbox, imgur, etc.) — used as-is, no fetch needed.
+    const rawRef  = imageRef.trim();
+    const isDriveRef = /drive\.google\.com/.test(rawRef) || /^[a-zA-Z0-9_-]{20,}$/.test(rawRef);
 
-    const token = ScriptApp.getOAuthToken();
-    const metaResp = UrlFetchApp.fetch(
-      'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=name,mimeType',
-      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
-    );
-    let mimeType = 'image/jpeg';
-    let fileName = 'promo.jpg';
-    if (metaResp.getResponseCode() === 200) {
-      const meta = JSON.parse(metaResp.getContentText());
-      mimeType = meta.mimeType || mimeType;
-      fileName = meta.name || fileName;
-    }
+    let fileUrl, fileName;
 
-    const imgResp = UrlFetchApp.fetch(
-      'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
-      { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
-    );
-    if (imgResp.getResponseCode() !== 200) {
-      return { success: false, message: 'Could not fetch header image from Drive (HTTP ' + imgResp.getResponseCode() + ')' };
-    }
-    const imgBytes   = imgResp.getContent();
-    const uploadBlob = Utilities.newBlob(imgBytes, mimeType, fileName);
+    if (!isDriveRef && /^https?:\/\//i.test(rawRef)) {
+      // Already a direct, publicly-hosted URL — use as-is
+      fileUrl  = rawRef;
+      fileName = rawRef.split('/').pop().split('?')[0] || 'promo.jpg';
+    } else {
+      let fileId = rawRef;
+      const idMatch = fileId.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (idMatch) fileId = idMatch[1];
 
-    const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
-    let fileUrl = driveUrl;
-    try {
-      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
-      });
-      const u = r.getContentText().trim();
-      if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
-    } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
+      const token = ScriptApp.getOAuthToken();
+      const metaResp = UrlFetchApp.fetch(
+        'https://www.googleapis.com/drive/v3/files/' + fileId + '?fields=name,mimeType',
+        { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+      );
+      let mimeType = 'image/jpeg';
+      fileName = 'promo.jpg';
+      if (metaResp.getResponseCode() === 200) {
+        const meta = JSON.parse(metaResp.getContentText());
+        mimeType = meta.mimeType || mimeType;
+        fileName = meta.name || fileName;
+      }
 
-    if (fileUrl === driveUrl) {
+      const imgResp = UrlFetchApp.fetch(
+        'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media',
+        { headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true }
+      );
+      if (imgResp.getResponseCode() !== 200) {
+        return { success: false, message: 'Could not fetch header image from Drive (HTTP ' + imgResp.getResponseCode() + '). If you pasted a direct image URL (not a Drive link), make sure it starts with http:// or https://.' };
+      }
+      const imgBytes   = imgResp.getContent();
+      const uploadBlob = Utilities.newBlob(imgBytes, mimeType, fileName);
+
+      const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
+      fileUrl = driveUrl;
       try {
-        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
         });
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
-        }
-      } catch(e) { Logger.log('[bulk-wa/uguu] exception: ' + e); }
+        const u = r.getContentText().trim();
+        if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+      } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
+
+      if (fileUrl === driveUrl) {
+        try {
+          const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+            method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+          });
+          if (r.getResponseCode() === 200) {
+            const j = JSON.parse(r.getContentText());
+            if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+          }
+        } catch(e) { Logger.log('[bulk-wa/uguu] exception: ' + e); }
+      }
+
+      if (fileUrl === driveUrl) {
+        try {
+          const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
+            method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
+          });
+          if (r.getResponseCode() === 200) {
+            const j = JSON.parse(r.getContentText());
+            if (j.status === 'success' && j.data && j.data.url)
+              fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+          }
+        } catch(e) { Logger.log('[bulk-wa/tmpfiles] exception: ' + e); }
+      }
     }
 
-    if (fileUrl === driveUrl) {
-      try {
-        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
-          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
-        });
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.status === 'success' && j.data && j.data.url)
-            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-        }
-      } catch(e) { Logger.log('[bulk-wa/tmpfiles] exception: ' + e); }
-    }
+    Logger.log('[bulk-wa] final fileUrl: ' + fileUrl);
 
     // Build executive name → mobile lookup (Users sheet: Name=col D, Mobile=col I)
     const usersRows = getSheet(CONFIG.SHEETS.USERS).getDataRange().getValues();
