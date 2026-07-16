@@ -2482,6 +2482,7 @@ function getMyLeads(sessionId, filterType) {
         assignedTo: assignedTo,
         followUpDate: formatDate(row[12]),
         lastContact: formatDate(row[11]),
+        createdDate: formatDate(row[13]),
         isSocial: isSocial,
         agingDays: _crmAgingDays(row[13]),
         isOverdue: !!(row[12] && _crmIsOverdue(row[12]) && status !== 'Converted' && status !== 'Lost'),
