@@ -3628,6 +3628,13 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       media: {
         url:      fileUrl,
         filename: fileName
+      },
+      // Contact attributes for segmentation in AiSensy (must already exist as attributes in
+      // the AiSensy project, else silently ignored — no error surfaced by their API)
+      attributes: {
+        ModelName: modelVariant || '',
+        '2nd':     execName     || '',
+        '3rd':     'Quotation Sent'
       }
     };
 
