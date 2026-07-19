@@ -35,50 +35,76 @@ function _isoToday() {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
 }
 
+function clearFilters() {
+  document.getElementById('dcSearch').value = '';
+  document.getElementById('dcFromDate').value = _isoToday();
+  document.getElementById('dcToDate').value = _isoToday();
+  loadList();
+}
+
 async function loadList() {
   const fromDate = document.getElementById('dcFromDate').value;
   const toDate   = document.getElementById('dcToDate').value;
   const search   = document.getElementById('dcSearch').value;
   const listEl   = document.getElementById('dcList');
+  document.getElementById('resultSummary').textContent = '';
 
   listEl.innerHTML = '<div class="empty-state">Loading…</div>';
 
   try {
     const r = await API.getDeliveryChallanList(fromDate, toDate, search);
     if (!r.success) {
-      listEl.innerHTML = '<div class="empty-state">' + esc(r.message || 'Error loading list') + '</div>';
+      listEl.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div>' + esc(r.message || 'Error loading list') + '</div>';
       return;
     }
     dcRecords = r.results || [];
-    renderList();
+    renderList(search.trim());
   } catch (e) {
-    listEl.innerHTML = '<div class="empty-state">Error loading list</div>';
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">⚠️</div>Error loading list</div>';
   }
 }
 
-function renderList() {
+function _initials(name) {
+  const parts = String(name || '').trim().split(/\s+/);
+  return ((parts[0] || '')[0] || '?').toUpperCase() + ((parts[1] || '')[0] || '').toUpperCase();
+}
+
+function renderList(searchTerm) {
   const listEl = document.getElementById('dcList');
+  const summaryEl = document.getElementById('resultSummary');
+
   if (dcRecords.length === 0) {
-    listEl.innerHTML = '<div class="empty-state">📭 No deliveries found for this filter</div>';
+    listEl.innerHTML = '<div class="empty-state"><div class="icon">📭</div>No deliveries found for this filter</div>';
+    summaryEl.textContent = '';
     return;
   }
+
+  summaryEl.textContent = dcRecords.length + (dcRecords.length === 1 ? ' delivery found' : ' deliveries found') +
+    (searchTerm ? ' for "' + searchTerm + '" (all dates)' : '');
 
   listEl.innerHTML = dcRecords.map(function (rec, idx) {
     const modelLine = [rec.model, rec.variant].filter(Boolean).join(' ');
     const pendingBadge = rec.accessoryPending
       ? '<div class="pending-badge">⚠️ Pending: ' + esc(rec.accessoryPending) + '</div>'
       : '';
+    const rowClass = rec.challanNo ? 'is-issued' : (rec.accessoryPending ? 'has-pending' : '');
     const rightSide = rec.challanNo
-      ? '<span class="challan-badge">DO #' + esc(rec.challanNo) + '</span> <button onclick="printRecord(' + idx + ')">🖨️ Print Again</button>'
+      ? '<span class="challan-badge">✅ DO #' + esc(rec.challanNo) + '</span><button class="reprint" onclick="printRecord(' + idx + ')">🖨️ Print Again</button>'
       : '<button onclick="printRecord(' + idx + ')"' + (rec.canPrint ? '' : ' disabled') + '>🖨️ Print DO</button>';
 
-    return '<div class="dc-row">' +
+    return '<div class="dc-row ' + rowClass + '">' +
+      '<div class="dc-avatar">' + esc(_initials(rec.customerName)) + '</div>' +
       '<div class="info">' +
         '<div class="customer">' + esc(rec.customerName) + '</div>' +
-        '<div class="meta">' + esc(rec.receiptNo) + ' · ' + esc(modelLine) + ' · 👤 ' + esc(rec.executiveName || 'Unassigned') + ' · 📅 ' + esc(rec.deliveryDate) + '</div>' +
+        '<div class="pills">' +
+          '<span class="dc-pill">🧾 ' + esc(rec.receiptNo) + '</span>' +
+          '<span class="dc-pill">🏍️ ' + esc(modelLine) + '</span>' +
+          '<span class="dc-pill">👤 ' + esc(rec.executiveName || 'Unassigned') + '</span>' +
+          '<span class="dc-pill">📅 ' + esc(rec.deliveryDate) + '</span>' +
+        '</div>' +
         pendingBadge +
       '</div>' +
-      rightSide +
+      '<div class="actions">' + rightSide + '</div>' +
     '</div>';
   }).join('');
 }

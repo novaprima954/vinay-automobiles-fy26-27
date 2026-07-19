@@ -6,43 +6,81 @@
   <title>Delivery Challan - Vinay Automobiles</title>
   <link rel="stylesheet" href="css/common.css">
   <style>
-    .filter-bar {
-      display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
-      background:#f8f9fa; border:2px solid #e9ecef; border-radius:12px; padding:16px; margin-bottom:20px;
+    body { background:#f4f5f9; }
+
+    .filter-card {
+      background:white; border-radius:14px; padding:18px 20px; margin-bottom:22px;
+      box-shadow:0 2px 10px rgba(0,0,0,0.06);
     }
-    .filter-bar .field { display:flex; flex-direction:column; gap:5px; }
-    .filter-bar label { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.4px; }
+    .filter-card-title {
+      font-size:13px; font-weight:800; color:#667eea; text-transform:uppercase; letter-spacing:0.5px;
+      margin-bottom:12px; display:flex; align-items:center; gap:6px;
+    }
+    .filter-bar { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+    .filter-bar .field { display:flex; flex-direction:column; gap:6px; }
+    .filter-bar label { font-size:11px; font-weight:700; color:#999; text-transform:uppercase; letter-spacing:0.4px; }
     .filter-bar input {
-      padding:9px 12px; border:2px solid #ddd; border-radius:8px; font-size:14px; box-sizing:border-box;
+      padding:10px 13px; border:2px solid #e6e6ef; border-radius:10px; font-size:14px; box-sizing:border-box;
+      transition:border-color 0.15s; background:#fafafe;
     }
-    .filter-bar input[type="text"] { min-width:200px; }
-    .filter-bar button {
-      padding:10px 20px; background:linear-gradient(135deg,#667eea,#764ba2); color:white;
-      border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; height:38px;
+    .filter-bar input:focus { outline:none; border-color:#667eea; background:white; }
+    .filter-bar input[type="text"] { min-width:230px; }
+    .filter-bar .search-field { flex:1; min-width:230px; position:relative; }
+    .filter-bar .search-field input { width:100%; padding-left:34px; }
+    .filter-bar .search-field .icon { position:absolute; left:12px; top:37px; font-size:14px; color:#aaa; }
+    .filter-bar button.clear-btn {
+      padding:10px 16px; background:#f0f1f7; color:#667eea; border:2px solid #e6e6ef;
+      border-radius:10px; font-size:13px; font-weight:700; cursor:pointer; height:42px;
+    }
+    .filter-mode-hint { font-size:12px; color:#999; margin-top:10px; font-style:italic; }
+
+    .result-summary {
+      display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;
+      padding:0 4px; font-size:13px; color:#777; font-weight:600;
     }
 
-    .dc-list { display:flex; flex-direction:column; gap:10px; }
+    .dc-list { display:flex; flex-direction:column; gap:12px; }
     .dc-row {
-      display:flex; align-items:center; gap:14px; background:white; border:2px solid #eee;
-      border-radius:10px; padding:12px 16px; flex-wrap:wrap;
+      display:flex; align-items:center; gap:16px; background:white; border-radius:14px;
+      padding:16px 18px; flex-wrap:wrap; box-shadow:0 1px 4px rgba(0,0,0,0.05);
+      border-left:4px solid #667eea; transition:box-shadow 0.15s;
     }
+    .dc-row:hover { box-shadow:0 4px 14px rgba(0,0,0,0.09); }
+    .dc-row.has-pending { border-left-color:#ff9800; }
+    .dc-row.is-issued { border-left-color:#43e97b; }
+
+    .dc-avatar {
+      width:44px; height:44px; border-radius:50%; background:linear-gradient(135deg,#667eea,#764ba2);
+      color:white; font-weight:800; font-size:16px; display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+    }
+
     .dc-row .info { flex:1; min-width:220px; }
-    .dc-row .customer { font-weight:800; font-size:15px; color:#222; }
-    .dc-row .meta { font-size:12px; color:#888; margin-top:2px; }
+    .dc-row .customer { font-weight:800; font-size:16px; color:#222; margin-bottom:4px; }
+    .dc-row .pills { display:flex; flex-wrap:wrap; gap:6px; }
+    .dc-pill {
+      font-size:11.5px; font-weight:600; color:#555; background:#f4f5f9; border-radius:20px;
+      padding:3px 10px; display:inline-flex; align-items:center; gap:4px;
+    }
     .dc-row .pending-badge {
-      display:inline-block; margin-top:4px; font-size:11px; font-weight:700; color:#e65100;
-      background:#fff3e0; border:1px solid #ff9800; border-radius:6px; padding:2px 8px;
+      display:inline-block; margin-top:6px; font-size:11.5px; font-weight:700; color:#e65100;
+      background:#fff3e0; border:1px solid #ffcc80; border-radius:8px; padding:4px 10px;
     }
     .dc-row .challan-badge {
-      font-size:12px; font-weight:800; color:#2e7d32; background:#e8f5e9; border-radius:6px; padding:4px 10px;
+      font-size:12.5px; font-weight:800; color:#1b5e20; background:#e8f5e9; border-radius:20px;
+      padding:6px 14px; white-space:nowrap;
     }
+    .dc-row .actions { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
     .dc-row button {
-      padding:9px 18px; background:linear-gradient(135deg,#43e97b,#38f9d7); color:white;
-      border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;
+      padding:10px 20px; background:linear-gradient(135deg,#43e97b,#38f9d7); color:white;
+      border:none; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;
+      box-shadow:0 2px 6px rgba(67,233,123,0.35);
     }
-    .dc-row button:disabled { opacity:0.5; cursor:not-allowed; background:#ccc; }
+    .dc-row button.reprint { background:linear-gradient(135deg,#90a4ae,#78909c); box-shadow:none; }
+    .dc-row button:disabled { opacity:0.45; cursor:not-allowed; background:#ccc; box-shadow:none; }
 
-    .empty-state { text-align:center; color:#999; padding:40px 20px; font-size:14px; }
+    .empty-state { text-align:center; color:#999; padding:60px 20px; font-size:14px; }
+    .empty-state .icon { font-size:40px; margin-bottom:10px; }
 
     /* ── Printable Delivery Challan (hidden on screen, shown only via print) ── */
     #doPrintArea { display:none; }
@@ -56,42 +94,43 @@
 
     .do-page { display:flex; gap:0; width:100%; }
     .do-copy {
-      flex:1; padding:12px 16px; font-family:'Segoe UI', Arial, sans-serif; font-size:12px; color:#1a1a1a;
+      flex:1; padding:14px 18px; font-family:'Segoe UI', Arial, sans-serif; font-size:12px; color:#1a1a1a;
       box-sizing:border-box;
     }
     .do-copy + .do-copy { border-left:2px dashed #bbb; }
 
-    .do-header { text-align:center; margin-bottom:6px; position:relative; }
+    .do-header { text-align:center; margin-bottom:7px; position:relative; padding-bottom:6px; border-bottom:3px solid #b71c1c; }
     .do-header .tvs {
-      position:absolute; right:0; top:2px; font-size:15px; font-weight:800; color:#b71c1c; letter-spacing:0.5px;
+      position:absolute; right:0; top:4px; font-size:16px; font-weight:800; color:#b71c1c; letter-spacing:1px;
+      font-style:italic;
     }
-    .do-header .company { font-size:21px; font-weight:800; color:#b71c1c; letter-spacing:0.5px; }
-    .do-header .addr { font-size:10.5px; color:#444; margin-top:2px; }
-    .do-header .contact { font-size:10.5px; color:#444; margin-top:2px; font-weight:600; }
+    .do-header .company { font-size:22px; font-weight:800; color:#b71c1c; letter-spacing:0.8px; }
+    .do-header .addr { font-size:10.5px; color:#555; margin-top:3px; }
+    .do-header .contact { font-size:10.5px; color:#333; margin-top:3px; font-weight:700; }
 
-    .do-box { border:1.5px solid #b71c1c; border-radius:8px; padding:10px 12px; margin-top:8px; }
-    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #b71c1c; padding-bottom:7px; margin-bottom:7px; gap:20px; }
+    .do-box { border:1.5px solid #b71c1c; border-radius:8px; padding:11px 13px; margin-top:9px; }
+    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #b71c1c; padding-bottom:8px; margin-bottom:8px; gap:24px; }
     .do-top-row .meta-block { text-align:right; }
-    .do-field-label { font-size:9px; color:#b71c1c; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; }
-    .do-field-value { font-size:13.5px; font-weight:700; border-bottom:1px solid #aaa; display:inline-block; min-width:150px; padding-bottom:1px; }
+    .do-field-label { font-size:9px; color:#b71c1c; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; }
+    .do-field-value { font-size:14px; font-weight:700; border-bottom:1px solid #999; display:inline-block; min-width:155px; padding-bottom:2px; margin-top:1px; }
 
-    .do-declaration { font-size:10.5px; margin:7px 0; line-height:1.5; color:#333; }
+    .do-declaration { font-size:10.5px; margin:8px 0; line-height:1.5; color:#333; }
 
-    .do-desc-title { font-size:11px; font-weight:800; color:#b71c1c; margin-top:6px; text-transform:uppercase; letter-spacing:0.3px; }
-    .do-desc-row { display:flex; gap:8px; font-size:12px; margin:5px 0; align-items:baseline; }
-    .do-desc-row .lbl { min-width:88px; color:#555; font-weight:600; }
-    .do-desc-row .val { flex:1; border-bottom:1px solid #aaa; font-weight:700; padding-bottom:1px; }
+    .do-desc-title { font-size:11px; font-weight:800; color:#b71c1c; margin-top:7px; text-transform:uppercase; letter-spacing:0.4px; }
+    .do-desc-row { display:flex; gap:9px; font-size:12px; margin:5px 0; align-items:baseline; }
+    .do-desc-row .lbl { min-width:90px; color:#555; font-weight:600; }
+    .do-desc-row .val { flex:1; border-bottom:1px solid #999; font-weight:700; padding-bottom:1px; }
 
-    .do-received-title { font-size:11px; font-weight:800; margin-top:10px; text-transform:uppercase; letter-spacing:0.3px; color:#333; }
-    .do-checks { display:flex; flex-wrap:wrap; gap:12px 18px; margin-top:7px; }
-    .do-check-item { display:flex; align-items:center; gap:5px; font-size:11px; color:#333; }
+    .do-received-title { font-size:11px; font-weight:800; margin-top:11px; text-transform:uppercase; letter-spacing:0.4px; color:#333; }
+    .do-checks { display:flex; flex-wrap:wrap; gap:12px 20px; margin-top:8px; }
+    .do-check-item { display:flex; align-items:center; gap:6px; font-size:11px; color:#333; }
     .do-check-box { width:13px; height:13px; border:1.5px solid #333; display:inline-block; border-radius:2px; }
 
-    .do-pending { margin-top:9px; font-size:11px; background:#fff3e0; border:1px solid #ff9800; border-radius:6px; padding:6px 9px; }
+    .do-pending { margin-top:10px; font-size:11px; background:#fff3e0; border:1px solid #ff9800; border-radius:6px; padding:6px 10px; }
     .do-pending .title { font-weight:800; color:#e65100; }
 
-    .do-sign-row { display:flex; justify-content:space-between; margin-top:24px; font-size:11px; font-weight:700; color:#333; }
-    .do-sign-row .line { border-top:1px solid #555; padding-top:4px; min-width:150px; text-align:center; }
+    .do-sign-row { display:flex; justify-content:space-between; margin-top:26px; font-size:11px; font-weight:700; color:#333; }
+    .do-sign-row .line { border-top:1px solid #555; padding-top:5px; min-width:155px; text-align:center; }
   </style>
 </head>
 <body>
@@ -110,22 +149,28 @@
     <div class="content">
       <div id="statusMessage" class="message hidden"></div>
 
-      <div class="filter-bar">
-        <div class="field">
-          <label>From</label>
-          <input type="date" id="dcFromDate" onchange="loadList()">
+      <div class="filter-card">
+        <div class="filter-card-title">🔍 Find Deliveries</div>
+        <div class="filter-bar">
+          <div class="field">
+            <label>From</label>
+            <input type="date" id="dcFromDate" onchange="loadList()">
+          </div>
+          <div class="field">
+            <label>To</label>
+            <input type="date" id="dcToDate" onchange="loadList()">
+          </div>
+          <div class="search-field">
+            <label>Customer Name</label>
+            <span class="icon">👤</span>
+            <input type="text" id="dcSearch" placeholder="Search across all deliveries…" oninput="loadList()">
+          </div>
+          <button class="clear-btn" onclick="clearFilters()">✕ Clear</button>
         </div>
-        <div class="field">
-          <label>To</label>
-          <input type="date" id="dcToDate" onchange="loadList()">
-        </div>
-        <div class="field">
-          <label>Customer Name</label>
-          <input type="text" id="dcSearch" placeholder="Search by customer name…" oninput="loadList()">
-        </div>
-        <button onclick="loadList()">🔄 Refresh</button>
+        <div class="filter-mode-hint">💡 Typing a customer name searches across <strong>all</strong> deliveries — the date range only applies when the name field is empty.</div>
       </div>
 
+      <div class="result-summary" id="resultSummary"></div>
       <div id="dcList" class="dc-list"></div>
     </div>
   </div>
