@@ -3653,23 +3653,32 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
     // uc?export=download can redirect through Google's virus-scan confirmation page
     // → AiSensy fetches HTML instead of PDF → WhatsApp stores wrong MIME → mobile shows .bin
     //
-    // Strategy: try three external hosts that serve files with Content-Type: application/pdf.
-    // Each logs its full response so we can diagnose which one is reachable from GAS servers.
-    // Falls back to Drive only if all three fail.
+    // Strategy: try Firebase Storage first (own infrastructure, most reliable), then external
+    // free hosts as fallback. Each logs its full response so we can diagnose which one is
+    // reachable from GAS servers. Falls back to Drive only if everything else fails.
     let fileUrl = driveUrl;
     const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
 
-    // ── Attempt 1: uguu.se (verified working — direct CDN URL, no confirmation page) ──
+    // ── Attempt 0: Firebase Storage (own project — most reliable, no third-party dependency) ──
     try {
-      const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-        method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
-      });
-      Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-      if (r.getResponseCode() === 200) {
-        const j = JSON.parse(r.getContentText());
-        if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
-      }
-    } catch(e) { Logger.log('[uguu] exception: ' + e); }
+      const fbUrl = _uploadToFirebaseStorage(pdfBytes, fileName);
+      if (fbUrl) { fileUrl = fbUrl; }
+      Logger.log('[firebase] uploaded: ' + fbUrl);
+    } catch(e) { Logger.log('[firebase] exception: ' + e); }
+
+    // ── Attempt 1: uguu.se (verified working — direct CDN URL, no confirmation page) ──
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
+        }
+      } catch(e) { Logger.log('[uguu] exception: ' + e); }
+    }
 
     // ── Attempt 2: catbox.moe (if uguu failed — currently returns 412, kept in case it recovers) ──
     if (fileUrl === driveUrl) {
@@ -3844,20 +3853,28 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
     const fileName   = brochureName + '.pdf';
     const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
 
-    // 2. Try temp hosts for a direct-download URL (same chain as quotation)
+    // 2. Try Firebase Storage first, then temp hosts for a direct-download URL (same chain as quotation)
     const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
     let fileUrl = driveUrl;
 
     try {
-      const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-        method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
-      });
-      Logger.log('[brochure/uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-      if (r.getResponseCode() === 200) {
-        const j = JSON.parse(r.getContentText());
-        if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
-      }
-    } catch(e) { Logger.log('[brochure/uguu] exception: ' + e); }
+      const fbUrl = _uploadToFirebaseStorage(pdfBytes, fileName);
+      if (fbUrl) fileUrl = fbUrl;
+      Logger.log('[brochure/firebase] uploaded: ' + fbUrl);
+    } catch(e) { Logger.log('[brochure/firebase] exception: ' + e); }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
+        });
+        Logger.log('[brochure/uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+        }
+      } catch(e) { Logger.log('[brochure/uguu] exception: ' + e); }
+    }
 
     if (fileUrl === driveUrl) {
       try {
