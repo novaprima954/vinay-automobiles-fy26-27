@@ -2806,6 +2806,23 @@ function logCRMInteraction(sessionId, leadId, interactionType, note, followUpDat
         if (note) sheet.getRange(targetRow, 17).setValue(note);
       }
 
+      // Finance interaction types double as loan-status updates (col V=22), since the
+      // Finance Details form no longer has a separate Loan Status field — logging the
+      // interaction IS how the financier updates status now.
+      var financeStatusMap = {
+        'Application Submitted': 'Applied',
+        'Documents Collected':   'Under Process',
+        'Loan Approved':         'Approved',
+        'Disbursement Done':     'Disbursed',
+        'Loan Rejected':         'Rejected'
+      };
+      if (financeStatusMap[interactionType]) {
+        var newLoanStatus = financeStatusMap[interactionType];
+        sheet.getRange(targetRow, 22).setValue(newLoanStatus);
+        // Disbursed = auto-convert the sales-side status too
+        if (newLoanStatus === 'Disbursed') sheet.getRange(targetRow, 8).setValue('Converted');
+      }
+
       sheet.getRange(targetRow, 16).setValue(now);
       SpreadsheetApp.flush();
 
@@ -2924,11 +2941,9 @@ function getFinancierDashboard(sessionId) {
     var data  = sheet.getDataRange().getValues();
     var today = new Date(); today.setHours(0,0,0,0);
     var weekEnd = new Date(today); weekEnd.setDate(today.getDate() + 7);
-    var now = new Date();
-    var thisMonth = now.getMonth(); var thisYear = now.getFullYear();
 
     var totalEnquiry = 0, overdueCount = 0, todayCount = 0;
-    var underProcess = 0, disbursedThisMonth = 0;
+    var underProcess = 0, disbursed = 0;
     var overdueLeads = [], todayLeads = [], weekLeads = [];
 
     for (var i = 1; i < data.length; i++) {
@@ -2941,10 +2956,7 @@ function getFinancierDashboard(sessionId) {
       if (fuDate) fuDate.setHours(0,0,0,0);
 
       if (loanStatus === 'Under Process' || loanStatus === 'Applied' || loanStatus === 'Approved') underProcess++;
-      if (loanStatus === 'Disbursed') {
-        var cd = row[13] ? new Date(row[13]) : null;
-        if (cd && cd.getMonth() === thisMonth && cd.getFullYear() === thisYear) disbursedThisMonth++;
-      }
+      if (loanStatus === 'Disbursed') disbursed++;
       if (fuDate && loanStatus !== 'Disbursed' && loanStatus !== 'Rejected' && loanStatus !== 'Not Interested') {
         if (fuDate < today) { overdueCount++; overdueLeads.push(_crmRowToObj(row)); }
         else if (fuDate.getTime() === today.getTime()) { todayCount++; todayLeads.push(_crmRowToObj(row)); }
@@ -2953,7 +2965,7 @@ function getFinancierDashboard(sessionId) {
     }
     return { success: true, dashboard: {
       totalEnquiry: totalEnquiry, overdueCount: overdueCount, todayCount: todayCount,
-      underProcess: underProcess, disbursedThisMonth: disbursedThisMonth,
+      underProcess: underProcess, disbursed: disbursed,
       overdueLeads: overdueLeads, todayLeads: todayLeads, weekLeads: weekLeads
     }};
   } catch(e) {
@@ -3122,6 +3134,15 @@ function convertLeadToSale(sessionId, leadId) {
       sheet.getRange(targetRow, 11).setValue(existingLog);
       sheet.getRange(targetRow, 12).setValue(now);
       sheet.getRange(targetRow, 16).setValue(now);
+
+      // Vice versa of the Disbursed→Converted auto-sync: if a financier is assigned and the
+      // loan isn't already marked Disbursed, converting the sale marks the loan Disbursed too.
+      var finAssigned = String(data[i][20] || '');
+      var loanStatus  = String(data[i][21] || '');
+      if (finAssigned && loanStatus !== 'Disbursed') {
+        sheet.getRange(targetRow, 22).setValue('Disbursed');
+      }
+
       SpreadsheetApp.flush();
 
       return {
