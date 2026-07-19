@@ -610,6 +610,9 @@ function applyFinancierLeadsFilter() {
 
   if (currentMyLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentMyLeadsSearch));
 
+  // Newest leads first
+  leads = leads.slice().sort((a, b) => (b.createdDate || '').localeCompare(a.createdDate || ''));
+
   financierLeadsFiltered = leads;
   renderFinancierLeads();
 }
@@ -639,13 +642,18 @@ function financierLeadCardHtml(lead) {
       <div class="lead-info-row">👤 ${esc(lead.assignedTo || 'Pool')} &nbsp;📅 ${esc(lead.followUpDate || '—')}</div>
       ${lead.loanAmount > 0 ? `<div class="lead-info-row">💰 Loan: ₹${lead.loanAmount.toLocaleString('en-IN')} &nbsp;📆 ${lead.tenure || '—'}m</div>` : ''}
     </div>
+    ${loanSt === 'Disbursed' ? `
+    <div class="lead-actions">
+      <div style="flex:1;text-align:center;padding:8px;font-size:12px;font-weight:700;color:#388E3C;">🔒 Disbursed — locked</div>
+      <button class="btn-act btn-edit-act"  onclick="openLead('${lead.leadId}')">Details</button>
+    </div>` : `
     <div class="lead-actions">
       <button class="btn-act btn-call-act"  onclick="callAndLog('${esc(lead.mobileNo || '')}','${lead.leadId}')">📞 Call</button>
       <button class="btn-act btn-log-act"   onclick="openLogSheet('${lead.leadId}')">📝 Log</button>
       <button class="btn-act" style="flex:1;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;"
         onclick="openFinanceSheet('${lead.leadId}')">🏦 Finance</button>
       <button class="btn-act btn-edit-act"  onclick="openLead('${lead.leadId}')">Details</button>
-    </div>
+    </div>`}
   </div>`;
 }
 
@@ -1884,8 +1892,9 @@ function renderLeadDetail(lead) {
     <div class="detail-section">
       <div style="display:flex;align-items:center;justify-content:space-between;">
         <div class="detail-section-title">🏦 Finance Details</div>
-        ${(isAdmin || isFinancier) && lead.financierAssigned ? `<button class="btn-act" style="padding:5px 12px;font-size:12px;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;cursor:pointer;font-weight:700;"
+        ${(isAdmin || isFinancier) && lead.financierAssigned && !(isFinancier && lead.loanStatus === 'Disbursed') ? `<button class="btn-act" style="padding:5px 12px;font-size:12px;background:#f0f9ff;color:#11998e;border:1.5px solid #11998e;border-radius:8px;cursor:pointer;font-weight:700;"
           onclick="openFinanceSheet('${lead.leadId}')">✏️ Update</button>` : ''}
+        ${isFinancier && lead.financierAssigned && lead.loanStatus === 'Disbursed' ? `<span style="font-size:11px;font-weight:700;color:#388E3C;">🔒 Locked</span>` : ''}
       </div>
       ${lead.financierAssigned ? `<div class="detail-row"><span class="detail-label">Financier</span><span class="detail-value" style="font-weight:800;">${esc(lead.financierAssigned)}</span></div>` : ''}
       ${lead.loanStatus ? `<div class="detail-row"><span class="detail-label">Loan Status</span><span class="detail-value"><span style="font-weight:700;color:${loanColor};">${esc(lead.loanStatus)}</span></span></div>` : ''}
@@ -2021,15 +2030,32 @@ function openLogSheet(leadId, isPoolClaim) {
   openSheet('logSheet');
 }
 
+const FINANCE_STATUS_TYPES = ['Documents Collected', 'Application Submitted', 'Loan Approved', 'Disbursement Done', 'Loan Rejected'];
+
 function selectNoteType(el, type) {
+  const isFinancier = currentUser && currentUser.role === 'financier';
+
+  // Disbursement Done requires finance details (scheme/loan amount/EMI) to already be filled in
+  if (isFinancier && type === 'Disbursement Done') {
+    const leadId = document.getElementById('logLeadId').value;
+    const lead = _findFinancierLead(leadId);
+    const hasFinanceDetails = lead && (lead.financeScheme || lead.loanAmount > 0 || lead.emi > 0);
+    if (!hasFinanceDetails) {
+      alert('Please add Finance Details (Scheme, Loan Amount, or EMI) via 🏦 Finance before marking Disbursement Done.');
+      return;
+    }
+  }
+
   selectedNoteType = type;
   document.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
 
-  const isFinancier = currentUser && currentUser.role === 'financier';
+  const isFinanceStatusType = FINANCE_STATUS_TYPES.includes(type);
   document.getElementById('lostReasonSection').style.display  = type === 'Lost' ? '' : 'none';
   document.getElementById('otherNoteSection').style.display   = type !== 'Lost' ? '' : 'none'; // show for ALL except Lost
-  document.getElementById('followupDateRow').style.display    = type === 'Lost' ? 'none' : '';
+  // No follow-up needed for Lost, or for finance status types (Documents Collected, Application
+  // Submitted, Loan Approved, Disbursement Done, Loan Rejected) — those are one-shot status updates
+  document.getElementById('followupDateRow').style.display    = (type === 'Lost' || isFinanceStatusType) ? 'none' : '';
   // Sales-funnel status buttons (New/Contacted/Interested) don't apply to the financier role —
   // loan status is set via the finance-specific note types themselves (Application Submitted, etc.)
   document.getElementById('statusChangeRow').style.display    = (type !== 'Lost' && !isFinancier) ? '' : 'none';
@@ -2057,8 +2083,10 @@ async function submitLog() {
   }
 
   const followUpDate = document.getElementById('logFollowUpDate').value || null;
-  // Follow-up date is mandatory for all types except Lost
-  if (selectedNoteType !== 'Lost' && !followUpDate) {
+  // Follow-up date is mandatory for all types except Lost — but not required for the financier
+  // role (finance status types don't even show the field; other finance notes make it optional)
+  const isFinancierSubmit = currentUser && currentUser.role === 'financier';
+  if (selectedNoteType !== 'Lost' && !isFinancierSubmit && !followUpDate) {
     alert('Please select a next follow-up date');
     return;
   }
