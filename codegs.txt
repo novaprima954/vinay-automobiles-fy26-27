@@ -12219,12 +12219,18 @@ function getDeliveryChallanList(sessionId, fromDate, toDate, search) {
     if (!v.success) return v;
     if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
 
-    const from = fromDate ? new Date(fromDate) : new Date();
-    const to   = toDate   ? new Date(toDate)   : new Date();
-    from.setHours(0, 0, 0, 0);
-    to.setHours(23, 59, 59, 999);
-
     const searchLower = (search || '').toLowerCase().trim();
+
+    // Date range and name search are independent, not ANDed: when searching by name, the date
+    // range is ignored entirely (search across all deliveries); when no name is given, the date
+    // range applies on its own (defaults to today if not set).
+    let from = null, to = null;
+    if (!searchLower) {
+      from = fromDate ? new Date(fromDate) : new Date();
+      to   = toDate   ? new Date(toDate)   : new Date();
+      from.setHours(0, 0, 0, 0);
+      to.setHours(23, 59, 59, 999);
+    }
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data  = sheet.getDataRange().getValues();
@@ -12237,7 +12243,7 @@ function getDeliveryChallanList(sessionId, fromDate, toDate, search) {
 
       const deliveryDate = row[11] ? new Date(row[11]) : null;
       if (!deliveryDate || isNaN(deliveryDate.getTime())) continue;
-      if (deliveryDate < from || deliveryDate > to) continue;
+      if (from && (deliveryDate < from || deliveryDate > to)) continue;
 
       const customerName = String(row[3] || '');
       if (searchLower && customerName.toLowerCase().indexOf(searchLower) === -1) continue;
