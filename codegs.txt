@@ -3622,7 +3622,22 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
     } catch(e) { Logger.log('[catbox] exception: ' + e); }
 
-    // ── Attempt 2: uguu.se (if catbox failed) ─────────────────────────────
+    // ── Attempt 2: 0x0.st (if catbox failed) ──────────────────────────────
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://0x0.st', {
+          method: 'POST',
+          payload: { file: uploadBlob },
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
+          muteHttpExceptions: true
+        });
+        Logger.log('[0x0] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        const u = r.getContentText().trim();
+        if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
+      } catch(e) { Logger.log('[0x0] exception: ' + e); }
+    }
+
+    // ── Attempt 3: uguu.se (if catbox and 0x0.st failed) ──────────────────
     if (fileUrl === driveUrl) {
       try {
         const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
@@ -3636,7 +3651,7 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       } catch(e) { Logger.log('[uguu] exception: ' + e); }
     }
 
-    // ── Attempt 3: tmpfiles.org (if uguu failed) ──────────────────────────
+    // ── Attempt 4: tmpfiles.org (last resort before Drive) ────────────────
     if (fileUrl === driveUrl) {
       try {
         const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
@@ -3809,6 +3824,20 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
       const u = r.getContentText().trim();
       if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
     } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://0x0.st', {
+          method: 'POST',
+          payload: { file: uploadBlob },
+          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
+          muteHttpExceptions: true
+        });
+        Logger.log('[brochure/0x0] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        const u2 = r.getContentText().trim();
+        if (r.getResponseCode() === 200 && u2.startsWith('https://')) fileUrl = u2;
+      } catch(e) { Logger.log('[brochure/0x0] exception: ' + e); }
+    }
 
     if (fileUrl === driveUrl) {
       try {
@@ -4074,6 +4103,19 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
         const u = r.getContentText().trim();
         if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
       } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
+
+      if (fileUrl === driveUrl) {
+        try {
+          const r = UrlFetchApp.fetch('https://0x0.st', {
+            method: 'POST',
+            payload: { file: uploadBlob },
+            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
+            muteHttpExceptions: true
+          });
+          const u2 = r.getContentText().trim();
+          if (r.getResponseCode() === 200 && u2.startsWith('https://')) fileUrl = u2;
+        } catch(e) { Logger.log('[bulk-wa/0x0] exception: ' + e); }
+      }
 
       if (fileUrl === driveUrl) {
         try {
