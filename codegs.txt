@@ -3590,23 +3590,11 @@ function searchCRMLeads(sessionId, query) {
 function testFileHosts() {
   const testBlob = Utilities.newBlob('This is a test file for upload diagnostics.', 'text/plain', 'test.txt');
 
-  Logger.log('=== Testing catbox.moe ===');
+  Logger.log('=== Testing Firebase Storage ===');
   try {
-    const r1 = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-      method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: testBlob }, muteHttpExceptions: true
-    });
-    Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | body: ' + r1.getContentText().substring(0, 300));
-  } catch(e) { Logger.log('catbox EXCEPTION: ' + e); }
-
-  Logger.log('=== Testing 0x0.st ===');
-  try {
-    const r2 = UrlFetchApp.fetch('https://0x0.st', {
-      method: 'POST', payload: { file: testBlob },
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
-      muteHttpExceptions: true
-    });
-    Logger.log('0x0.st HTTP ' + r2.getResponseCode() + ' | body: ' + r2.getContentText().substring(0, 300));
-  } catch(e) { Logger.log('0x0.st EXCEPTION: ' + e); }
+    const fbUrl = _uploadToFirebaseStorage(Utilities.newBlob('test').getBytes(), 'diagnostic-test.txt');
+    Logger.log('firebase SUCCESS | url: ' + fbUrl);
+  } catch(e) { Logger.log('firebase EXCEPTION: ' + e); }
 
   Logger.log('=== Testing uguu.se ===');
   try {
@@ -3616,15 +3604,15 @@ function testFileHosts() {
     Logger.log('uguu HTTP ' + r3.getResponseCode() + ' | body: ' + r3.getContentText().substring(0, 300));
   } catch(e) { Logger.log('uguu EXCEPTION: ' + e); }
 
-  Logger.log('=== Testing tmpfiles.org ===');
+  Logger.log('=== Testing catbox.moe ===');
   try {
-    const r4 = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
-      method: 'POST', payload: { file: testBlob }, muteHttpExceptions: true
+    const r1 = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+      method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: testBlob }, muteHttpExceptions: true
     });
-    Logger.log('tmpfiles HTTP ' + r4.getResponseCode() + ' | body: ' + r4.getContentText().substring(0, 300));
-  } catch(e) { Logger.log('tmpfiles EXCEPTION: ' + e); }
+    Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | body: ' + r1.getContentText().substring(0, 300));
+  } catch(e) { Logger.log('catbox EXCEPTION: ' + e); }
 
-  Logger.log('=== Done — check each host above for HTTP code and response body ===');
+  Logger.log('=== Done — check each host above for HTTP code / response body ===');
 }
 
 function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo, modelVariant, execName, execMobile) {
@@ -3692,22 +3680,8 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       } catch(e) { Logger.log('[catbox] exception: ' + e); }
     }
 
-    // ── Attempt 3: tmpfiles.org (last resort before Drive) ────────────────
-    if (fileUrl === driveUrl) {
-      try {
-        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
-          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
-        });
-        Logger.log('[tmpfiles] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.status === 'success' && j.data && j.data.url) {
-            // tmpfiles.org's API can return http:// (not https://) — match either scheme
-            fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
-          }
-        }
-      } catch(e) { Logger.log('[tmpfiles] exception: ' + e); }
-    }
+    // tmpfiles.org removed — confirmed it still shows a download/confirmation page even via
+    // the /dl/ direct-download variant, unsuitable for WhatsApp media fetching. Falls to Drive.
 
     Logger.log('[whatsapp] final fileUrl: ' + fileUrl);
 
@@ -3887,19 +3861,7 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
       } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
     }
 
-    if (fileUrl === driveUrl) {
-      try {
-        const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
-          method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
-        });
-        Logger.log('[brochure/tmpfiles] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.status === 'success' && j.data && j.data.url)
-            fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
-        }
-      } catch(e) { Logger.log('[brochure/tmpfiles] exception: ' + e); }
-    }
+    // tmpfiles.org removed — confirmed unreliable (download/confirmation page even via /dl/)
 
     Logger.log('[brochure] final fileUrl: ' + fileUrl);
 
@@ -4150,19 +4112,7 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
           if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
         } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
       }
-
-      if (fileUrl === driveUrl) {
-        try {
-          const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
-            method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
-          });
-          if (r.getResponseCode() === 200) {
-            const j = JSON.parse(r.getContentText());
-            if (j.status === 'success' && j.data && j.data.url)
-              fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
-          }
-        } catch(e) { Logger.log('[bulk-wa/tmpfiles] exception: ' + e); }
-      }
+      // tmpfiles.org removed — confirmed unreliable (download/confirmation page even via /dl/)
     }
 
     Logger.log('[bulk-wa] final fileUrl: ' + fileUrl);
