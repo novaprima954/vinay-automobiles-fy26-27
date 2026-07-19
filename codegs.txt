@@ -354,6 +354,7 @@ case 'getInvTransactions': result = getInvTransactions(params, params.sessionId)
 case 'cancelBooking':          result = cancelBooking(params, params.sessionId); break;
 case 'getDeliveryChallanRecord': result = getDeliveryChallanRecord(params.sessionId, params.receiptNo); break;
 case 'issueDeliveryChallan':      result = issueDeliveryChallan(params.sessionId, params.receiptNo); break;
+case 'getDeliveryChallanList':    result = getDeliveryChallanList(params.sessionId, params.fromDate, params.toDate, params.search); break;
 case 'getPendingAccountCheck': result = getPendingAccountCheck(params, params.sessionId); break;
 case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);              break;
 case 'getDailyActivity':          result = getDailyActivity(params.sessionId);               break;
@@ -12096,15 +12097,15 @@ function _getNextDeliveryChallanNo() {
   return next;
 }
 
-/** Look up an already-issued challan number for a receipt, if one exists. */
-function _findIssuedDeliveryChallan(receiptNo) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DeliveryChallans');
-  if (!sheet) return null;
-  const data = sheet.getDataRange().getValues();
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][1]) === String(receiptNo)) return data[i][0];
+/** Name → mobile lookup from the Users sheet (col D=Name, col I=Mobile). */
+function _getExecMobileMap() {
+  const rows = getSheet(CONFIG.SHEETS.USERS).getDataRange().getValues();
+  const map = {};
+  for (let i = 1; i < rows.length; i++) {
+    const nm = String(rows[i][3] || '').trim();
+    if (nm) map[nm] = String(rows[i][8] || '').trim();
   }
-  return null;
+  return map;
 }
 
 /**
@@ -12119,28 +12120,32 @@ function getDeliveryChallanRecord(sessionId, receiptNo) {
 
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data  = sheet.getDataRange().getValues();
+    const execMobileMap = _getExecMobileMap();
 
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (String(row[0]).trim() !== String(receiptNo).trim()) continue;
 
-      const accessoryFitted = String(row[36] || '');
+      const executiveName = row[1] || '';
+      const pending        = String(row[38] || '').trim();
       const record = {
         receiptNo:        row[0],
         customerName:     row[3]  || '',
-        executiveName:    row[1]  || '',
+        executiveName:    executiveName,
+        executiveMobile:  execMobileMap[executiveName] || '',
         model:            row[5]  || '',
         variant:          row[6]  || '',
         colour:           row[7]  || '',
         financierName:    row[10] || '',
         deliveryDate:     row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
-        frameNumber:      row[60] || '',  // Chasis No. — Column BI
+        frameNumber:      row[60] || '',  // Chassis No. — Column BI
         engineNumber:     row[59] || '',  // Column BH
-        accessoryFitted:  accessoryFitted,
-        accessoryPending: row[38] || ''
+        accessoryFitted:  String(row[36] || ''),
+        accessoryPending: pending,
+        canPrint:         !pending
       };
 
-      return { success: true, record: record, challanNo: _findIssuedDeliveryChallan(receiptNo) };
+      return { success: true, record: record, challanNo: row[65] || null }; // col BN = DeliveryChallanNo
     }
 
     return { success: false, message: 'Record not found: ' + receiptNo };
@@ -12149,8 +12154,12 @@ function getDeliveryChallanRecord(sessionId, receiptNo) {
 
 /**
  * Issue (or reuse) a sequential Delivery Challan number for a receipt. Admin only.
- * Requires Accessory Fitted = Yes. Idempotent — re-printing the same receipt returns
- * the same number instead of burning a new one from the sequence.
+ * Gate: blocked only while the Pending Accessories column has items — not the
+ * "Accessory Fitted" flag directly, since that can lag/mismatch minor cases.
+ * Idempotent — re-printing the same receipt returns the same number instead of
+ * burning a new one from the sequence. The number is saved in the Data sheet
+ * itself (col BN) so it's visible alongside the record, plus logged to a
+ * DeliveryChallans sheet for an audit trail (who/when).
  */
 function issueDeliveryChallan(sessionId, receiptNo) {
   try {
@@ -12161,18 +12170,21 @@ function issueDeliveryChallan(sessionId, receiptNo) {
     const sheet = getSheet(CONFIG.SHEETS.DATA);
     const data  = sheet.getDataRange().getValues();
 
-    let matchedRow = null;
+    let targetRow = -1, matchedRow = null;
     for (let i = 1; i < data.length; i++) {
-      if (String(data[i][0]).trim() === String(receiptNo).trim()) { matchedRow = data[i]; break; }
+      if (String(data[i][0]).trim() === String(receiptNo).trim()) { matchedRow = data[i]; targetRow = i + 1; break; }
     }
     if (!matchedRow) return { success: false, message: 'Record not found: ' + receiptNo };
 
-    if (String(matchedRow[36] || '') !== 'Yes') {
-      return { success: false, message: 'Accessories must be fitted (Accessory Fitted = Yes) before printing the Delivery Challan' };
+    if (matchedRow[65]) return { success: true, challanNo: matchedRow[65] }; // already issued — reuse
+
+    const pending = String(matchedRow[38] || '').trim();
+    if (pending) {
+      return { success: false, message: 'Cannot print — pending accessories: ' + pending };
     }
 
-    const existing = _findIssuedDeliveryChallan(receiptNo);
-    if (existing) return { success: true, challanNo: existing };
+    const challanNo = _getNextDeliveryChallanNo();
+    sheet.getRange(targetRow, 66).setValue(challanNo); // col BN = DeliveryChallanNo
 
     const ss = SpreadsheetApp.getActiveSpreadsheet();
     let challanSheet = ss.getSheetByName('DeliveryChallans');
@@ -12180,14 +12192,64 @@ function issueDeliveryChallan(sessionId, receiptNo) {
       challanSheet = ss.insertSheet('DeliveryChallans');
       challanSheet.appendRow(['ChallanNo', 'ReceiptNo', 'CustomerName', 'Model', 'PrintedBy', 'PrintedDate']);
     }
-
-    const challanNo = _getNextDeliveryChallanNo();
     challanSheet.appendRow([
       challanNo, receiptNo, matchedRow[3] || '', matchedRow[5] || '',
       v.user.name || v.user.username || '', new Date()
     ]);
 
     return { success: true, challanNo: challanNo };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * List of deliveries for the Delivery Challan list view. Admin only — shows all
+ * executives. Filters by delivery date range (defaults to today) and optional
+ * customer-name search.
+ */
+function getDeliveryChallanList(sessionId, fromDate, toDate, search) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const from = fromDate ? new Date(fromDate) : new Date();
+    const to   = toDate   ? new Date(toDate)   : new Date();
+    from.setHours(0, 0, 0, 0);
+    to.setHours(23, 59, 59, 999);
+
+    const searchLower = (search || '').toLowerCase().trim();
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data  = sheet.getDataRange().getValues();
+    const results = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (!row[0]) continue;
+      if (String(row[64] || '') === 'CANCELLED') continue;
+
+      const deliveryDate = row[11] ? new Date(row[11]) : null;
+      if (!deliveryDate || isNaN(deliveryDate.getTime())) continue;
+      if (deliveryDate < from || deliveryDate > to) continue;
+
+      const customerName = String(row[3] || '');
+      if (searchLower && customerName.toLowerCase().indexOf(searchLower) === -1) continue;
+
+      results.push({
+        receiptNo:        row[0],
+        customerName:     customerName,
+        executiveName:    row[1] || '',
+        model:            row[5] || '',
+        variant:          row[6] || '',
+        deliveryDate:     Utilities.formatDate(deliveryDate, 'Asia/Kolkata', 'yyyy-MM-dd'),
+        accessoryPending: String(row[38] || '').trim(),
+        challanNo:        row[65] || null
+      });
+    }
+
+    results.sort(function(a, b) { return a.executiveName.localeCompare(b.executiveName) || a.customerName.localeCompare(b.customerName); });
+
+    return { success: true, results: results };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
