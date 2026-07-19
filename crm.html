@@ -527,8 +527,8 @@
 
   <!-- ═══ ADMIN TAB (admin only) ═══ -->
   <div id="adminTab" class="tab-content">
-    <!-- Calls Report section (admin) -->
-    <div style="padding:12px 16px 8px;background:white;margin:12px 0 0;border-radius:0;">
+    <!-- Calls Report section (admin only) -->
+    <div id="callsReportSection" style="padding:12px 16px 8px;background:white;margin:12px 0 0;border-radius:0;">
       <div class="section-title" style="margin-bottom:10px;">📞 Calls Report</div>
       <!-- Date range -->
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
@@ -565,8 +565,8 @@
       </div>
       <div id="callsReportContent" style="margin-top:4px;"></div>
     </div>
-    <!-- Executive-wise Analysis section (admin) -->
-    <div style="padding:12px 16px 8px;background:white;margin:12px 0 0;border-radius:0;">
+    <!-- Executive-wise Analysis section (admin only) -->
+    <div id="execAnalysisSection" style="padding:12px 16px 8px;background:white;margin:12px 0 0;border-radius:0;">
       <div class="section-title" style="margin-bottom:10px;">📊 Executive-wise Analysis</div>
       <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin-bottom:8px;">
         <div style="flex:1;min-width:110px;">
@@ -754,17 +754,7 @@
       <div class="sheet-title">🏦 Finance Details <button class="sheet-close" onclick="closeSheet('financeSheet')">✕</button></div>
       <div class="sheet-body">
         <input type="hidden" id="finLeadId">
-        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Loan Status</label>
-        <select id="finLoanStatus" class="assign-select" style="margin-bottom:14px;">
-          <option value="New">New</option>
-          <option value="Called">Called</option>
-          <option value="Applied">Applied</option>
-          <option value="Under Process">Under Process</option>
-          <option value="Approved">Approved</option>
-          <option value="Disbursed">💰 Disbursed (will convert lead)</option>
-          <option value="Rejected">Rejected</option>
-          <option value="Not Interested">Not Interested</option>
-        </select>
+        <p style="font-size:12px;color:#888;margin:0 0 14px;">Loan status and follow-up date are now set via <strong>📝 Log</strong> on the lead (Application Submitted, Loan Approved, Disbursement Done, etc.)</p>
         <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Scheme / Offer</label>
         <input type="text" id="finScheme" class="assign-select" style="margin-bottom:14px;" placeholder="e.g. 0% for 12 months">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
@@ -785,8 +775,6 @@
             <input type="number" id="finTenure" class="assign-select" placeholder="0" min="0" max="84">
           </div>
         </div>
-        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Finance Follow-up Date</label>
-        <input type="date" id="finFollowUpDate" class="assign-select" style="margin-bottom:14px;">
         <button class="btn-primary" id="finSubmitBtn" onclick="submitFinanceDetails()">Save</button>
       </div>
     </div>
@@ -818,6 +806,10 @@
     <div class="filter-chip"               onclick="setFinancierLoanFilter('Approved',this)">Approved</div>
     <div class="filter-chip"               onclick="setFinancierLoanFilter('Disbursed',this)">💰 Disbursed</div>
     <div class="filter-chip"               onclick="setFinancierLoanFilter('Rejected',this)">Rejected</div>
+  </div>
+  <div id="finMonthFilterRow" style="display:none;padding:6px 16px 4px;">
+    <input type="month" id="finMonthFilter" onchange="applyFinancierLeadsFilter()"
+      style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;">
   </div>
 
   <!-- Bottom Nav -->
@@ -939,6 +931,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js"></script>
-<script src="js/crm.js?v=9"></script>
+<script src="js/crm.js?v=10"></script>
 </body>
 </html>

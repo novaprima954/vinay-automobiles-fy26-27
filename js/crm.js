@@ -399,7 +399,8 @@ function filterMyLeadsByStatus(st, el) {
 function filterMyLeadsByName() {
   const el = document.getElementById('myLeadsSearch');
   currentMyLeadsSearch = el ? el.value : '';
-  applyMyLeadsFilters();
+  if (currentUser.role === 'financier') applyFinancierLeadsFilter();
+  else applyMyLeadsFilters();
 }
 
 function applyMyLeadsFilters() {
@@ -481,11 +482,23 @@ function _setupFinancierUI() {
   ['myLeadsSourceFilter','myLeadsStatusFilter'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
   });
-  // Move loan filter into my leads tab
+  // Move loan filter + month filter into my leads tab
   const finFilter = document.getElementById('finLoanStatusFilter');
+  const finMonthRow = document.getElementById('finMonthFilterRow');
   const myLeadsTab = document.getElementById('myLeadsTab');
   if (finFilter && myLeadsTab) { finFilter.style.display = ''; myLeadsTab.insertBefore(finFilter, myLeadsTab.firstChild); }
-  // Show "Analytics" tab for financier (reuse navAdmin element, renamed)
+  if (finMonthRow && myLeadsTab && finFilter) {
+    finMonthRow.style.display = '';
+    myLeadsTab.insertBefore(finMonthRow, finFilter.nextSibling);
+  }
+  // Default month filter to the current month
+  const finMonthInput = document.getElementById('finMonthFilter');
+  if (finMonthInput && !finMonthInput.value) {
+    const now = new Date();
+    finMonthInput.value = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  }
+  // Show "Analytics" tab for financier (reuse navAdmin element, renamed) — but hide the
+  // admin-only Calls Report / Executive-wise Analysis sections inside it
   const navAdmin = document.getElementById('navAdmin');
   if (navAdmin) {
     navAdmin.style.display = '';
@@ -494,6 +507,9 @@ function _setupFinancierUI() {
     if (adminIcon)  adminIcon.textContent  = '📊';
     if (adminLabel) adminLabel.textContent = 'Analytics';
   }
+  ['callsReportSection', 'execAnalysisSection'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
   // Hide FAB add-lead (financier doesn't add leads)
   const fab = document.querySelector('.fab');
   if (fab) fab.style.display = 'none';
@@ -507,7 +523,7 @@ function _setupFinancierUI() {
   if (document.querySelector('.stat-card.overdue .stat-card-label'))   document.querySelector('.stat-card.overdue .stat-card-label').textContent   = 'Overdue';
   if (document.querySelector('.stat-card.urgent .stat-card-label'))    document.querySelector('.stat-card.urgent .stat-card-label').textContent    = 'Due Today';
   if (document.querySelector('.stat-card.available .stat-card-label')) document.querySelector('.stat-card.available .stat-card-label').textContent = 'Under Process';
-  if (document.querySelector('.stat-card.converted .stat-card-label')) document.querySelector('.stat-card.converted .stat-card-label').textContent = 'Disbursed (Month)';
+  if (document.querySelector('.stat-card.converted .stat-card-label')) document.querySelector('.stat-card.converted .stat-card-label').textContent = 'Disbursed';
   if (document.querySelector('.stat-card.available .stat-card-icon'))  document.querySelector('.stat-card.available .stat-card-icon').textContent  = '⏳';
   if (document.querySelector('.stat-card.converted .stat-card-icon'))  document.querySelector('.stat-card.converted .stat-card-icon').textContent  = '💰';
 }
@@ -526,7 +542,7 @@ function _displayFinancierDashboard(d) {
   document.getElementById('overdueCount').textContent   = d.overdueCount      || 0;
   document.getElementById('weekCount').textContent      = d.todayCount         || 0;
   document.getElementById('availableCount').textContent = d.underProcess       || 0;
-  document.getElementById('convertedCount').textContent = d.disbursedThisMonth || 0;
+  document.getElementById('convertedCount').textContent = d.disbursed || 0;
 
   const badge = document.getElementById('overdueNavBadge');
   if (d.overdueCount > 0) { badge.textContent = d.overdueCount > 99 ? '99+' : d.overdueCount; badge.style.display = ''; }
@@ -587,6 +603,13 @@ function setFinancierLoanFilter(filter, el) {
 function applyFinancierLeadsFilter() {
   let leads = financierLeadsAll;
   if (currentFinLoanFilter !== 'all') leads = leads.filter(l => (l.loanStatus || 'New') === currentFinLoanFilter);
+
+  const monthEl = document.getElementById('finMonthFilter');
+  const month = monthEl ? monthEl.value : '';
+  if (month) leads = leads.filter(l => (l.createdDate || '').startsWith(month));
+
+  if (currentMyLeadsSearch) leads = leads.filter(l => _nameMatch(l, currentMyLeadsSearch));
+
   financierLeadsFiltered = leads;
   renderFinancierLeads();
 }
@@ -631,14 +654,11 @@ function financierLeadCardHtml(lead) {
 function openFinanceSheet(leadId) {
   const lead = _findFinancierLead(leadId) || findCachedLead(leadId) || {};
   document.getElementById('finLeadId').value           = leadId;
-  document.getElementById('finLoanStatus').value       = lead.loanStatus           || 'New';
   document.getElementById('finScheme').value           = lead.financeScheme        || '';
   document.getElementById('finDownPayment').value      = lead.downPayment          || '';
   document.getElementById('finLoanAmount').value       = lead.loanAmount           || '';
   document.getElementById('finEMI').value              = lead.emi                  || '';
   document.getElementById('finTenure').value           = lead.tenure               || '';
-  const finFuEl = document.getElementById('finFollowUpDate');
-  if (finFuEl) { finFuEl.value = lead.financierFollowUpDate || ''; _setFollowUpDateLimits('finFollowUpDate'); }
   openSheet('financeSheet');
 }
 
@@ -651,20 +671,17 @@ async function submitFinanceDetails() {
   const btn    = document.getElementById('finSubmitBtn');
   btn.disabled = true; btn.textContent = 'Saving...';
   try {
-    const finFuEl = document.getElementById('finFollowUpDate');
     const data = {
-      loanStatus:           document.getElementById('finLoanStatus').value,
       financeScheme:        document.getElementById('finScheme').value.trim(),
       downPayment:          Number(document.getElementById('finDownPayment').value) || 0,
       loanAmount:           Number(document.getElementById('finLoanAmount').value)  || 0,
       emi:                  Number(document.getElementById('finEMI').value)         || 0,
-      tenure:               Number(document.getElementById('finTenure').value)      || 0,
-      financierFollowUpDate: finFuEl ? finFuEl.value : ''
+      tenure:               Number(document.getElementById('finTenure').value)      || 0
     };
     const r = await API.updateFinanceDetails(leadId, data);
     if (r.success) {
       closeSheet('financeSheet');
-      showMessage(r.autoConverted ? '💰 Disbursed — lead converted to Sale!' : 'Finance details saved', 'success');
+      showMessage('Finance details saved', 'success');
       if (currentUser.role === 'financier') loadFinancierLeads();
       else if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
       _bgRefreshDashboard();
@@ -821,8 +838,8 @@ async function loadFinancierAnalytics() {
           </tbody></table></div>`;
     }
 
-    // Exec → Financier referral matrix
-    if (r.execReferrals && r.execReferrals.length > 0) {
+    // Exec → Financier referral matrix (admin only — not relevant to a single financier's view)
+    if (currentUser.role === 'admin' && r.execReferrals && r.execReferrals.length > 0) {
       const allFins = [...new Set(r.execReferrals.flatMap(e => Object.keys(e.referrals)))];
       html += `<div class="analytics-card">
         <div class="analytics-card-title">👥 Executive Referrals</div>
@@ -1845,7 +1862,7 @@ function renderLeadDetail(lead) {
     <div style="display:flex;gap:8px;padding:14px 18px;border-top:1px solid #f0f0f0;">
       <button class="btn-act btn-call-act" style="flex:1;" onclick="callLead('${esc(lead.mobileNo)}')">📞 Call</button>
       <button class="btn-act btn-log-act" style="flex:1;" onclick="closeSheet('detailSheet');openLogSheet('${lead.leadId}')">📝 Log</button>
-      <a class="btn-act btn-quot-act" href="crm-quote.html?leadId=${lead.leadId}" style="flex:1;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">📄 Quote</a>
+      ${!isFinancier ? `<a class="btn-act btn-quot-act" href="crm-quote.html?leadId=${lead.leadId}" style="flex:1;text-decoration:none;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;">📄 Quote</a>` : ''}
     </div>
     ${lead.status !== 'Converted' ? `<div style="padding:0 18px 14px;">
       <button class="btn-act" style="width:100%;background:linear-gradient(135deg,#66BB6A,#388E3C);color:white;padding:11px;" onclick="convertLead('${lead.leadId}','${esc(lead.customerName)}')">✅ Convert to Sale</button>
@@ -2009,10 +2026,13 @@ function selectNoteType(el, type) {
   document.querySelectorAll('.note-type-btn').forEach(b => b.classList.remove('selected'));
   el.classList.add('selected');
 
+  const isFinancier = currentUser && currentUser.role === 'financier';
   document.getElementById('lostReasonSection').style.display  = type === 'Lost' ? '' : 'none';
   document.getElementById('otherNoteSection').style.display   = type !== 'Lost' ? '' : 'none'; // show for ALL except Lost
   document.getElementById('followupDateRow').style.display    = type === 'Lost' ? 'none' : '';
-  document.getElementById('statusChangeRow').style.display    = (type !== 'Lost') ? '' : 'none';
+  // Sales-funnel status buttons (New/Contacted/Interested) don't apply to the financier role —
+  // loan status is set via the finance-specific note types themselves (Application Submitted, etc.)
+  document.getElementById('statusChangeRow').style.display    = (type !== 'Lost' && !isFinancier) ? '' : 'none';
 
   document.getElementById('logSubmitBtn').disabled = false;
 }
