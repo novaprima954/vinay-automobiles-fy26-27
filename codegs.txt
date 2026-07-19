@@ -2748,12 +2748,15 @@ function updateLead(sessionId, leadId, data) {
       if (data.lostReason !== undefined)        sheet.getRange(targetRow, 17).setValue(data.lostReason);
 
       // Financier assignment/reassignment — log it as an interaction so there's an audit trail
-      // of who the lead was previously with (e.g. rejected by one financier, transferred to another)
+      // of who the lead was previously with (e.g. rejected by one financier, transferred to another),
+      // and give the new financier a clean slate (old loan status + finance details cleared —
+      // the log entry below preserves the history, it's just not carried into the live fields).
       if (data.financierAssigned !== undefined && data.financierAssigned !== financierAssigned) {
         sheet.getRange(targetRow, 21).setValue(data.financierAssigned);
+        sheet.getRange(targetRow, 22, 1, 7).setValue(''); // V:AB — LoanStatus, Scheme, DownPayment, LoanAmount, EMI, Tenure, FinancierFollowUpDate
         var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
         var action = financierAssigned
-          ? 'Financier changed: ' + financierAssigned + ' → ' + (data.financierAssigned || 'None')
+          ? 'Financier changed: ' + financierAssigned + ' → ' + (data.financierAssigned || 'None') + ' (loan status & finance details reset for new financier)'
           : 'Financier assigned: ' + data.financierAssigned;
         var entry = ts + '||Financier Reassigned||' + action + '||' + user.name;
         var existingLog = sheetData[i][10] ? entry + '\n' + sheetData[i][10] : entry;
