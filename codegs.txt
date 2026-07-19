@@ -12126,8 +12126,12 @@ function getDeliveryChallanRecord(sessionId, receiptNo) {
       const row = data[i];
       if (String(row[0]).trim() !== String(receiptNo).trim()) continue;
 
-      const executiveName = row[1] || '';
+      const executiveName  = row[1] || '';
       const pending        = String(row[38] || '').trim();
+      const accessoryFitted = String(row[36] || '');
+      // Print gate: Yes (fully done), or No-with-pending-items-tracked — both printable.
+      // Only "No" with nothing recorded in Pending (i.e. not even started) is blocked.
+      const canPrint = accessoryFitted === 'Yes' || !!pending;
       const record = {
         receiptNo:        row[0],
         customerName:     row[3]  || '',
@@ -12140,9 +12144,9 @@ function getDeliveryChallanRecord(sessionId, receiptNo) {
         deliveryDate:     row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
         frameNumber:      row[60] || '',  // Chassis No. — Column BI
         engineNumber:     row[59] || '',  // Column BH
-        accessoryFitted:  String(row[36] || ''),
+        accessoryFitted:  accessoryFitted,
         accessoryPending: pending,
-        canPrint:         !pending
+        canPrint:         canPrint
       };
 
       return { success: true, record: record, challanNo: row[65] || null }; // col BN = DeliveryChallanNo
@@ -12178,9 +12182,12 @@ function issueDeliveryChallan(sessionId, receiptNo) {
 
     if (matchedRow[65]) return { success: true, challanNo: matchedRow[65] }; // already issued — reuse
 
-    const pending = String(matchedRow[38] || '').trim();
-    if (pending) {
-      return { success: false, message: 'Cannot print — pending accessories: ' + pending };
+    const pending        = String(matchedRow[38] || '').trim();
+    const accessoryFitted = String(matchedRow[36] || '');
+    // Print gate: Yes (fully done), or No-with-pending-items-tracked — both printable.
+    // Only "No" with nothing recorded in Pending (i.e. not even started) is blocked.
+    if (accessoryFitted !== 'Yes' && !pending) {
+      return { success: false, message: 'Cannot print — accessories check has not been started for this record' };
     }
 
     const challanNo = _getNextDeliveryChallanNo();
@@ -12235,6 +12242,12 @@ function getDeliveryChallanList(sessionId, fromDate, toDate, search) {
       const customerName = String(row[3] || '');
       if (searchLower && customerName.toLowerCase().indexOf(searchLower) === -1) continue;
 
+      const pending        = String(row[38] || '').trim();
+      const accessoryFitted = String(row[36] || '');
+      // Print gate: Yes (fully done), or No-with-pending-items-tracked — both printable.
+      // Only "No" with nothing recorded in Pending (i.e. not even started) is blocked.
+      const canPrint = accessoryFitted === 'Yes' || !!pending;
+
       results.push({
         receiptNo:        row[0],
         customerName:     customerName,
@@ -12242,7 +12255,9 @@ function getDeliveryChallanList(sessionId, fromDate, toDate, search) {
         model:            row[5] || '',
         variant:          row[6] || '',
         deliveryDate:     Utilities.formatDate(deliveryDate, 'Asia/Kolkata', 'yyyy-MM-dd'),
-        accessoryPending: String(row[38] || '').trim(),
+        accessoryFitted:  accessoryFitted,
+        accessoryPending: pending,
+        canPrint:         canPrint,
         challanNo:        row[65] || null
       });
     }
