@@ -3659,46 +3659,31 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
     let fileUrl = driveUrl;
     const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
 
-    // ── Attempt 1: catbox.moe ──────────────────────────────────────────────
+    // ── Attempt 1: uguu.se (verified working — direct CDN URL, no confirmation page) ──
     try {
-      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+      const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+        method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
       });
-      Logger.log('[catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-      const u = r.getContentText().trim();
-      if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
-    } catch(e) { Logger.log('[catbox] exception: ' + e); }
+      Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+      if (r.getResponseCode() === 200) {
+        const j = JSON.parse(r.getContentText());
+        if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
+      }
+    } catch(e) { Logger.log('[uguu] exception: ' + e); }
 
-    // ── Attempt 2: 0x0.st (if catbox failed) ──────────────────────────────
+    // ── Attempt 2: catbox.moe (if uguu failed — currently returns 412, kept in case it recovers) ──
     if (fileUrl === driveUrl) {
       try {
-        const r = UrlFetchApp.fetch('https://0x0.st', {
-          method: 'POST',
-          payload: { file: uploadBlob },
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
-          muteHttpExceptions: true
+        const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
         });
-        Logger.log('[0x0] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        Logger.log('[catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
         const u = r.getContentText().trim();
         if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
-      } catch(e) { Logger.log('[0x0] exception: ' + e); }
+      } catch(e) { Logger.log('[catbox] exception: ' + e); }
     }
 
-    // ── Attempt 3: uguu.se (if catbox and 0x0.st failed) ──────────────────
-    if (fileUrl === driveUrl) {
-      try {
-        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
-        });
-        Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
-        }
-      } catch(e) { Logger.log('[uguu] exception: ' + e); }
-    }
-
-    // ── Attempt 4: tmpfiles.org (last resort before Drive) ────────────────
+    // ── Attempt 3: tmpfiles.org (last resort before Drive) ────────────────
     if (fileUrl === driveUrl) {
       try {
         const r = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
@@ -3864,39 +3849,25 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
     let fileUrl = driveUrl;
 
     try {
-      const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-        method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+      const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+        method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
       });
-      Logger.log('[brochure/catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-      const u = r.getContentText().trim();
-      if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
-    } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
+      Logger.log('[brochure/uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+      if (r.getResponseCode() === 200) {
+        const j = JSON.parse(r.getContentText());
+        if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+      }
+    } catch(e) { Logger.log('[brochure/uguu] exception: ' + e); }
 
     if (fileUrl === driveUrl) {
       try {
-        const r = UrlFetchApp.fetch('https://0x0.st', {
-          method: 'POST',
-          payload: { file: uploadBlob },
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
-          muteHttpExceptions: true
+        const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
         });
-        Logger.log('[brochure/0x0] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-        const u2 = r.getContentText().trim();
-        if (r.getResponseCode() === 200 && u2.startsWith('https://')) fileUrl = u2;
-      } catch(e) { Logger.log('[brochure/0x0] exception: ' + e); }
-    }
-
-    if (fileUrl === driveUrl) {
-      try {
-        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
-        });
-        Logger.log('[brochure/uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
-        if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
-        }
-      } catch(e) { Logger.log('[brochure/uguu] exception: ' + e); }
+        Logger.log('[brochure/catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        const u = r.getContentText().trim();
+        if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+      } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
     }
 
     if (fileUrl === driveUrl) {
@@ -4144,36 +4115,23 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
       const driveUrl = 'https://drive.google.com/uc?export=download&id=' + fileId;
       fileUrl = driveUrl;
       try {
-        const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+        const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+          method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
         });
-        const u = r.getContentText().trim();
-        if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
-      } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
+        if (r.getResponseCode() === 200) {
+          const j = JSON.parse(r.getContentText());
+          if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
+        }
+      } catch(e) { Logger.log('[bulk-wa/uguu] exception: ' + e); }
 
       if (fileUrl === driveUrl) {
         try {
-          const r = UrlFetchApp.fetch('https://0x0.st', {
-            method: 'POST',
-            payload: { file: uploadBlob },
-            headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
-            muteHttpExceptions: true
+          const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+            method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
           });
-          const u2 = r.getContentText().trim();
-          if (r.getResponseCode() === 200 && u2.startsWith('https://')) fileUrl = u2;
-        } catch(e) { Logger.log('[bulk-wa/0x0] exception: ' + e); }
-      }
-
-      if (fileUrl === driveUrl) {
-        try {
-          const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
-            method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
-          });
-          if (r.getResponseCode() === 200) {
-            const j = JSON.parse(r.getContentText());
-            if (j.success && j.files && j.files[0] && j.files[0].url) fileUrl = j.files[0].url;
-          }
-        } catch(e) { Logger.log('[bulk-wa/uguu] exception: ' + e); }
+          const u = r.getContentText().trim();
+          if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+        } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
       }
 
       if (fileUrl === driveUrl) {
