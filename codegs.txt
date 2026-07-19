@@ -2784,6 +2784,11 @@ function logCRMInteraction(sessionId, leadId, interactionType, note, followUpDat
                    (user.role === 'financier' && finAssigned === user.name);
       if (!canLog) return { success: false, message: 'Access denied' };
 
+      // Once a loan is Disbursed, the financier can't log further interactions (locked)
+      if (user.role === 'financier' && String(data[i][21] || '') === 'Disbursed') {
+        return { success: false, message: 'This loan is already Disbursed — locked from further changes' };
+      }
+
       var targetRow = i + 1;
       var now = new Date();
       var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
@@ -2993,6 +2998,11 @@ function updateFinanceDetails(sessionId, leadId, data) {
       var finAssigned = String(sheetData[i][20] || '');
       var canEdit = user.role === 'admin' || (user.role === 'financier' && finAssigned === user.name);
       if (!canEdit) return { success: false, message: 'Access denied' };
+
+      // Once a loan is Disbursed, the financier can't edit finance details either (locked)
+      if (user.role === 'financier' && String(sheetData[i][21] || '') === 'Disbursed') {
+        return { success: false, message: 'This loan is already Disbursed — locked from further changes' };
+      }
 
       var r = i + 1;
       var now = new Date();
