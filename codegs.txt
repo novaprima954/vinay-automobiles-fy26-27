@@ -3580,6 +3580,53 @@ function searchCRMLeads(sessionId, query) {
  * Upload PDF to Google Drive "CRM Quotations" folder and send via AiSensy.
  * Config sheet must have rows: key=aisensy_api_key, key=aisensy_campaign_quotation
  */
+/**
+ * TEMPORARY DIAGNOSTIC — run this manually from the Apps Script editor (select
+ * "testFileHosts" in the function dropdown at the top, click ▶ Run) to see exactly
+ * why catbox/0x0.st/uguu are failing. Output appears in the "Execution log" panel
+ * that pops up automatically after running — no need to dig through Executions history.
+ * Safe to delete once the real host issue is found and fixed.
+ */
+function testFileHosts() {
+  const testBlob = Utilities.newBlob('This is a test file for upload diagnostics.', 'text/plain', 'test.txt');
+
+  Logger.log('=== Testing catbox.moe ===');
+  try {
+    const r1 = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
+      method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: testBlob }, muteHttpExceptions: true
+    });
+    Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | body: ' + r1.getContentText().substring(0, 300));
+  } catch(e) { Logger.log('catbox EXCEPTION: ' + e); }
+
+  Logger.log('=== Testing 0x0.st ===');
+  try {
+    const r2 = UrlFetchApp.fetch('https://0x0.st', {
+      method: 'POST', payload: { file: testBlob },
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; VinayAutomobilesCRM/1.0)' },
+      muteHttpExceptions: true
+    });
+    Logger.log('0x0.st HTTP ' + r2.getResponseCode() + ' | body: ' + r2.getContentText().substring(0, 300));
+  } catch(e) { Logger.log('0x0.st EXCEPTION: ' + e); }
+
+  Logger.log('=== Testing uguu.se ===');
+  try {
+    const r3 = UrlFetchApp.fetch('https://uguu.se/upload.php', {
+      method: 'POST', payload: { 'files[]': testBlob }, muteHttpExceptions: true
+    });
+    Logger.log('uguu HTTP ' + r3.getResponseCode() + ' | body: ' + r3.getContentText().substring(0, 300));
+  } catch(e) { Logger.log('uguu EXCEPTION: ' + e); }
+
+  Logger.log('=== Testing tmpfiles.org ===');
+  try {
+    const r4 = UrlFetchApp.fetch('https://tmpfiles.org/api/v1/upload', {
+      method: 'POST', payload: { file: testBlob }, muteHttpExceptions: true
+    });
+    Logger.log('tmpfiles HTTP ' + r4.getResponseCode() + ' | body: ' + r4.getContentText().substring(0, 300));
+  } catch(e) { Logger.log('tmpfiles EXCEPTION: ' + e); }
+
+  Logger.log('=== Done — check each host above for HTTP code and response body ===');
+}
+
 function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, customerPhone, quotNo, modelVariant, execName, execMobile) {
   try {
     const validation = validateSession(sessionId);
