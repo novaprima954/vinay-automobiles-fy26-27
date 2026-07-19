@@ -2746,7 +2746,20 @@ function updateLead(sessionId, leadId, data) {
       if (data.expectedDate !== undefined)      sheet.getRange(targetRow, 10).setValue(data.expectedDate);
       if (data.followUpDate !== undefined)      sheet.getRange(targetRow, 13).setValue(data.followUpDate);
       if (data.lostReason !== undefined)        sheet.getRange(targetRow, 17).setValue(data.lostReason);
-      if (data.financierAssigned !== undefined) sheet.getRange(targetRow, 21).setValue(data.financierAssigned);
+
+      // Financier assignment/reassignment — log it as an interaction so there's an audit trail
+      // of who the lead was previously with (e.g. rejected by one financier, transferred to another)
+      if (data.financierAssigned !== undefined && data.financierAssigned !== financierAssigned) {
+        sheet.getRange(targetRow, 21).setValue(data.financierAssigned);
+        var ts = Utilities.formatDate(now, 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm');
+        var action = financierAssigned
+          ? 'Financier changed: ' + financierAssigned + ' → ' + (data.financierAssigned || 'None')
+          : 'Financier assigned: ' + data.financierAssigned;
+        var entry = ts + '||Financier Reassigned||' + action + '||' + user.name;
+        var existingLog = sheetData[i][10] ? entry + '\n' + sheetData[i][10] : entry;
+        sheet.getRange(targetRow, 11).setValue(existingLog);
+      }
+
       if (data.punchedInAccelerator !== undefined) sheet.getRange(targetRow, 29).setValue(!!data.punchedInAccelerator);
       sheet.getRange(targetRow, 12).setValue(now);
       sheet.getRange(targetRow, 16).setValue(now);
