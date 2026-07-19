@@ -3646,7 +3646,8 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
         if (r.getResponseCode() === 200) {
           const j = JSON.parse(r.getContentText());
           if (j.status === 'success' && j.data && j.data.url) {
-            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+            // tmpfiles.org's API can return http:// (not https://) — match either scheme
+            fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
           }
         }
       } catch(e) { Logger.log('[tmpfiles] exception: ' + e); }
@@ -3831,7 +3832,7 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
         if (r.getResponseCode() === 200) {
           const j = JSON.parse(r.getContentText());
           if (j.status === 'success' && j.data && j.data.url)
-            fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+            fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
         }
       } catch(e) { Logger.log('[brochure/tmpfiles] exception: ' + e); }
     }
@@ -4094,7 +4095,7 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
           if (r.getResponseCode() === 200) {
             const j = JSON.parse(r.getContentText());
             if (j.status === 'success' && j.data && j.data.url)
-              fileUrl = j.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+              fileUrl = j.data.url.replace(/^https?:\/\/tmpfiles\.org\//, 'https://tmpfiles.org/dl/');
           }
         } catch(e) { Logger.log('[bulk-wa/tmpfiles] exception: ' + e); }
       }
