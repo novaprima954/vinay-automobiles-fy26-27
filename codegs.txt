@@ -3646,13 +3646,16 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
     // reachable from GAS servers. Falls back to Drive only if everything else fails.
     let fileUrl = driveUrl;
     const uploadBlob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+    const uploadAttempts = []; // returned in the API response so it's visible without digging through Executions
 
     // ── Attempt 0: Firebase Storage (own project — most reliable, no third-party dependency) ──
     try {
       const fbUrl = _uploadToFirebaseStorage(pdfBytes, fileName);
       if (fbUrl) { fileUrl = fbUrl; }
-      Logger.log('[firebase] uploaded: ' + fbUrl);
-    } catch(e) { Logger.log('[firebase] exception: ' + e); }
+      uploadAttempts.push({ host: 'firebase', success: true, detail: fbUrl });
+    } catch(e) {
+      uploadAttempts.push({ host: 'firebase', success: false, detail: String(e).slice(0, 200) });
+    }
 
     // ── Attempt 1: uguu.se (verified working — direct CDN URL, no confirmation page) ──
     if (fileUrl === driveUrl) {
@@ -3660,12 +3663,16 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
         const r = UrlFetchApp.fetch('https://uguu.se/upload.php', {
           method: 'POST', payload: { 'files[]': uploadBlob }, muteHttpExceptions: true
         });
-        Logger.log('[uguu] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        const body = r.getContentText();
+        let ok = false;
         if (r.getResponseCode() === 200) {
-          const j = JSON.parse(r.getContentText());
-          if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; }
+          const j = JSON.parse(body);
+          if (j.success && j.files && j.files[0] && j.files[0].url) { fileUrl = j.files[0].url; ok = true; }
         }
-      } catch(e) { Logger.log('[uguu] exception: ' + e); }
+        uploadAttempts.push({ host: 'uguu', success: ok, detail: 'HTTP ' + r.getResponseCode() + ' | ' + body.slice(0, 150) });
+      } catch(e) {
+        uploadAttempts.push({ host: 'uguu', success: false, detail: String(e).slice(0, 200) });
+      }
     }
 
     // ── Attempt 2: catbox.moe (if uguu failed — currently returns 412, kept in case it recovers) ──
@@ -3674,10 +3681,13 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
         const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
           method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
         });
-        Logger.log('[catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
         const u = r.getContentText().trim();
-        if (r.getResponseCode() === 200 && u.startsWith('https://')) { fileUrl = u; }
-      } catch(e) { Logger.log('[catbox] exception: ' + e); }
+        const ok = r.getResponseCode() === 200 && u.startsWith('https://');
+        if (ok) fileUrl = u;
+        uploadAttempts.push({ host: 'catbox', success: ok, detail: 'HTTP ' + r.getResponseCode() + ' | ' + u.slice(0, 150) });
+      } catch(e) {
+        uploadAttempts.push({ host: 'catbox', success: false, detail: String(e).slice(0, 200) });
+      }
     }
 
     // tmpfiles.org removed — confirmed it still shows a download/confirmation page even via
@@ -3752,10 +3762,10 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
         } catch(logErr) { Logger.log('WhatsApp log error: ' + logErr); }
       }
 
-      return { success: true, destination: destination, fileUrl: fileUrl };
+      return { success: true, destination: destination, fileUrl: fileUrl, uploadAttempts: uploadAttempts };
     }
     const errMsg = (parsed && (parsed.message || parsed.error)) || body || ('HTTP ' + code);
-    return { success: false, message: String(errMsg).slice(0, 300) };
+    return { success: false, message: String(errMsg).slice(0, 300), uploadAttempts: uploadAttempts };
 
   } catch(e) {
     Logger.log('sendQuotationWhatsApp error: ' + e.toString());
