@@ -147,7 +147,7 @@ function _todayDMY() {
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
 }
 
-function _doCopyHtml(rec, challanNo) {
+function _doCopyHtml(rec, challanNo, copyLabel) {
   const modelLine = 'TVS ' + [rec.model, rec.variant].filter(Boolean).join(' ');
   const checkItems = ['Owner Manual', 'Tool Kit', 'Battery & Warranty Card', 'Mirror', 'Saree Guard', 'Leg Guard'];
 
@@ -155,16 +155,19 @@ function _doCopyHtml(rec, challanNo) {
     ? '<div class="do-pending"><span class="title">Pending Accessories:</span> ' + esc(rec.accessoryPending) + '</div>'
     : '';
 
-  const execContact = 'Executive: ' + esc(rec.executiveName || '-') +
-    (rec.executiveMobile ? ' (' + esc(rec.executiveMobile) + ')' : '') +
-    ' &nbsp;·&nbsp; 9130040050';
-
   return '<div class="do-copy">' +
+    '<div class="do-copy-label">' + esc(copyLabel) + '</div>' +
     '<div class="do-header">' +
-      '<span class="tvs">TVS</span>' +
-      '<div class="company">VINAY AUTOMOBILES</div>' +
-      '<div class="addr">Mahaveer Nagar, Darwha Road, Yavatmal</div>' +
-      '<div class="contact">' + execContact + '</div>' +
+      '<div class="do-logo"><div class="tri"></div><div class="tri-inner"></div></div>' +
+      '<div class="do-header-text">' +
+        '<div class="company">VINAY AUTOMOBILES</div>' +
+        '<div class="addr">Mahaveer Nagar, Darwha Road, Yavatmal</div>' +
+      '</div>' +
+      '<span class="tvs-mark">TVS</span>' +
+    '</div>' +
+    '<div class="do-contact-row">' +
+      '<span>👤 Executive: ' + esc(rec.executiveName || '-') + (rec.executiveMobile ? ' — ' + esc(rec.executiveMobile) : '') + '</span>' +
+      '<span>☎ 9130040050</span>' +
     '</div>' +
     '<div class="do-box">' +
       '<div class="do-top-row">' +
@@ -175,23 +178,26 @@ function _doCopyHtml(rec, challanNo) {
         '<div class="meta-block">' +
           '<div class="do-field-label">Date</div>' +
           '<div class="do-field-value">' + esc(rec.deliveryDate ? _formatDMY(rec.deliveryDate) : _todayDMY()) + '</div>' +
-          '<div class="do-field-label" style="margin-top:5px;">Delivery Challan No.</div>' +
+          '<div class="do-field-label" style="margin-top:6px;">Delivery Challan No.</div>' +
           '<div class="do-field-value">' + esc(challanNo) + '</div>' +
         '</div>' +
       '</div>' +
       '<div class="do-declaration">I have taken delivery of the following described vehicle from Vinay Automobiles, Yavatmal, in good condition and to my entire satisfaction.</div>' +
       '<div class="do-desc-title">Description</div>' +
-      '<div class="do-desc-row"><span class="lbl">One TVS Model</span><span class="val">' + esc(modelLine) + '</span></div>' +
-      '<div class="do-desc-row"><span class="lbl">Chassis No.</span><span class="val">' + esc(rec.frameNumber) + '</span></div>' +
-      '<div class="do-desc-row"><span class="lbl">Engine No.</span><span class="val">' + esc(rec.engineNumber) + '</span></div>' +
-      '<div class="do-desc-row"><span class="lbl">Colour</span><span class="val">' + esc(rec.colour) + '</span><span class="lbl" style="min-width:50px;">Key No.</span><span class="val"></span></div>' +
+      '<div class="do-desc-grid">' +
+        '<div class="do-desc-row full"><span class="lbl">One TVS Model</span><span class="val">' + esc(modelLine) + '</span></div>' +
+        '<div class="do-desc-row"><span class="lbl">Chassis No.</span><span class="val">' + esc(rec.frameNumber) + '</span></div>' +
+        '<div class="do-desc-row"><span class="lbl">Engine No.</span><span class="val">' + esc(rec.engineNumber) + '</span></div>' +
+        '<div class="do-desc-row"><span class="lbl">Colour</span><span class="val">' + esc(rec.colour) + '</span></div>' +
+        '<div class="do-desc-row"><span class="lbl">Key No.</span><span class="val"></span></div>' +
+      '</div>' +
       '<div class="do-received-title">I have also received the following</div>' +
       '<div class="do-checks">' +
         checkItems.map(function (item) {
           return '<div class="do-check-item"><span class="do-check-box"></span>' + item + '</div>';
         }).join('') +
       '</div>' +
-      '<div class="do-desc-row" style="margin-top:9px;"><span class="lbl">Hypothecation</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
+      '<div class="do-desc-row do-hyp-row"><span class="lbl">Hypothecation</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
       pendingHtml +
       '<div class="do-sign-row">' +
         '<div class="line">Customer\'s Signature</div>' +
@@ -203,7 +209,10 @@ function _doCopyHtml(rec, challanNo) {
 
 function buildPrintArea(rec, challanNo) {
   const area = document.getElementById('doPrintArea');
-  area.innerHTML = '<div class="do-page">' + _doCopyHtml(rec, challanNo) + _doCopyHtml(rec, challanNo) + '</div>';
+  area.innerHTML = '<div class="do-page">' +
+    _doCopyHtml(rec, challanNo, 'Customer Copy') +
+    _doCopyHtml(rec, challanNo, 'Office Copy') +
+  '</div>';
 }
 
 let _msgTimer = null;
