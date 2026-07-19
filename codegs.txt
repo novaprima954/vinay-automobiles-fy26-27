@@ -352,6 +352,8 @@ case 'getIssuedItems':     result = getIssuedItems(params, params.sessionId); br
 case 'invReturn':          result = invReturn(params, params.sessionId); break;
 case 'getInvTransactions': result = getInvTransactions(params, params.sessionId); break;
 case 'cancelBooking':          result = cancelBooking(params, params.sessionId); break;
+case 'getDeliveryChallanRecord': result = getDeliveryChallanRecord(params.sessionId, params.receiptNo); break;
+case 'issueDeliveryChallan':      result = issueDeliveryChallan(params.sessionId, params.receiptNo); break;
 case 'getPendingAccountCheck': result = getPendingAccountCheck(params, params.sessionId); break;
 case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);              break;
 case 'getDailyActivity':          result = getDailyActivity(params.sessionId);               break;
@@ -12079,6 +12081,114 @@ function cancelBooking(params, sessionId) {
     }
     return { success: false, message: 'Record not found: ' + receiptNo };
   } catch(e) { return { success: false, message: e.message }; }
+}
+
+// ==========================================
+// DELIVERY CHALLAN (DO) — admin only
+// ==========================================
+
+/** Next sequential Delivery Challan number, persisted via Script Properties. */
+function _getNextDeliveryChallanNo() {
+  const props = PropertiesService.getScriptProperties();
+  let next = parseInt(props.getProperty('DELIVERY_CHALLAN_NEXT_NO'), 10);
+  if (!next || isNaN(next)) next = 2501;
+  props.setProperty('DELIVERY_CHALLAN_NEXT_NO', String(next + 1));
+  return next;
+}
+
+/** Look up an already-issued challan number for a receipt, if one exists. */
+function _findIssuedDeliveryChallan(receiptNo) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('DeliveryChallans');
+  if (!sheet) return null;
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (String(data[i][1]) === String(receiptNo)) return data[i][0];
+  }
+  return null;
+}
+
+/**
+ * Fetch the record data needed to render a Delivery Challan (DO). Admin only.
+ * Does NOT issue/consume a challan number — that only happens on issueDeliveryChallan.
+ */
+function getDeliveryChallanRecord(sessionId, receiptNo) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data  = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (String(row[0]).trim() !== String(receiptNo).trim()) continue;
+
+      const accessoryFitted = String(row[36] || '');
+      const record = {
+        receiptNo:        row[0],
+        customerName:     row[3]  || '',
+        executiveName:    row[1]  || '',
+        model:            row[5]  || '',
+        variant:          row[6]  || '',
+        colour:           row[7]  || '',
+        financierName:    row[10] || '',
+        deliveryDate:     row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
+        frameNumber:      row[60] || '',  // Chasis No. — Column BI
+        engineNumber:     row[59] || '',  // Column BH
+        accessoryFitted:  accessoryFitted,
+        accessoryPending: row[38] || ''
+      };
+
+      return { success: true, record: record, challanNo: _findIssuedDeliveryChallan(receiptNo) };
+    }
+
+    return { success: false, message: 'Record not found: ' + receiptNo };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Issue (or reuse) a sequential Delivery Challan number for a receipt. Admin only.
+ * Requires Accessory Fitted = Yes. Idempotent — re-printing the same receipt returns
+ * the same number instead of burning a new one from the sequence.
+ */
+function issueDeliveryChallan(sessionId, receiptNo) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+    if (v.user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data  = sheet.getDataRange().getValues();
+
+    let matchedRow = null;
+    for (let i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(receiptNo).trim()) { matchedRow = data[i]; break; }
+    }
+    if (!matchedRow) return { success: false, message: 'Record not found: ' + receiptNo };
+
+    if (String(matchedRow[36] || '') !== 'Yes') {
+      return { success: false, message: 'Accessories must be fitted (Accessory Fitted = Yes) before printing the Delivery Challan' };
+    }
+
+    const existing = _findIssuedDeliveryChallan(receiptNo);
+    if (existing) return { success: true, challanNo: existing };
+
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let challanSheet = ss.getSheetByName('DeliveryChallans');
+    if (!challanSheet) {
+      challanSheet = ss.insertSheet('DeliveryChallans');
+      challanSheet.appendRow(['ChallanNo', 'ReceiptNo', 'CustomerName', 'Model', 'PrintedBy', 'PrintedDate']);
+    }
+
+    const challanNo = _getNextDeliveryChallanNo();
+    challanSheet.appendRow([
+      challanNo, receiptNo, matchedRow[3] || '', matchedRow[5] || '',
+      v.user.name || v.user.username || '', new Date()
+    ]);
+
+    return { success: true, challanNo: challanNo };
+  } catch(e) { return { success: false, message: e.toString() }; }
 }
 
 /**
