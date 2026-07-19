@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delivery Challan - Vinay Automobiles</title>
+  <link rel="stylesheet" href="css/common.css">
+  <style>
+    .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+    .search-row input {
+      flex:1; min-width:200px; padding:12px 14px; border:2px solid #ddd; border-radius:10px;
+      font-size:15px; box-sizing:border-box;
+    }
+    .search-row button {
+      padding:12px 22px; background:linear-gradient(135deg,#667eea,#764ba2); color:white;
+      border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer;
+    }
+    .search-row button:disabled { opacity:0.6; cursor:not-allowed; }
+
+    .record-card {
+      background:#f8f9fa; border:2px solid #e9ecef; border-radius:12px; padding:20px; margin-bottom:20px; display:none;
+    }
+    .record-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee; font-size:14px; }
+    .record-row .label { color:#888; font-weight:600; }
+    .record-row .value { color:#222; font-weight:700; }
+
+    .gate-banner {
+      display:none; background:#fff3e0; border:2px solid #ff9800; color:#e65100;
+      border-radius:10px; padding:14px 18px; font-weight:700; margin-bottom:20px;
+    }
+
+    .print-btn {
+      width:100%; padding:15px; background:linear-gradient(135deg,#43e97b,#38f9d7); color:white;
+      border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; display:none;
+    }
+    .print-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+    /* ── Printable Delivery Challan (hidden on screen, shown only via print) ── */
+    #doPrintArea { display:none; }
+
+    @media print {
+      body * { visibility:hidden; }
+      #doPrintArea, #doPrintArea * { visibility:visible; }
+      #doPrintArea { display:block; position:absolute; top:0; left:0; width:100%; }
+      @page { size: landscape; margin: 8mm; }
+    }
+
+    .do-page { display:flex; gap:0; width:100%; }
+    .do-copy {
+      flex:1; padding:14px 18px; font-family:Arial, sans-serif; font-size:12px; color:#000;
+      box-sizing:border-box;
+    }
+    .do-copy + .do-copy { border-left:2px dashed #999; }
+
+    .do-header { text-align:center; margin-bottom:8px; }
+    .do-header .company { font-size:20px; font-weight:800; color:#c00; }
+    .do-header .tvs { font-size:14px; font-weight:800; color:#c00; float:right; }
+    .do-header .addr { font-size:11px; color:#333; }
+    .do-header .contact { font-size:11px; color:#333; margin-top:2px; }
+
+    .do-box { border:1.5px solid #c00; border-radius:6px; padding:8px 10px; margin-top:8px; }
+    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #c00; padding-bottom:6px; margin-bottom:6px; }
+    .do-top-row .from-block { flex:1; }
+    .do-top-row .meta-block { text-align:right; }
+    .do-field-label { font-size:9px; color:#c00; font-weight:700; text-transform:uppercase; }
+    .do-field-value { font-size:13px; font-weight:700; border-bottom:1px solid #999; display:inline-block; min-width:140px; }
+
+    .do-declaration { font-size:11px; margin:8px 0; line-height:1.5; }
+
+    .do-desc-title { font-size:11px; font-weight:800; color:#c00; margin-top:6px; }
+    .do-desc-row { display:flex; gap:6px; font-size:12px; margin:4px 0; }
+    .do-desc-row .lbl { min-width:90px; color:#333; }
+    .do-desc-row .val { flex:1; border-bottom:1px solid #999; font-weight:700; }
+
+    .do-received-title { font-size:11px; font-weight:800; margin-top:10px; }
+    .do-checks { display:flex; flex-wrap:wrap; gap:14px; margin-top:6px; }
+    .do-check-item { display:flex; align-items:center; gap:5px; font-size:11px; }
+    .do-check-box { width:14px; height:14px; border:1.5px solid #333; display:inline-block; }
+
+    .do-pending { margin-top:10px; font-size:11px; }
+    .do-pending .title { font-weight:800; color:#c00; }
+
+    .do-sign-row { display:flex; justify-content:space-between; margin-top:26px; font-size:11px; font-weight:700; }
+    .do-sign-row .line { border-top:1px solid #333; padding-top:3px; min-width:150px; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-title">
+        <span style="font-size: 30px;">🧾</span>
+        <h1>Delivery Challan</h1>
+      </div>
+      <div class="header-right">
+        <span id="currentUser"></span>
+        <button class="btn-secondary" onclick="goBack()">← Back</button>
+      </div>
+    </div>
+
+    <div class="content">
+      <div id="statusMessage" class="message hidden"></div>
+
+      <div class="search-row">
+        <input type="text" id="receiptSearch" placeholder="Enter Receipt No…" onkeydown="if(event.key==='Enter') searchRecord()">
+        <button onclick="searchRecord()" id="searchBtn">🔍 Search</button>
+      </div>
+
+      <div id="gateBanner" class="gate-banner"></div>
+
+      <div id="recordCard" class="record-card">
+        <div class="record-row"><span class="label">Customer</span><span class="value" id="rCustomerName">-</span></div>
+        <div class="record-row"><span class="label">Model</span><span class="value" id="rModel">-</span></div>
+        <div class="record-row"><span class="label">Executive</span><span class="value" id="rExecutive">-</span></div>
+        <div class="record-row"><span class="label">Accessory Fitted</span><span class="value" id="rAccessoryFitted">-</span></div>
+        <div class="record-row"><span class="label">Delivery Challan No.</span><span class="value" id="rChallanNo">Not yet issued</span></div>
+      </div>
+
+      <button class="print-btn" id="printBtn" onclick="printDeliveryChallan()">🖨️ Generate &amp; Print Delivery Challan</button>
+    </div>
+  </div>
+
+  <!-- Printable area — populated by JS, only visible via @media print -->
+  <div id="doPrintArea"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/delivery-challan.js"></script>
+</body>
+</html>

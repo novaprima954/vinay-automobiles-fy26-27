@@ -1223,5 +1223,13 @@ const API = {
 
   async getSalesActivitySystemCounts() {
     return await this.call('getSalesActivitySystemCounts', { sessionId: SessionManager.getSessionId() });
+  },
+
+  async getDeliveryChallanRecord(receiptNo) {
+    return await this.call('getDeliveryChallanRecord', { sessionId: SessionManager.getSessionId(), receiptNo });
+  },
+
+  async issueDeliveryChallan(receiptNo) {
+    return await this.call('issueDeliveryChallan', { sessionId: SessionManager.getSessionId(), receiptNo });
   }
 };
