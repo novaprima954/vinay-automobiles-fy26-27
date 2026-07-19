@@ -3690,6 +3690,25 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       }
     }
 
+    // ── Attempt 3: litterbox.catbox.moe (catbox's anonymous temp-file service — no uploader
+    // registration required, unlike main catbox.moe; files expire after 72h, fine for a
+    // quotation that's meant to be viewed right after sending) ──
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+          method: 'POST',
+          payload: { reqtype: 'fileupload', time: '72h', fileToUpload: uploadBlob },
+          muteHttpExceptions: true
+        });
+        const u = r.getContentText().trim();
+        const ok = r.getResponseCode() === 200 && u.startsWith('https://');
+        if (ok) fileUrl = u;
+        uploadAttempts.push({ host: 'litterbox', success: ok, detail: 'HTTP ' + r.getResponseCode() + ' | ' + u.slice(0, 150) });
+      } catch(e) {
+        uploadAttempts.push({ host: 'litterbox', success: false, detail: String(e).slice(0, 200) });
+      }
+    }
+
     // tmpfiles.org removed — confirmed it still shows a download/confirmation page even via
     // the /dl/ direct-download variant, unsuitable for WhatsApp media fetching. Falls to Drive.
 
@@ -3869,6 +3888,19 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
         const u = r.getContentText().trim();
         if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
       } catch(e) { Logger.log('[brochure/catbox] exception: ' + e); }
+    }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const r = UrlFetchApp.fetch('https://litterbox.catbox.moe/resources/internals/api.php', {
+          method: 'POST',
+          payload: { reqtype: 'fileupload', time: '72h', fileToUpload: uploadBlob },
+          muteHttpExceptions: true
+        });
+        Logger.log('[brochure/litterbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
+        const u = r.getContentText().trim();
+        if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
+      } catch(e) { Logger.log('[brochure/litterbox] exception: ' + e); }
     }
 
     // tmpfiles.org removed — confirmed unreliable (download/confirmation page even via /dl/)
