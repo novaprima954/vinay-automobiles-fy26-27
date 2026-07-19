@@ -856,8 +856,38 @@ function showApprovalModal() {
   document.getElementById('modalFrameNumber').value  = data.frameNumber  || '';
   const modalDelivery = document.getElementById('modalDeliveryDate');
   if (modalDelivery) modalDelivery.value = data.deliveryDate || '';
+
+  const testRideCb = document.getElementById('modalTestRideTaken');
+  if (testRideCb) testRideCb.checked = false;
+  updateApproveSaveBtnState();
+
   const modal = document.getElementById('approvalModal');
   modal.style.display = 'flex';
+}
+
+/**
+ * Enable/disable the Approve & Save button based on the Test Ride Taken checkbox
+ */
+function onModalTestRideTakenChange() {
+  updateApproveSaveBtnState();
+}
+
+function updateApproveSaveBtnState() {
+  const testRideCb = document.getElementById('modalTestRideTaken');
+  const btn = document.getElementById('approveSaveBtn');
+  if (!testRideCb || !btn) return;
+
+  if (testRideCb.checked) {
+    btn.disabled = false;
+    btn.style.background = 'linear-gradient(135deg,#28a745,#20c997)';
+    btn.style.color = 'white';
+    btn.style.cursor = 'pointer';
+  } else {
+    btn.disabled = true;
+    btn.style.background = '#ccc';
+    btn.style.color = '#888';
+    btn.style.cursor = 'not-allowed';
+  }
 }
 
 /**

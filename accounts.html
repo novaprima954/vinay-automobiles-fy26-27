@@ -836,8 +836,14 @@
         <input type="date" id="modalDeliveryDate"
           style="width:100%;padding:10px 12px;border:2px solid #f7971e;border-radius:8px;font-size:15px;font-weight:600;box-sizing:border-box;outline:none;">
       </div>
+      <div style="margin-bottom:22px;">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:14px;font-weight:700;color:#333;">
+          <input type="checkbox" id="modalTestRideTaken" onchange="onModalTestRideTakenChange()" style="width:18px;height:18px;cursor:pointer;">
+          Test Ride Taken
+        </label>
+      </div>
       <div style="display:flex;gap:12px;">
-        <button onclick="confirmApprovalAndSave()" style="flex:1;padding:13px;background:linear-gradient(135deg,#28a745,#20c997);color:white;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;">
+        <button onclick="confirmApprovalAndSave()" id="approveSaveBtn" disabled style="flex:1;padding:13px;background:#ccc;color:#888;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:not-allowed;">
           ✅ Approve &amp; Save
         </button>
         <button onclick="closeApprovalModal()" style="padding:13px 20px;background:#f0f0f0;color:#555;border:none;border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;">
@@ -850,6 +856,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/accounts.js?v=3"></script>
+  <script src="js/accounts.js?v=4"></script>
 </body>
 </html>
