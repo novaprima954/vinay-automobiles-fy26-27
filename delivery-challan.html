@@ -6,34 +6,43 @@
   <title>Delivery Challan - Vinay Automobiles</title>
   <link rel="stylesheet" href="css/common.css">
   <style>
-    .search-row { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
-    .search-row input {
-      flex:1; min-width:200px; padding:12px 14px; border:2px solid #ddd; border-radius:10px;
-      font-size:15px; box-sizing:border-box;
+    .filter-bar {
+      display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end;
+      background:#f8f9fa; border:2px solid #e9ecef; border-radius:12px; padding:16px; margin-bottom:20px;
     }
-    .search-row button {
-      padding:12px 22px; background:linear-gradient(135deg,#667eea,#764ba2); color:white;
-      border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer;
+    .filter-bar .field { display:flex; flex-direction:column; gap:5px; }
+    .filter-bar label { font-size:11px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:0.4px; }
+    .filter-bar input {
+      padding:9px 12px; border:2px solid #ddd; border-radius:8px; font-size:14px; box-sizing:border-box;
     }
-    .search-row button:disabled { opacity:0.6; cursor:not-allowed; }
-
-    .record-card {
-      background:#f8f9fa; border:2px solid #e9ecef; border-radius:12px; padding:20px; margin-bottom:20px; display:none;
-    }
-    .record-row { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee; font-size:14px; }
-    .record-row .label { color:#888; font-weight:600; }
-    .record-row .value { color:#222; font-weight:700; }
-
-    .gate-banner {
-      display:none; background:#fff3e0; border:2px solid #ff9800; color:#e65100;
-      border-radius:10px; padding:14px 18px; font-weight:700; margin-bottom:20px;
+    .filter-bar input[type="text"] { min-width:200px; }
+    .filter-bar button {
+      padding:10px 20px; background:linear-gradient(135deg,#667eea,#764ba2); color:white;
+      border:none; border-radius:8px; font-size:14px; font-weight:700; cursor:pointer; height:38px;
     }
 
-    .print-btn {
-      width:100%; padding:15px; background:linear-gradient(135deg,#43e97b,#38f9d7); color:white;
-      border:none; border-radius:10px; font-size:16px; font-weight:700; cursor:pointer; display:none;
+    .dc-list { display:flex; flex-direction:column; gap:10px; }
+    .dc-row {
+      display:flex; align-items:center; gap:14px; background:white; border:2px solid #eee;
+      border-radius:10px; padding:12px 16px; flex-wrap:wrap;
     }
-    .print-btn:disabled { opacity:0.5; cursor:not-allowed; }
+    .dc-row .info { flex:1; min-width:220px; }
+    .dc-row .customer { font-weight:800; font-size:15px; color:#222; }
+    .dc-row .meta { font-size:12px; color:#888; margin-top:2px; }
+    .dc-row .pending-badge {
+      display:inline-block; margin-top:4px; font-size:11px; font-weight:700; color:#e65100;
+      background:#fff3e0; border:1px solid #ff9800; border-radius:6px; padding:2px 8px;
+    }
+    .dc-row .challan-badge {
+      font-size:12px; font-weight:800; color:#2e7d32; background:#e8f5e9; border-radius:6px; padding:4px 10px;
+    }
+    .dc-row button {
+      padding:9px 18px; background:linear-gradient(135deg,#43e97b,#38f9d7); color:white;
+      border:none; border-radius:8px; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap;
+    }
+    .dc-row button:disabled { opacity:0.5; cursor:not-allowed; background:#ccc; }
+
+    .empty-state { text-align:center; color:#999; padding:40px 20px; font-size:14px; }
 
     /* ── Printable Delivery Challan (hidden on screen, shown only via print) ── */
     #doPrintArea { display:none; }
@@ -42,46 +51,47 @@
       body * { visibility:hidden; }
       #doPrintArea, #doPrintArea * { visibility:visible; }
       #doPrintArea { display:block; position:absolute; top:0; left:0; width:100%; }
-      @page { size: landscape; margin: 8mm; }
+      @page { size: landscape; margin: 7mm; }
     }
 
     .do-page { display:flex; gap:0; width:100%; }
     .do-copy {
-      flex:1; padding:14px 18px; font-family:Arial, sans-serif; font-size:12px; color:#000;
+      flex:1; padding:12px 16px; font-family:'Segoe UI', Arial, sans-serif; font-size:12px; color:#1a1a1a;
       box-sizing:border-box;
     }
-    .do-copy + .do-copy { border-left:2px dashed #999; }
+    .do-copy + .do-copy { border-left:2px dashed #bbb; }
 
-    .do-header { text-align:center; margin-bottom:8px; }
-    .do-header .company { font-size:20px; font-weight:800; color:#c00; }
-    .do-header .tvs { font-size:14px; font-weight:800; color:#c00; float:right; }
-    .do-header .addr { font-size:11px; color:#333; }
-    .do-header .contact { font-size:11px; color:#333; margin-top:2px; }
+    .do-header { text-align:center; margin-bottom:6px; position:relative; }
+    .do-header .tvs {
+      position:absolute; right:0; top:2px; font-size:15px; font-weight:800; color:#b71c1c; letter-spacing:0.5px;
+    }
+    .do-header .company { font-size:21px; font-weight:800; color:#b71c1c; letter-spacing:0.5px; }
+    .do-header .addr { font-size:10.5px; color:#444; margin-top:2px; }
+    .do-header .contact { font-size:10.5px; color:#444; margin-top:2px; font-weight:600; }
 
-    .do-box { border:1.5px solid #c00; border-radius:6px; padding:8px 10px; margin-top:8px; }
-    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #c00; padding-bottom:6px; margin-bottom:6px; }
-    .do-top-row .from-block { flex:1; }
+    .do-box { border:1.5px solid #b71c1c; border-radius:8px; padding:10px 12px; margin-top:8px; }
+    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #b71c1c; padding-bottom:7px; margin-bottom:7px; gap:20px; }
     .do-top-row .meta-block { text-align:right; }
-    .do-field-label { font-size:9px; color:#c00; font-weight:700; text-transform:uppercase; }
-    .do-field-value { font-size:13px; font-weight:700; border-bottom:1px solid #999; display:inline-block; min-width:140px; }
+    .do-field-label { font-size:9px; color:#b71c1c; font-weight:800; text-transform:uppercase; letter-spacing:0.3px; }
+    .do-field-value { font-size:13.5px; font-weight:700; border-bottom:1px solid #aaa; display:inline-block; min-width:150px; padding-bottom:1px; }
 
-    .do-declaration { font-size:11px; margin:8px 0; line-height:1.5; }
+    .do-declaration { font-size:10.5px; margin:7px 0; line-height:1.5; color:#333; }
 
-    .do-desc-title { font-size:11px; font-weight:800; color:#c00; margin-top:6px; }
-    .do-desc-row { display:flex; gap:6px; font-size:12px; margin:4px 0; }
-    .do-desc-row .lbl { min-width:90px; color:#333; }
-    .do-desc-row .val { flex:1; border-bottom:1px solid #999; font-weight:700; }
+    .do-desc-title { font-size:11px; font-weight:800; color:#b71c1c; margin-top:6px; text-transform:uppercase; letter-spacing:0.3px; }
+    .do-desc-row { display:flex; gap:8px; font-size:12px; margin:5px 0; align-items:baseline; }
+    .do-desc-row .lbl { min-width:88px; color:#555; font-weight:600; }
+    .do-desc-row .val { flex:1; border-bottom:1px solid #aaa; font-weight:700; padding-bottom:1px; }
 
-    .do-received-title { font-size:11px; font-weight:800; margin-top:10px; }
-    .do-checks { display:flex; flex-wrap:wrap; gap:14px; margin-top:6px; }
-    .do-check-item { display:flex; align-items:center; gap:5px; font-size:11px; }
-    .do-check-box { width:14px; height:14px; border:1.5px solid #333; display:inline-block; }
+    .do-received-title { font-size:11px; font-weight:800; margin-top:10px; text-transform:uppercase; letter-spacing:0.3px; color:#333; }
+    .do-checks { display:flex; flex-wrap:wrap; gap:12px 18px; margin-top:7px; }
+    .do-check-item { display:flex; align-items:center; gap:5px; font-size:11px; color:#333; }
+    .do-check-box { width:13px; height:13px; border:1.5px solid #333; display:inline-block; border-radius:2px; }
 
-    .do-pending { margin-top:10px; font-size:11px; }
-    .do-pending .title { font-weight:800; color:#c00; }
+    .do-pending { margin-top:9px; font-size:11px; background:#fff3e0; border:1px solid #ff9800; border-radius:6px; padding:6px 9px; }
+    .do-pending .title { font-weight:800; color:#e65100; }
 
-    .do-sign-row { display:flex; justify-content:space-between; margin-top:26px; font-size:11px; font-weight:700; }
-    .do-sign-row .line { border-top:1px solid #333; padding-top:3px; min-width:150px; text-align:center; }
+    .do-sign-row { display:flex; justify-content:space-between; margin-top:24px; font-size:11px; font-weight:700; color:#333; }
+    .do-sign-row .line { border-top:1px solid #555; padding-top:4px; min-width:150px; text-align:center; }
   </style>
 </head>
 <body>
@@ -100,22 +110,23 @@
     <div class="content">
       <div id="statusMessage" class="message hidden"></div>
 
-      <div class="search-row">
-        <input type="text" id="receiptSearch" placeholder="Enter Receipt No…" onkeydown="if(event.key==='Enter') searchRecord()">
-        <button onclick="searchRecord()" id="searchBtn">🔍 Search</button>
+      <div class="filter-bar">
+        <div class="field">
+          <label>From</label>
+          <input type="date" id="dcFromDate" onchange="loadList()">
+        </div>
+        <div class="field">
+          <label>To</label>
+          <input type="date" id="dcToDate" onchange="loadList()">
+        </div>
+        <div class="field">
+          <label>Customer Name</label>
+          <input type="text" id="dcSearch" placeholder="Search by customer name…" oninput="loadList()">
+        </div>
+        <button onclick="loadList()">🔄 Refresh</button>
       </div>
 
-      <div id="gateBanner" class="gate-banner"></div>
-
-      <div id="recordCard" class="record-card">
-        <div class="record-row"><span class="label">Customer</span><span class="value" id="rCustomerName">-</span></div>
-        <div class="record-row"><span class="label">Model</span><span class="value" id="rModel">-</span></div>
-        <div class="record-row"><span class="label">Executive</span><span class="value" id="rExecutive">-</span></div>
-        <div class="record-row"><span class="label">Accessory Fitted</span><span class="value" id="rAccessoryFitted">-</span></div>
-        <div class="record-row"><span class="label">Delivery Challan No.</span><span class="value" id="rChallanNo">Not yet issued</span></div>
-      </div>
-
-      <button class="print-btn" id="printBtn" onclick="printDeliveryChallan()">🖨️ Generate &amp; Print Delivery Challan</button>
+      <div id="dcList" class="dc-list"></div>
     </div>
   </div>
 

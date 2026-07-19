@@ -2,8 +2,7 @@
 // DELIVERY CHALLAN (DO) — admin only
 // ==========================================
 
-let currentDCRecord = null;
-let currentDCChallanNo = null;
+let dcRecords = [];
 
 document.addEventListener('DOMContentLoaded', function () {
   const session = SessionManager.getSession();
@@ -15,6 +14,12 @@ document.addEventListener('DOMContentLoaded', function () {
     return;
   }
   document.getElementById('currentUser').textContent = user.name || '';
+
+  const today = _isoToday();
+  document.getElementById('dcFromDate').value = today;
+  document.getElementById('dcToDate').value = today;
+
+  loadList();
 });
 
 function goBack() {
@@ -25,101 +30,115 @@ function esc(str) {
   return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-async function searchRecord() {
-  const receiptNo = document.getElementById('receiptSearch').value.trim();
-  if (!receiptNo) { showMessage('Enter a receipt number', 'error'); return; }
+function _isoToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
 
-  const btn = document.getElementById('searchBtn');
-  btn.disabled = true; btn.textContent = 'Searching...';
+async function loadList() {
+  const fromDate = document.getElementById('dcFromDate').value;
+  const toDate   = document.getElementById('dcToDate').value;
+  const search   = document.getElementById('dcSearch').value;
+  const listEl   = document.getElementById('dcList');
+
+  listEl.innerHTML = '<div class="empty-state">Loading…</div>';
 
   try {
-    const r = await API.getDeliveryChallanRecord(receiptNo);
-    btn.disabled = false; btn.textContent = '🔍 Search';
-
+    const r = await API.getDeliveryChallanList(fromDate, toDate, search);
     if (!r.success) {
-      showMessage(r.message || 'Record not found', 'error');
-      document.getElementById('recordCard').style.display = 'none';
-      document.getElementById('printBtn').style.display = 'none';
-      document.getElementById('gateBanner').style.display = 'none';
+      listEl.innerHTML = '<div class="empty-state">' + esc(r.message || 'Error loading list') + '</div>';
       return;
     }
-
-    currentDCRecord = r.record;
-    currentDCChallanNo = r.challanNo || null;
-    renderRecord();
+    dcRecords = r.results || [];
+    renderList();
   } catch (e) {
-    btn.disabled = false; btn.textContent = '🔍 Search';
-    showMessage('Error searching record', 'error');
+    listEl.innerHTML = '<div class="empty-state">Error loading list</div>';
   }
 }
 
-function renderRecord() {
-  const rec = currentDCRecord;
-  document.getElementById('recordCard').style.display = 'block';
-  document.getElementById('rCustomerName').textContent = rec.customerName || '-';
-  document.getElementById('rModel').textContent = [rec.model, rec.variant].filter(Boolean).join(' ') || '-';
-  document.getElementById('rExecutive').textContent = rec.executiveName || '-';
-  document.getElementById('rAccessoryFitted').textContent = rec.accessoryFitted || 'No';
-  document.getElementById('rChallanNo').textContent = currentDCChallanNo || 'Not yet issued';
-
-  const gate = document.getElementById('gateBanner');
-  const printBtn = document.getElementById('printBtn');
-  printBtn.style.display = 'block';
-
-  if (rec.accessoryFitted !== 'Yes') {
-    gate.style.display = 'block';
-    gate.textContent = '⚠️ Accessories are not yet marked as fitted for this record — Delivery Challan cannot be printed until Accessory Fitted = Yes.';
-    printBtn.disabled = true;
-  } else {
-    gate.style.display = 'none';
-    printBtn.disabled = false;
+function renderList() {
+  const listEl = document.getElementById('dcList');
+  if (dcRecords.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">📭 No deliveries found for this filter</div>';
+    return;
   }
+
+  listEl.innerHTML = dcRecords.map(function (rec, idx) {
+    const modelLine = [rec.model, rec.variant].filter(Boolean).join(' ');
+    const pendingBadge = rec.accessoryPending
+      ? '<div class="pending-badge">⚠️ Pending: ' + esc(rec.accessoryPending) + '</div>'
+      : '';
+    const rightSide = rec.challanNo
+      ? '<span class="challan-badge">DO #' + esc(rec.challanNo) + '</span> <button onclick="printRecord(' + idx + ')">🖨️ Print Again</button>'
+      : '<button onclick="printRecord(' + idx + ')"' + (rec.accessoryPending ? ' disabled' : '') + '>🖨️ Print DO</button>';
+
+    return '<div class="dc-row">' +
+      '<div class="info">' +
+        '<div class="customer">' + esc(rec.customerName) + '</div>' +
+        '<div class="meta">' + esc(rec.receiptNo) + ' · ' + esc(modelLine) + ' · 👤 ' + esc(rec.executiveName || 'Unassigned') + ' · 📅 ' + esc(rec.deliveryDate) + '</div>' +
+        pendingBadge +
+      '</div>' +
+      rightSide +
+    '</div>';
+  }).join('');
 }
 
-async function printDeliveryChallan() {
-  if (!currentDCRecord) return;
-  const btn = document.getElementById('printBtn');
-  btn.disabled = true; btn.textContent = '⏳ Preparing...';
+async function printRecord(idx) {
+  const rec = dcRecords[idx];
+  if (!rec) return;
 
   try {
-    const r = await API.issueDeliveryChallan(currentDCRecord.receiptNo);
+    const r = await API.issueDeliveryChallan(rec.receiptNo);
     if (!r.success) {
       showMessage(r.message || 'Could not issue Delivery Challan', 'error');
-      btn.disabled = false; btn.textContent = '🖨️ Generate & Print Delivery Challan';
       return;
     }
-    currentDCChallanNo = r.challanNo;
-    document.getElementById('rChallanNo').textContent = currentDCChallanNo;
+    rec.challanNo = r.challanNo;
 
-    buildPrintArea(currentDCRecord, currentDCChallanNo);
-    btn.disabled = false; btn.textContent = '🖨️ Generate & Print Delivery Challan';
+    // Need the full record (executive mobile, chassis/engine no, financier, etc.) to print
+    const fullRes = await API.getDeliveryChallanRecord(rec.receiptNo);
+    if (!fullRes.success) {
+      showMessage(fullRes.message || 'Could not load record details', 'error');
+      return;
+    }
 
+    buildPrintArea(fullRes.record, r.challanNo);
+    renderList();
     setTimeout(function () { window.print(); }, 200);
   } catch (e) {
     showMessage('Error preparing Delivery Challan', 'error');
-    btn.disabled = false; btn.textContent = '🖨️ Generate & Print Delivery Challan';
   }
 }
 
-function _todayDDMMYYYY() {
+function _formatDMY(isoDate) {
+  const parts = String(isoDate).split('-');
+  if (parts.length !== 3) return isoDate;
+  return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+
+function _todayDMY() {
   const d = new Date();
   return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
 }
 
 function _doCopyHtml(rec, challanNo) {
   const modelLine = 'TVS ' + [rec.model, rec.variant].filter(Boolean).join(' ');
-  const checkItems = ['Owner Mannual', 'Tool Kit', 'Battery & Warranty Card', 'Mirror', 'Saree Guard', 'Leg Guard'];
+  const checkItems = ['Owner Manual', 'Tool Kit', 'Battery & Warranty Card', 'Mirror', 'Saree Guard', 'Leg Guard'];
 
   const pendingHtml = rec.accessoryPending
     ? '<div class="do-pending"><span class="title">Pending Accessories:</span> ' + esc(rec.accessoryPending) + '</div>'
     : '';
 
+  const execContact = 'Executive: ' + esc(rec.executiveName || '-') +
+    (rec.executiveMobile ? ' (' + esc(rec.executiveMobile) + ')' : '') +
+    ' &nbsp;·&nbsp; 9130040050';
+
   return '<div class="do-copy">' +
     '<div class="do-header">' +
       '<span class="tvs">TVS</span>' +
       '<div class="company">VINAY AUTOMOBILES</div>' +
-      '<div class="addr">Mahavir Nagar, Darwha Road, YAVATMAL</div>' +
-      '<div class="contact">Executive: ' + esc(rec.executiveName || '-') + ' &nbsp;·&nbsp; 9130040050</div>' +
+      '<div class="addr">Mahaveer Nagar, Darwha Road, Yavatmal</div>' +
+      '<div class="contact">' + execContact + '</div>' +
     '</div>' +
     '<div class="do-box">' +
       '<div class="do-top-row">' +
@@ -129,24 +148,24 @@ function _doCopyHtml(rec, challanNo) {
         '</div>' +
         '<div class="meta-block">' +
           '<div class="do-field-label">Date</div>' +
-          '<div class="do-field-value">' + esc(rec.deliveryDate ? _formatDMY(rec.deliveryDate) : _todayDDMMYYYY()) + '</div>' +
-          '<div class="do-field-label" style="margin-top:4px;">Delivery Challan No.</div>' +
+          '<div class="do-field-value">' + esc(rec.deliveryDate ? _formatDMY(rec.deliveryDate) : _todayDMY()) + '</div>' +
+          '<div class="do-field-label" style="margin-top:5px;">Delivery Challan No.</div>' +
           '<div class="do-field-value">' + esc(challanNo) + '</div>' +
         '</div>' +
       '</div>' +
-      '<div class="do-declaration">I have taken the delivery of the following described Vehicle from Vinay Automobiles, Yavatmal in Good Condition &amp; to my entire satisfaction</div>' +
-      '<div class="do-desc-title">Descreption :</div>' +
-      '<div class="do-desc-row"><span class="lbl">One TVS MODEL</span><span class="val">' + esc(modelLine) + '</span></div>' +
-      '<div class="do-desc-row"><span class="lbl">Chasis No.</span><span class="val">' + esc(rec.frameNumber) + '</span></div>' +
+      '<div class="do-declaration">I have taken delivery of the following described vehicle from Vinay Automobiles, Yavatmal, in good condition and to my entire satisfaction.</div>' +
+      '<div class="do-desc-title">Description</div>' +
+      '<div class="do-desc-row"><span class="lbl">One TVS Model</span><span class="val">' + esc(modelLine) + '</span></div>' +
+      '<div class="do-desc-row"><span class="lbl">Chassis No.</span><span class="val">' + esc(rec.frameNumber) + '</span></div>' +
       '<div class="do-desc-row"><span class="lbl">Engine No.</span><span class="val">' + esc(rec.engineNumber) + '</span></div>' +
       '<div class="do-desc-row"><span class="lbl">Colour</span><span class="val">' + esc(rec.colour) + '</span><span class="lbl" style="min-width:50px;">Key No.</span><span class="val"></span></div>' +
-      '<div class="do-received-title">I have also received the following.</div>' +
+      '<div class="do-received-title">I have also received the following</div>' +
       '<div class="do-checks">' +
-        checkItems.map(function(item) {
+        checkItems.map(function (item) {
           return '<div class="do-check-item"><span class="do-check-box"></span>' + item + '</div>';
         }).join('') +
       '</div>' +
-      '<div class="do-desc-row" style="margin-top:8px;"><span class="lbl">HYP Bank</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
+      '<div class="do-desc-row" style="margin-top:9px;"><span class="lbl">Hypothecation</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
       pendingHtml +
       '<div class="do-sign-row">' +
         '<div class="line">Customer\'s Signature</div>' +
@@ -154,12 +173,6 @@ function _doCopyHtml(rec, challanNo) {
       '</div>' +
     '</div>' +
   '</div>';
-}
-
-function _formatDMY(isoDate) {
-  const parts = String(isoDate).split('-');
-  if (parts.length !== 3) return isoDate;
-  return parts[2] + '/' + parts[1] + '/' + parts[0];
 }
 
 function buildPrintArea(rec, challanNo) {

@@ -1231,5 +1231,9 @@ const API = {
 
   async issueDeliveryChallan(receiptNo) {
     return await this.call('issueDeliveryChallan', { sessionId: SessionManager.getSessionId(), receiptNo });
+  },
+
+  async getDeliveryChallanList(fromDate, toDate, search) {
+    return await this.call('getDeliveryChallanList', { sessionId: SessionManager.getSessionId(), fromDate, toDate, search: search || '' });
   }
 };
