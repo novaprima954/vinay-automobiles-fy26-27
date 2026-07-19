@@ -70,7 +70,7 @@ function renderList() {
       : '';
     const rightSide = rec.challanNo
       ? '<span class="challan-badge">DO #' + esc(rec.challanNo) + '</span> <button onclick="printRecord(' + idx + ')">🖨️ Print Again</button>'
-      : '<button onclick="printRecord(' + idx + ')"' + (rec.accessoryPending ? ' disabled' : '') + '>🖨️ Print DO</button>';
+      : '<button onclick="printRecord(' + idx + ')"' + (rec.canPrint ? '' : ' disabled') + '>🖨️ Print DO</button>';
 
     return '<div class="dc-row">' +
       '<div class="info">' +
