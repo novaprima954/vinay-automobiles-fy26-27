@@ -5042,6 +5042,12 @@ function getAdminDashboard(sessionId, dateFilter) {
     // Executive stats
     const executiveStats = {};
 
+    // Vehicle-type classification: EV = iQube and Orbiter models, everything else = ICE
+    function _isEvModel(model) {
+      const m = String(model || '').toUpperCase();
+      return m.indexOf('IQUBE') !== -1 || m.indexOf('ORBITER') !== -1;
+    }
+
     // Accessories breakdown (Account Check = Yes only)
     const accessories = {
       guard: 0,
@@ -5098,9 +5104,15 @@ function getAdminDashboard(sessionId, dateFilter) {
 
       // Executive total bookings (by booking date)
       if (!executiveStats[executive]) {
-        executiveStats[executive] = { totalSales: 0, completedSales: 0, fullAccessories: 0 };
+        executiveStats[executive] = {
+          totalSales: 0, totalSalesIce: 0, totalSalesEv: 0,
+          completedSales: 0, completedSalesIce: 0, completedSalesEv: 0,
+          fullAccessories: 0, fullAccessoriesIce: 0, fullAccessoriesEv: 0
+        };
       }
       executiveStats[executive].totalSales++;
+      if (_isEvModel(model)) executiveStats[executive].totalSalesEv++;
+      else executiveStats[executive].totalSalesIce++;
     }
 
     // Loop 2: filter by delivery date (col L) — Account Check: Yes sections
@@ -5122,12 +5134,21 @@ function getAdminDashboard(sessionId, dateFilter) {
 
       // Executive completed sales + full accessories
       if (!executiveStats[executive]) {
-        executiveStats[executive] = { totalSales: 0, completedSales: 0, fullAccessories: 0 };
+        executiveStats[executive] = {
+          totalSales: 0, totalSalesIce: 0, totalSalesEv: 0,
+          completedSales: 0, completedSalesIce: 0, completedSalesEv: 0,
+          fullAccessories: 0, fullAccessoriesIce: 0, fullAccessoriesEv: 0
+        };
       }
+      const isEv = _isEvModel(model);
       executiveStats[executive].completedSales++;
+      if (isEv) executiveStats[executive].completedSalesEv++;
+      else executiveStats[executive].completedSalesIce++;
       // Count vehicles with all 4 core accessories (Guard + Grip + SeatCover + Matin)
       if (row[12] === 'Yes' && row[13] === 'Yes' && row[14] === 'Yes' && row[15] === 'Yes') {
         executiveStats[executive].fullAccessories++;
+        if (isEv) executiveStats[executive].fullAccessoriesEv++;
+        else executiveStats[executive].fullAccessoriesIce++;
       }
 
       // Accessories breakdown
@@ -5165,8 +5186,14 @@ function getAdminDashboard(sessionId, dateFilter) {
       .map(exec => ({
         executive: exec,
         totalSales: executiveStats[exec].totalSales,
+        totalSalesIce: executiveStats[exec].totalSalesIce,
+        totalSalesEv: executiveStats[exec].totalSalesEv,
         completedSales: executiveStats[exec].completedSales,
-        fullAccessories: executiveStats[exec].fullAccessories
+        completedSalesIce: executiveStats[exec].completedSalesIce,
+        completedSalesEv: executiveStats[exec].completedSalesEv,
+        fullAccessories: executiveStats[exec].fullAccessories,
+        fullAccessoriesIce: executiveStats[exec].fullAccessoriesIce,
+        fullAccessoriesEv: executiveStats[exec].fullAccessoriesEv
       })).sort((a, b) => b.completedSales - a.completedSales);
 
     // Helper: extract clean model name from CRM_Leads variant string
@@ -5195,6 +5222,8 @@ function getAdminDashboard(sessionId, dateFilter) {
     if (crmLeadsSheet) {
       const crmLeadsData = crmLeadsSheet.getDataRange().getValues();
       const enquiryMap = {};
+      const enquiryMapIce = {};
+      const enquiryMapEv = {};
       const todayForCrm = new Date(); todayForCrm.setHours(0, 0, 0, 0);
       for (let i = 1; i < crmLeadsData.length; i++) {
         const clr = crmLeadsData[i];
@@ -5227,6 +5256,8 @@ function getAdminDashboard(sessionId, dateFilter) {
         // Walk-in enquiry per executive
         if (clSource === 'walk-in' && clExec) {
           enquiryMap[clExec] = (enquiryMap[clExec] || 0) + 1;
+          if (_isEvModel(clModel)) enquiryMapEv[clExec] = (enquiryMapEv[clExec] || 0) + 1;
+          else enquiryMapIce[clExec] = (enquiryMapIce[clExec] || 0) + 1;
         }
         // Model enquiry (all sources)
         if (clModel) {
@@ -5237,7 +5268,11 @@ function getAdminDashboard(sessionId, dateFilter) {
           }
         }
       }
-      executiveList.forEach(function(e) { e.walkInEnquiry = enquiryMap[e.executive] || 0; });
+      executiveList.forEach(function(e) {
+        e.walkInEnquiry = enquiryMap[e.executive] || 0;
+        e.walkInEnquiryIce = enquiryMapIce[e.executive] || 0;
+        e.walkInEnquiryEv = enquiryMapEv[e.executive] || 0;
+      });
     }
 
     // Convert model counts to sorted array
