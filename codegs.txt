@@ -254,6 +254,9 @@ function handleRequest(e) {
       case 'getCustomerFormRecords':
         result = getCustomerFormRecords(params);
         break;
+      case 'saveCustomerFormToDrive':
+        result = saveCustomerFormToDrive(params.sessionId, params.pdfBase64, params.fileName, params.customerName);
+        break;
       case 'parseAndCheckExcel':
         result = parseAndCheckExcel(params.sessionId, params.base64Data, params.fileName);
         break;
@@ -4276,6 +4279,47 @@ function _getOrCreateCRMQuotationsFolder() {
 
   const sf = parent.getFoldersByName(dateName);
   return sf.hasNext() ? sf.next() : parent.createFolder(dateName);
+}
+
+function _getOrCreateCustomerFormFolder() {
+  // Structure: Customer Form / DD-MMM-YYYY (date-wise subfolders)
+  const parentName = 'Customer Form';
+  let parent;
+  const pf = DriveApp.getFoldersByName(parentName);
+  parent = pf.hasNext() ? pf.next() : DriveApp.createFolder(parentName);
+
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now      = new Date();
+  const dateName = String(now.getDate()).padStart(2,'0') + '-' + months[now.getMonth()] + '-' + now.getFullYear();
+
+  const sf = parent.getFoldersByName(dateName);
+  return { folder: sf.hasNext() ? sf.next() : parent.createFolder(dateName), dateName: dateName };
+}
+
+/**
+ * Save a generated Customer Form PDF to Drive, in a date-wise subfolder under "Customer Form".
+ */
+function saveCustomerFormToDrive(sessionId, pdfBase64, fileName, customerName) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return v;
+
+    const pdfBytes = Utilities.base64Decode(pdfBase64);
+    const { folder, dateName } = _getOrCreateCustomerFormFolder();
+    const blob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName);
+    const file = folder.createFile(blob);
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+    return {
+      success:    true,
+      message:    'Customer Form saved to Drive (' + dateName + ')',
+      folderDate: dateName,
+      fileUrl:    'https://drive.google.com/uc?export=download&id=' + file.getId()
+    };
+  } catch(e) {
+    Logger.log('saveCustomerFormToDrive error: ' + e.toString());
+    return { success: false, message: e.toString() };
+  }
 }
 
 function _getMainConfig() {
