@@ -6,6 +6,13 @@ let currentUser = null;
 let currentSessionId = null;
 let currentFilter = 'month'; // Default to 'This Month'
 let dashboardData = null;
+let currentExecVehicleFilter = 'all'; // 'all' | 'ice' | 'ev' — used by the "By Executive" section
+
+// EV = iQube and Orbiter models; everything else is ICE. Mirrors the backend's _isEvModel.
+function _isEvModelClient(model) {
+  const m = String(model || '').toUpperCase();
+  return m.indexOf('IQUBE') !== -1 || m.indexOf('ORBITER') !== -1;
+}
 let discountUnlocked = false; // persists within session so filter changes don't re-lock
 let discountExcludeApache = false;         // Apache toggle state (admin)
 let lastDiscountData = null;               // cached discount data for re-render on toggle (admin)
@@ -812,24 +819,12 @@ function renderAdminDashboard(data) {
     <!-- Executive Comparison -->
     <div class="section">
       <div class="section-header">👥 By Executive (Account Check: Yes)</div>
-      ${data.executiveList.map((exec, index) => `
-        <div style="border-bottom:1px solid #f0f0f0;">
-          <div class="list-item" onclick="toggleExecutiveDetail('${exec.executive}', 'adminExecDetail_${index}', this)" style="cursor:pointer;border-bottom:none;">
-            <div class="list-item-main">
-              <div class="list-item-title">
-                ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
-                ${exec.executive}
-              </div>
-              <div class="list-item-subtitle">Enquiry: ${exec.walkInEnquiry || 0} | Bookings: ${exec.totalSales} | 🎯 Full Acc: ${exec.fullAccessories || 0}</div>
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;">
-              <span style="font-size:18px;font-weight:700;color:#667eea;">${exec.completedSales}</span>
-              <span class="execChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
-            </div>
-          </div>
-          <div id="adminExecDetail_${index}" style="display:none;"></div>
-        </div>
-      `).join('')}
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+        <button class="filter-btn ${currentExecVehicleFilter === 'all' ? 'active' : ''}" id="execFilterAll" onclick="setExecVehicleFilter('all')">All Vehicle</button>
+        <button class="filter-btn ${currentExecVehicleFilter === 'ice' ? 'active' : ''}" id="execFilterIce" onclick="setExecVehicleFilter('ice')">⛽ ICE</button>
+        <button class="filter-btn ${currentExecVehicleFilter === 'ev' ? 'active' : ''}" id="execFilterEv" onclick="setExecVehicleFilter('ev')">🔋 EV</button>
+      </div>
+      <div id="execListContainer"></div>
     </div>
 
     <!-- Model-wise Sales -->
@@ -1146,6 +1141,8 @@ function renderAdminDashboard(data) {
   `;
 
   content.style.display = 'block';
+
+  renderExecutiveList();
 
   // Load Stock In analysis immediately (no password needed)
   loadStockInAnalysis();
@@ -1782,6 +1779,59 @@ async function showPendingDetails(type, name) {
 }
 
 /**
+ * Renders the "By Executive" list into #execListContainer, using the field set that
+ * matches the current vehicle filter (all/ice/ev). Also resets any expanded dropdowns
+ * since the underlying numbers/customers change with the filter.
+ */
+function renderExecutiveList() {
+  const container = document.getElementById('execListContainer');
+  if (!container || !dashboardData || !dashboardData.executiveList) return;
+
+  const suffix = currentExecVehicleFilter === 'ice' ? 'Ice' : currentExecVehicleFilter === 'ev' ? 'Ev' : '';
+
+  container.innerHTML = dashboardData.executiveList.map((exec, index) => {
+    const enquiry   = suffix ? (exec['walkInEnquiry' + suffix] || 0)   : (exec.walkInEnquiry || 0);
+    const bookings  = suffix ? (exec['totalSales' + suffix] || 0)      : exec.totalSales;
+    const fullAcc   = suffix ? (exec['fullAccessories' + suffix] || 0) : (exec.fullAccessories || 0);
+    const completed = suffix ? (exec['completedSales' + suffix] || 0)  : exec.completedSales;
+
+    return `
+        <div style="border-bottom:1px solid #f0f0f0;">
+          <div class="list-item" onclick="toggleExecutiveDetail('${exec.executive}', 'adminExecDetail_${index}', this)" style="cursor:pointer;border-bottom:none;">
+            <div class="list-item-main">
+              <div class="list-item-title">
+                ${index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : ''}
+                ${exec.executive}
+              </div>
+              <div class="list-item-subtitle">Enquiry: ${enquiry} | Bookings: ${bookings} | 🎯 Full Acc: ${fullAcc}</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="font-size:18px;font-weight:700;color:#667eea;">${completed}</span>
+              <span class="execChevron" style="color:#999;font-size:12px;transition:transform 0.2s;">▼</span>
+            </div>
+          </div>
+          <div id="adminExecDetail_${index}" style="display:none;"></div>
+        </div>
+      `;
+  }).join('');
+}
+
+/**
+ * Switch the vehicle-type filter for the "By Executive" section (All Vehicle/ICE/EV).
+ */
+function setExecVehicleFilter(filter) {
+  currentExecVehicleFilter = filter;
+  ['execFilterAll', 'execFilterIce', 'execFilterEv'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) btn.classList.remove('active');
+  });
+  const activeId = filter === 'ice' ? 'execFilterIce' : filter === 'ev' ? 'execFilterEv' : 'execFilterAll';
+  const activeBtn = document.getElementById(activeId);
+  if (activeBtn) activeBtn.classList.add('active');
+  renderExecutiveList();
+}
+
+/**
  * Toggle inline executive sales detail below the clicked row
  */
 async function toggleExecutiveDetail(executive, detailId, rowEl) {
@@ -1810,7 +1860,16 @@ async function toggleExecutiveDetail(executive, detailId, rowEl) {
       dateFilter: currentFilter
     });
     if (response.success && response.data && response.data.customers && response.data.customers.length > 0) {
-      const customers = response.data.customers;
+      let customers = response.data.customers;
+      if (currentExecVehicleFilter === 'ice') customers = customers.filter(c => !_isEvModelClient(c.model));
+      else if (currentExecVehicleFilter === 'ev') customers = customers.filter(c => _isEvModelClient(c.model));
+
+      if (customers.length === 0) {
+        detail.innerHTML = '<div style="padding:10px 16px;text-align:center;color:#999;font-size:12px;">No records for this vehicle filter</div>';
+        detail.dataset.loaded = 'true';
+        return;
+      }
+
       var tableHtml = '<div style="background:#f9fafe;padding:8px 16px 14px;">';
       tableHtml += '<table style="width:100%;border-collapse:collapse;font-size:12px;">';
       tableHtml += '<thead><tr style="background:#eef1fb;">';
