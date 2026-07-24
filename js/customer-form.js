@@ -117,6 +117,43 @@ function getAccessoriesList(record) {
   return accessories.length > 0 ? accessories.join(', ') : 'None';
 }
 
+function esc(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Renders the customer's actual stored receipt numbers (Receipt No + Receipt No 1-4) as tick items. */
+function renderReceiptTicks(record) {
+  const container = document.getElementById('formReceiptTicks');
+  if (!container) return;
+
+  const candidates = [
+    record.receiptNo,
+    record.receiptNo1,
+    record.receiptNo2,
+    record.receiptNo3,
+    record.receiptNo4
+  ].map(function (v) { return String(v || '').trim(); }).filter(Boolean);
+
+  // De-duplicate while preserving order (receiptNo and receiptNo1 can sometimes match)
+  const seen = {};
+  const unique = candidates.filter(function (v) {
+    if (seen[v]) return false;
+    seen[v] = true;
+    return true;
+  });
+
+  container.innerHTML = unique.length
+    ? unique.map(function (rn) {
+        return '<span class="tick-item"><span class="tick-box"></span>' + esc(rn) + '</span>';
+      }).join('')
+    : '<span style="color:#999;font-size:12px;">None on record</span>';
+}
+
+function toggleChoiceNumber() {
+  const box = document.getElementById('choiceNumberBox');
+  if (box) box.classList.toggle('checked');
+}
+
 async function openCustomerForm(receiptNo) {
   const sessionId = SessionManager.getSessionId();
   
@@ -148,7 +185,12 @@ async function openCustomerForm(receiptNo) {
       document.getElementById('formCustomerName').textContent = currentRecord.customerName || '';
       document.getElementById('formMobileNo').textContent = currentRecord.mobileNo || '';
       document.getElementById('formFinancer').textContent = currentRecord.financierName || 'Cash';
-      
+
+      renderReceiptTicks(currentRecord);
+      // Reset Choice Number to unticked for each newly opened record
+      const choiceBox = document.getElementById('choiceNumberBox');
+      if (choiceBox) choiceBox.classList.remove('checked');
+
       const financierName = (currentRecord.financierName || 'Cash').toLowerCase().trim();
       const isCash = financierName === 'cash' || financierName === '';
       

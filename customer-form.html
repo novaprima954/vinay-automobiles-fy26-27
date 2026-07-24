@@ -194,6 +194,27 @@
       border: 1.5px solid #333;
       border-radius: 2px;
       display: inline-block;
+      position: relative;
+    }
+
+    .tick-box-interactive {
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .tick-box-interactive.checked {
+      background: #28a745;
+      border-color: #28a745;
+    }
+
+    .tick-box-interactive.checked::after {
+      content: "✓";
+      position: absolute;
+      top: -3px;
+      left: 1px;
+      font-size: 11px;
+      font-weight: 800;
+      color: white;
+      line-height: 1;
     }
 
     .vehicle-sticker-space {
@@ -632,15 +653,13 @@
             </div>
             <div style="margin-top: 8px;">
               <span class="summary-label">Receipt Number:</span>
-              <span class="tick-group">
-                <span class="tick-item"><span class="tick-box"></span>1</span>
-                <span class="tick-item"><span class="tick-box"></span>2</span>
-                <span class="tick-item"><span class="tick-box"></span>3</span>
-                <span class="tick-item"><span class="tick-box"></span>4</span>
-              </span>
+              <span class="tick-group" id="formReceiptTicks"><!-- populated with the customer's actual receipt numbers --></span>
             </div>
             <div style="margin-top: 8px;">
-              <span class="tick-item"><span class="tick-box"></span><span class="summary-label" style="width:auto;">Choice Number</span></span>
+              <span class="tick-item" id="choiceNumberItem" onclick="toggleChoiceNumber()" style="cursor:pointer;">
+                <span class="tick-box tick-box-interactive" id="choiceNumberBox"></span>
+                <span class="summary-label" style="width:auto;">Choice Number</span>
+              </span>
             </div>
           </div>
         </div>
