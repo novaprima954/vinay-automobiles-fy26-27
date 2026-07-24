@@ -174,6 +174,28 @@
       color: #555;
     }
 
+    .tick-group {
+      display: inline-flex;
+      gap: 16px;
+      vertical-align: middle;
+    }
+
+    .tick-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 13px;
+      color: #333;
+    }
+
+    .tick-box {
+      width: 13px;
+      height: 13px;
+      border: 1.5px solid #333;
+      border-radius: 2px;
+      display: inline-block;
+    }
+
     .vehicle-sticker-space {
       width: 260px;
       height: 160px;
@@ -404,6 +426,15 @@
       background: #c82333;
     }
 
+    .btn-drive {
+      background: #11998e;
+      color: white;
+    }
+
+    .btn-drive:hover {
+      background: #0d7a70;
+    }
+
     .btn-close {
       background: #6c757d;
       color: white;
@@ -572,6 +603,9 @@
     <button class="btn-action btn-pdf" onclick="shareAsPDF()">
       📄 Share as PDF
     </button>
+    <button class="btn-action btn-drive" onclick="saveCustomerFormToDrive()">
+      💾 Save to Drive
+    </button>
     <button class="btn-action btn-close" onclick="closeAllForms()">
       ← Back to List
     </button>
@@ -595,6 +629,18 @@
             <div>
               <span class="summary-label">Accessories:</span>
               <span class="summary-value" id="formAccessories">-</span>
+            </div>
+            <div style="margin-top: 8px;">
+              <span class="summary-label">Receipt Number:</span>
+              <span class="tick-group">
+                <span class="tick-item"><span class="tick-box"></span>1</span>
+                <span class="tick-item"><span class="tick-box"></span>2</span>
+                <span class="tick-item"><span class="tick-box"></span>3</span>
+                <span class="tick-item"><span class="tick-box"></span>4</span>
+              </span>
+            </div>
+            <div style="margin-top: 8px;">
+              <span class="tick-item"><span class="tick-box"></span><span class="summary-label" style="width:auto;">Choice Number</span></span>
             </div>
           </div>
         </div>

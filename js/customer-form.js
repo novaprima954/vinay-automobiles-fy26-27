@@ -226,60 +226,94 @@ function printAllForms() {
   window.print();
 }
 
-async function shareAsPDF() {
+/**
+ * Renders page1/page2/page3 into a single jsPDF document. Shared by shareAsPDF()
+ * (downloads locally) and saveCustomerFormToDrive() (uploads to Drive).
+ */
+async function _buildCustomerFormPdf() {
   if (!currentRecord || !currentRecord.customerName) {
-    alert('⚠️ No customer data available');
-    return;
+    throw new Error('NO_DATA');
   }
-
   if (typeof html2canvas === 'undefined' || typeof window.jspdf === 'undefined') {
-    alert('PDF library not loaded. Please use Print → Save as PDF instead.');
-    window.print();
-    return;
+    throw new Error('NO_LIBRARY');
   }
 
+  const customerName = currentRecord.customerName
+    .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
+  const filename = customerName + '.pdf';
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+
+  const pageIds = ['page1', 'page2', 'page3'];
+  let firstPage = true;
+
+  for (let i = 0; i < pageIds.length; i++) {
+    const el = document.getElementById(pageIds[i]);
+    if (!el || el.style.display === 'none') continue;
+
+    const canvas = await html2canvas(el, {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      windowWidth: 794,
+      scrollY: 0
+    });
+
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    if (!firstPage) pdf.addPage();
+    // Fit image to exactly A4 (210 x 297 mm)
+    pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+    firstPage = false;
+  }
+
+  if (firstPage) throw new Error('NO_PAGES');
+
+  return { pdf, filename };
+}
+
+async function shareAsPDF() {
   showMessage('⏳ Generating PDF... Please wait.', 'info');
-
   try {
-    const customerName = currentRecord.customerName
-      .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
-    const filename = customerName + '.pdf';
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-
-    const pageIds = ['page1', 'page2', 'page3'];
-    let firstPage = true;
-
-    for (let i = 0; i < pageIds.length; i++) {
-      const el = document.getElementById(pageIds[i]);
-      if (!el || el.style.display === 'none') continue;
-
-      const canvas = await html2canvas(el, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        windowWidth: 794,
-        scrollY: 0
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-      if (!firstPage) pdf.addPage();
-      // Fit image to exactly A4 (210 x 297 mm)
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-      firstPage = false;
-    }
-
-    if (firstPage) { alert('⚠️ No pages to export'); return; }
-
+    const { pdf, filename } = await _buildCustomerFormPdf();
     pdf.save(filename);
     showMessage('✅ PDF downloaded: ' + filename, 'success');
-
   } catch (error) {
     console.error('PDF generation error:', error);
+    if (error.message === 'NO_DATA') { alert('⚠️ No customer data available'); return; }
+    if (error.message === 'NO_LIBRARY') { alert('PDF library not loaded. Please use Print → Save as PDF instead.'); window.print(); return; }
+    if (error.message === 'NO_PAGES') { alert('⚠️ No pages to export'); return; }
     showMessage('⚠️ PDF failed — using print dialog instead.', 'error');
     window.print();
+  }
+}
+
+async function saveCustomerFormToDrive() {
+  showMessage('⏳ Saving to Drive... Please wait.', 'info');
+  try {
+    const { pdf, filename } = await _buildCustomerFormPdf();
+    const dataUri = pdf.output('datauristring');
+    const base64 = dataUri.split(',')[1];
+
+    const r = await API.call('saveCustomerFormToDrive', {
+      sessionId: SessionManager.getSessionId(),
+      pdfBase64: base64,
+      fileName: filename,
+      customerName: currentRecord.customerName || ''
+    });
+
+    if (r.success) {
+      showMessage('✅ Saved to Drive — Customer Form / ' + (r.folderDate || ''), 'success');
+    } else {
+      showMessage('❌ ' + (r.message || 'Could not save to Drive'), 'error');
+    }
+  } catch (error) {
+    console.error('Save to Drive error:', error);
+    if (error.message === 'NO_DATA') { alert('⚠️ No customer data available'); return; }
+    if (error.message === 'NO_LIBRARY') { alert('PDF library not loaded — cannot save to Drive.'); return; }
+    if (error.message === 'NO_PAGES') { alert('⚠️ No pages to save'); return; }
+    showMessage('⚠️ Could not save to Drive: ' + error.message, 'error');
   }
 }
 
