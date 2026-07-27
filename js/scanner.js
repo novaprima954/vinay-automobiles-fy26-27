@@ -9,6 +9,7 @@ let currentRecord = null;
 let photoStream = null;
 let currentPhotoType = null; // 'chassis' or 'vehicle'
 let currentPhotoDataUrl = null;
+let photoUploadInProgress = false;
 let scannerSearchTimer = null;
 
 // ==========================================
@@ -229,6 +230,7 @@ function closeScanner() {
 function resetPhotoCaptureState() {
   currentPhotoType = null;
   currentPhotoDataUrl = null;
+  photoUploadInProgress = false;
   stopPhotoCamera();
 
   document.getElementById('photoCapturePanel').classList.remove('active');
@@ -236,7 +238,11 @@ function resetPhotoCaptureState() {
   document.getElementById('photoCapturedImage').style.display = 'none';
   document.getElementById('photoCaptureBtn').style.display = 'block';
   document.getElementById('photoRetakeBtn').style.display = 'none';
-  document.getElementById('photoSaveBtn').style.display = 'none';
+
+  const saveBtn = document.getElementById('photoSaveBtn');
+  saveBtn.style.display = 'none';
+  saveBtn.disabled = false;
+  saveBtn.textContent = '💾 Save Photo';
 }
 
 function updatePhotoActionUI(photoType, isSaved) {
@@ -252,6 +258,14 @@ function updatePhotoActionUI(photoType, isSaved) {
 }
 
 async function openPhotoCapture(photoType) {
+  if (photoUploadInProgress) {
+    alert('Please wait for the current photo to finish saving first.');
+    return;
+  }
+
+  // Defensively release any stream left over from the other photo type
+  stopPhotoCamera();
+
   currentPhotoType = photoType;
   currentPhotoDataUrl = null;
 
@@ -312,8 +326,14 @@ function retakePhotoImage() {
 }
 
 async function savePhotoAsPdf() {
-  if (!currentPhotoDataUrl || !currentPhotoType) return;
+  if (!currentPhotoDataUrl || !currentPhotoType || photoUploadInProgress) return;
 
+  // Capture locally — currentPhotoType is a shared global and must not be
+  // trusted after the upload's await, in case the user switches photo type mid-upload.
+  const photoType = currentPhotoType;
+  const photoDataUrl = currentPhotoDataUrl;
+
+  photoUploadInProgress = true;
   const saveBtn = document.getElementById('photoSaveBtn');
   saveBtn.disabled = true;
   saveBtn.textContent = '⏳ Saving...';
@@ -322,36 +342,38 @@ async function savePhotoAsPdf() {
     // Fit the photo into an A4 page (portrait), same pattern used for the Customer Form PDF
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-    pdf.addImage(currentPhotoDataUrl, 'JPEG', 0, 0, 210, 297);
+    pdf.addImage(photoDataUrl, 'JPEG', 0, 0, 210, 297);
     const pdfBase64 = pdf.output('datauristring').split(',')[1];
 
     const customerName = (currentRecord.customerName || 'Unknown')
       .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
-    const fileName = customerName + '_' + currentPhotoType + '.pdf';
+    const fileName = customerName + '_' + photoType + '.pdf';
 
     const sessionId = SessionManager.getSessionId();
     const response = await API.call('uploadScannerPhoto', {
       sessionId: sessionId,
       receiptNo: currentReceiptNo,
-      photoType: currentPhotoType,
+      photoType: photoType,
       pdfBase64: pdfBase64,
       fileName: fileName
     });
 
     if (response.success) {
       showMessage('✅ ' + response.message, 'success');
-      if (currentPhotoType === 'chassis') currentRecord.chassisPhotoSaved = 'Yes';
-      if (currentPhotoType === 'vehicle') currentRecord.vehiclePhotoSaved = 'Yes';
-      updatePhotoActionUI(currentPhotoType, true);
+      if (photoType === 'chassis') currentRecord.chassisPhotoSaved = 'Yes';
+      if (photoType === 'vehicle') currentRecord.vehiclePhotoSaved = 'Yes';
+      updatePhotoActionUI(photoType, true);
       resetPhotoCaptureState();
     } else {
       showMessage('❌ ' + response.message, 'error');
+      photoUploadInProgress = false;
       saveBtn.disabled = false;
       saveBtn.textContent = '💾 Save Photo';
     }
   } catch (error) {
     console.error('Save photo error:', error);
     showMessage('❌ Failed to save photo. Please try again.', 'error');
+    photoUploadInProgress = false;
     saveBtn.disabled = false;
     saveBtn.textContent = '💾 Save Photo';
   }
