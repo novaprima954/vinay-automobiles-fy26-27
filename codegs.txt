@@ -251,6 +251,12 @@ function handleRequest(e) {
       case 'saveVehicleNumbers':
         result = saveVehicleNumbers(params);
         break;
+      case 'searchVehicleRecords':
+        result = searchVehicleRecords(params);
+        break;
+      case 'uploadScannerPhoto':
+        result = uploadScannerPhoto(params);
+        break;
       case 'getCustomerFormRecords':
         result = getCustomerFormRecords(params);
         break;
@@ -1384,6 +1390,8 @@ function getRecordByReceiptNo(sessionId, receiptNo) {
             buzzer: row[62] || '',
             backrest: row[63] || '',
             extendedwarranty: row[64] || '',
+            chassisPhotoSaved: row[66] || '',
+            vehiclePhotoSaved: row[67] || '',
           }
         };
       }
@@ -8214,6 +8222,199 @@ function saveVehicleNumbers(params) {
       success: false,
       message: 'Error saving vehicle numbers: ' + error.toString()
     };
+  }
+}
+
+/**
+ * Search ALL of a user's vehicle records (not just pending/blank ones).
+ * Used by Scanner's live search so a record can be found again after
+ * Engine/Frame numbers were already saved (and it dropped off the pending list),
+ * so a missed Chassis/Vehicle photo can still be added later.
+ */
+function searchVehicleRecords(params) {
+  try {
+    const sessionId = params.sessionId;
+    const query = String(params.query || '').trim().toLowerCase();
+
+    const validation = validateSession(sessionId);
+    if (!validation.success) {
+      return validation;
+    }
+
+    const user = validation.user;
+
+    if (user.role !== 'admin' && user.role !== 'sales') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    if (query.length < 2) {
+      return { success: true, records: [] };
+    }
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data = sheet.getDataRange().getValues();
+
+    const COL_ENGINE = 59;
+    const COL_FRAME = 60;
+    const COL_CHASSIS_PHOTO = 66;
+    const COL_VEHICLE_PHOTO = 67;
+
+    const records = [];
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+
+      const receiptNo = row[0];
+      if (!receiptNo) continue;
+
+      const executiveName = row[1];
+      const isUserRecord = (user.role === 'admin') || (String(executiveName).trim() === String(user.name).trim());
+      if (!isUserRecord) continue;
+
+      const customerName = row[3] || '';
+      const mobileNo = row[4] || '';
+      const engineNumber = row[COL_ENGINE] || '';
+      const frameNumber = row[COL_FRAME] || '';
+
+      const haystack = [receiptNo, customerName, mobileNo, engineNumber, frameNumber]
+        .map(function(v) { return String(v).toLowerCase(); })
+        .join(' | ');
+
+      if (haystack.indexOf(query) === -1) continue;
+
+      records.push({
+        receiptNo: receiptNo,
+        executiveName: executiveName,
+        bookingDate: formatDate(row[2]),
+        customerName: customerName,
+        mobileNo: mobileNo,
+        variant: String(row[6] || ''),
+        engineNumber: engineNumber,
+        frameNumber: frameNumber,
+        chassisPhotoSaved: row[COL_CHASSIS_PHOTO] || '',
+        vehiclePhotoSaved: row[COL_VEHICLE_PHOTO] || ''
+      });
+
+      if (records.length >= 25) break;
+    }
+
+    return { success: true, records: records };
+
+  } catch (error) {
+    Logger.log('❌ Error in searchVehicleRecords: ' + error.toString());
+    return {
+      success: false,
+      message: 'Error searching records: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Extract a Drive folder ID from either a raw ID or a folder share link.
+ */
+function _extractDriveFolderId(idOrUrl) {
+  const s = String(idOrUrl || '').trim();
+  const m = s.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (m) return m[1];
+  return s; // assume it's already a bare folder ID
+}
+
+/**
+ * Get (or create) the date-wise / customer-wise subfolder inside the external
+ * Scanner Photos Drive folder configured in the Config sheet
+ * (key: scanner_photo_folder_id — can be a bare folder ID or a full share link).
+ * That external folder must already be shared with Editor access to the
+ * account this script executes as.
+ */
+function _getOrCreateScannerPhotoFolder(customerName) {
+  const cfg = _getMainConfig();
+  const rawFolderRef = cfg['scanner_photo_folder_id'];
+  if (!rawFolderRef) {
+    throw new Error('Scanner photo Drive folder not set in Config sheet (key: scanner_photo_folder_id)');
+  }
+
+  const rootFolder = DriveApp.getFolderById(_extractDriveFolderId(rawFolderRef));
+
+  const months   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now      = new Date();
+  const dateName = String(now.getDate()).padStart(2,'0') + '-' + months[now.getMonth()] + '-' + now.getFullYear();
+
+  const df = rootFolder.getFoldersByName(dateName);
+  const dateFolder = df.hasNext() ? df.next() : rootFolder.createFolder(dateName);
+
+  const custName = String(customerName || 'Unknown').trim() || 'Unknown';
+  const cf = dateFolder.getFoldersByName(custName);
+  return cf.hasNext() ? cf.next() : dateFolder.createFolder(custName);
+}
+
+/**
+ * Save a Scanner-captured Chassis or Vehicle photo (already converted to a
+ * single-page PDF on the client) into the external Drive folder, and mark
+ * the corresponding tracker column (BO = chassisPhotoSaved, BP = vehiclePhotoSaved).
+ */
+function uploadScannerPhoto(params) {
+  try {
+    const sessionId = params.sessionId;
+    const receiptNo = params.receiptNo;
+    const photoType = params.photoType; // 'chassis' or 'vehicle'
+    const pdfBase64 = params.pdfBase64;
+    const fileName = params.fileName;
+
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const user = validation.user;
+    if (user.role !== 'admin' && user.role !== 'sales') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    if (photoType !== 'chassis' && photoType !== 'vehicle') {
+      return { success: false, message: 'Invalid photo type' };
+    }
+    if (!pdfBase64) {
+      return { success: false, message: 'No photo data received' };
+    }
+
+    const sheet = getSheet(CONFIG.SHEETS.DATA);
+    const data = sheet.getDataRange().getValues();
+
+    let targetRow = -1;
+    let customerName = '';
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      if (row[0] && row[0].toString() === String(receiptNo)) {
+        const executiveName = row[1];
+        if (user.role === 'sales' && executiveName !== user.name) {
+          return { success: false, message: 'Access denied. You can only edit your own records.' };
+        }
+        customerName = row[3] || '';
+        targetRow = i + 1;
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return { success: false, message: 'Receipt No not found: ' + receiptNo };
+    }
+
+    const folder = _getOrCreateScannerPhotoFolder(customerName);
+    const pdfBytes = Utilities.base64Decode(pdfBase64);
+    const blob = Utilities.newBlob(pdfBytes, 'application/pdf', fileName || (photoType + '.pdf'));
+    const file = folder.createFile(blob);
+
+    const col = (photoType === 'chassis') ? 67 : 68; // BO=67, BP=68 (1-indexed sheet columns)
+    sheet.getRange(targetRow, col).setValue('Yes');
+    SpreadsheetApp.flush();
+
+    return {
+      success: true,
+      message: (photoType === 'chassis' ? 'Chassis' : 'Vehicle') + ' photo saved successfully',
+      fileUrl: file.getUrl()
+    };
+
+  } catch (error) {
+    Logger.log('❌ Error in uploadScannerPhoto: ' + error.toString());
+    return { success: false, message: 'Error saving photo: ' + error.toString() };
   }
 }
 
