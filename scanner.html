@@ -331,6 +331,102 @@
       cursor: not-allowed;
     }
 
+    /* Live Search */
+    .search-box {
+      margin-bottom: 15px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 15px;
+      border: 2px solid #ddd;
+      border-radius: 10px;
+      font-size: 15px;
+      box-sizing: border-box;
+    }
+
+    .search-box input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .search-hint {
+      font-size: 12px;
+      color: #999;
+      margin-top: 6px;
+      padding: 0 4px;
+    }
+
+    /* Photo Section */
+    .photo-section {
+      background: #f8f9fa;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+
+    .photo-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px;
+      background: white;
+      border-radius: 10px;
+      margin-bottom: 10px;
+    }
+
+    .photo-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .photo-row-label {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .btn-photo-action {
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      white-space: nowrap;
+    }
+
+    .photo-saved-badge {
+      background: #28a745;
+      color: white;
+      font-size: 13px;
+      font-weight: 700;
+      padding: 8px 14px;
+      border-radius: 8px;
+    }
+
+    .photo-capture-panel {
+      display: none;
+      margin-top: 15px;
+    }
+
+    .photo-capture-panel.active {
+      display: block;
+    }
+
+    #photoVideoElement, #photoCapturedImage {
+      width: 100%;
+      border-radius: 10px;
+      background: #000;
+      display: block;
+    }
+
+    #photoCapturedImage {
+      display: none;
+    }
+
     .empty-state {
       text-align: center;
       padding: 60px 20px;
@@ -382,6 +478,12 @@
 
     <!-- Status Message -->
     <div id="statusMessage" class="message hidden"></div>
+
+    <!-- Live Search -->
+    <div class="search-box">
+      <input type="text" id="scannerSearchInput" placeholder="🔍 Search by name, mobile, receipt, engine or frame no..." oninput="onScannerSearchInput()" />
+      <div class="search-hint">Search finds ANY record, including ones already saved — use this to add a missed photo later.</div>
+    </div>
 
     <!-- Records List -->
     <div id="recordsList">
@@ -481,6 +583,37 @@
           💾 Save Vehicle Numbers
         </button>
 
+        <!-- Chassis & Vehicle Photo Section -->
+        <div class="photo-section" style="margin-top: 20px;">
+          <h4 style="margin: 0 0 15px 0; color: #333;">Chassis & Vehicle Photos</h4>
+
+          <div class="photo-row">
+            <span class="photo-row-label">📦 Chassis Photo</span>
+            <span id="chassisPhotoAction">
+              <button class="btn-photo-action" onclick="openPhotoCapture('chassis')">📷 Take Photo</button>
+            </span>
+          </div>
+
+          <div class="photo-row">
+            <span class="photo-row-label">🏍️ Vehicle Photo</span>
+            <span id="vehiclePhotoAction">
+              <button class="btn-photo-action" onclick="openPhotoCapture('vehicle')">📷 Take Photo</button>
+            </span>
+          </div>
+
+          <div class="photo-capture-panel" id="photoCapturePanel">
+            <div class="camera-container">
+              <video id="photoVideoElement" autoplay playsinline></video>
+              <img id="photoCapturedImage" alt="Captured">
+            </div>
+            <div class="camera-buttons">
+              <button class="btn-camera btn-capture" id="photoCaptureBtn" style="display:block;" onclick="capturePhotoImage()">📸 Capture</button>
+              <button class="btn-camera btn-retake" id="photoRetakeBtn" onclick="retakePhotoImage()">🔄 Retake</button>
+              <button class="btn-camera" id="photoSaveBtn" style="display:none;background:#28a745;color:#fff;" onclick="savePhotoAsPdf()">💾 Save Photo</button>
+            </div>
+          </div>
+        </div>
+
       </div>
 
     </div>
@@ -488,10 +621,11 @@
 
   <!-- Tesseract.js OCR Library - Using unpkg to avoid tracking prevention -->
   <script src="https://unpkg.com/tesseract.js@v4.0.0/dist/tesseract.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script src="js/config.js"></script>
   <script src="js/api.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/scanner.js"></script>
+  <script src="js/scanner.js?v=2"></script>
 </body>
 </html>

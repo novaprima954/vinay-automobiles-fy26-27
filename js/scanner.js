@@ -6,6 +6,11 @@ let currentStream = null;
 let currentReceiptNo = null;
 let currentRecord = null;
 
+let photoStream = null;
+let currentPhotoType = null; // 'chassis' or 'vehicle'
+let currentPhotoDataUrl = null;
+let scannerSearchTimer = null;
+
 // ==========================================
 // PAGE INITIALIZATION
 // ==========================================
@@ -62,6 +67,40 @@ async function loadPendingRecords() {
     console.error('Error loading records:', error);
     showMessage('Failed to load records', 'error');
   }
+}
+
+/**
+ * Live search — debounced. Empty/short query reverts to the normal pending list.
+ * Search hits ALL of the user's records (not just pending ones), so a record
+ * that already had its Engine/Frame saved can still be found to add a missed photo.
+ */
+function onScannerSearchInput() {
+  const query = document.getElementById('scannerSearchInput').value.trim();
+
+  clearTimeout(scannerSearchTimer);
+  scannerSearchTimer = setTimeout(async function() {
+    if (query.length < 2) {
+      loadPendingRecords();
+      return;
+    }
+
+    const sessionId = SessionManager.getSessionId();
+    try {
+      const response = await API.call('searchVehicleRecords', {
+        sessionId: sessionId,
+        query: query
+      });
+
+      if (response.success) {
+        displayRecords(response.records);
+      } else {
+        showMessage(response.message, 'error');
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+      showMessage('Search failed', 'error');
+    }
+  }, 300);
 }
 
 /**
@@ -149,10 +188,15 @@ async function openScanner(receiptNo) {
       
       // Show modal
       document.getElementById('scannerModal').classList.add('active');
-      
+
       // Reset camera state
       resetCameraState();
-      
+
+      // Reflect existing photo status
+      resetPhotoCaptureState();
+      updatePhotoActionUI('chassis', currentRecord.chassisPhotoSaved === 'Yes');
+      updatePhotoActionUI('vehicle', currentRecord.vehiclePhotoSaved === 'Yes');
+
     } else {
       showMessage(response.message, 'error');
     }
@@ -168,13 +212,149 @@ async function openScanner(receiptNo) {
 function closeScanner() {
   // Stop camera if running
   stopCamera();
-  
+  stopPhotoCamera();
+
   // Hide modal
   document.getElementById('scannerModal').classList.remove('active');
-  
+
   // Clear current record
   currentReceiptNo = null;
   currentRecord = null;
+}
+
+// ==========================================
+// CHASSIS / VEHICLE PHOTO CAPTURE
+// ==========================================
+
+function resetPhotoCaptureState() {
+  currentPhotoType = null;
+  currentPhotoDataUrl = null;
+  stopPhotoCamera();
+
+  document.getElementById('photoCapturePanel').classList.remove('active');
+  document.getElementById('photoVideoElement').style.display = 'block';
+  document.getElementById('photoCapturedImage').style.display = 'none';
+  document.getElementById('photoCaptureBtn').style.display = 'block';
+  document.getElementById('photoRetakeBtn').style.display = 'none';
+  document.getElementById('photoSaveBtn').style.display = 'none';
+}
+
+function updatePhotoActionUI(photoType, isSaved) {
+  const el = document.getElementById(photoType + 'PhotoAction');
+  if (!el) return;
+
+  if (isSaved) {
+    el.innerHTML = '<span class="photo-saved-badge">✅ Saved</span>';
+  } else {
+    const label = photoType === 'chassis' ? '📦' : '🏍️';
+    el.innerHTML = '<button class="btn-photo-action" onclick="openPhotoCapture(\'' + photoType + '\')">📷 Take Photo</button>';
+  }
+}
+
+async function openPhotoCapture(photoType) {
+  currentPhotoType = photoType;
+  currentPhotoDataUrl = null;
+
+  const panel = document.getElementById('photoCapturePanel');
+  panel.classList.add('active');
+  panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  const video = document.getElementById('photoVideoElement');
+  const image = document.getElementById('photoCapturedImage');
+  video.style.display = 'block';
+  image.style.display = 'none';
+  document.getElementById('photoCaptureBtn').style.display = 'block';
+  document.getElementById('photoRetakeBtn').style.display = 'none';
+  document.getElementById('photoSaveBtn').style.display = 'none';
+
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment' }
+    });
+    photoStream = stream;
+    video.srcObject = stream;
+  } catch (error) {
+    console.error('Camera error:', error);
+    alert('Failed to access camera. Please ensure camera permissions are granted.');
+  }
+}
+
+function stopPhotoCamera() {
+  if (photoStream) {
+    photoStream.getTracks().forEach(function(track) { track.stop(); });
+    photoStream = null;
+  }
+}
+
+function capturePhotoImage() {
+  const video = document.getElementById('photoVideoElement');
+  const image = document.getElementById('photoCapturedImage');
+
+  const canvas = document.createElement('canvas');
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext('2d').drawImage(video, 0, 0);
+
+  currentPhotoDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+  image.src = currentPhotoDataUrl;
+
+  video.style.display = 'none';
+  image.style.display = 'block';
+  document.getElementById('photoCaptureBtn').style.display = 'none';
+  document.getElementById('photoRetakeBtn').style.display = 'block';
+  document.getElementById('photoSaveBtn').style.display = 'block';
+
+  stopPhotoCamera();
+}
+
+function retakePhotoImage() {
+  openPhotoCapture(currentPhotoType);
+}
+
+async function savePhotoAsPdf() {
+  if (!currentPhotoDataUrl || !currentPhotoType) return;
+
+  const saveBtn = document.getElementById('photoSaveBtn');
+  saveBtn.disabled = true;
+  saveBtn.textContent = '⏳ Saving...';
+
+  try {
+    // Fit the photo into an A4 page (portrait), same pattern used for the Customer Form PDF
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+    pdf.addImage(currentPhotoDataUrl, 'JPEG', 0, 0, 210, 297);
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+
+    const customerName = (currentRecord.customerName || 'Unknown')
+      .replace(/[^a-zA-Z0-9\s]/g, '').replace(/\s+/g, '_').toUpperCase();
+    const fileName = customerName + '_' + currentPhotoType + '.pdf';
+
+    const sessionId = SessionManager.getSessionId();
+    const response = await API.call('uploadScannerPhoto', {
+      sessionId: sessionId,
+      receiptNo: currentReceiptNo,
+      photoType: currentPhotoType,
+      pdfBase64: pdfBase64,
+      fileName: fileName
+    });
+
+    if (response.success) {
+      showMessage('✅ ' + response.message, 'success');
+      if (currentPhotoType === 'chassis') currentRecord.chassisPhotoSaved = 'Yes';
+      if (currentPhotoType === 'vehicle') currentRecord.vehiclePhotoSaved = 'Yes';
+      updatePhotoActionUI(currentPhotoType, true);
+      resetPhotoCaptureState();
+    } else {
+      showMessage('❌ ' + response.message, 'error');
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Save Photo';
+    }
+  } catch (error) {
+    console.error('Save photo error:', error);
+    showMessage('❌ Failed to save photo. Please try again.', 'error');
+    saveBtn.disabled = false;
+    saveBtn.textContent = '💾 Save Photo';
+  }
 }
 
 /**
