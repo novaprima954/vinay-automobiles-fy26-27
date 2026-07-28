@@ -154,6 +154,11 @@ function toggleChoiceNumber() {
   if (box) box.classList.toggle('checked');
 }
 
+function toggleExtraTick(name) {
+  const box = document.getElementById(name + 'Box');
+  if (box) box.classList.toggle('checked');
+}
+
 async function openCustomerForm(receiptNo) {
   const sessionId = SessionManager.getSessionId();
   
@@ -187,9 +192,13 @@ async function openCustomerForm(receiptNo) {
       document.getElementById('formFinancer').textContent = currentRecord.financierName || 'Cash';
 
       renderReceiptTicks(currentRecord);
-      // Reset Choice Number to unticked for each newly opened record
+      // Reset Choice Number / DMS / INS / RTO to unticked for each newly opened record
       const choiceBox = document.getElementById('choiceNumberBox');
       if (choiceBox) choiceBox.classList.remove('checked');
+      ['dms', 'ins', 'rto'].forEach(function(name) {
+        const box = document.getElementById(name + 'Box');
+        if (box) box.classList.remove('checked');
+      });
 
       const financierName = (currentRecord.financierName || 'Cash').toLowerCase().trim();
       const isCash = financierName === 'cash' || financierName === '';
