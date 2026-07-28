@@ -340,7 +340,27 @@ async function shareAsPDF() {
   }
 }
 
+function showToast(text, type) {
+  const toast = document.getElementById('toastNotification');
+  if (!toast) return;
+
+  toast.textContent = text;
+  toast.className = 'toast no-print ' + (type || '') + ' show';
+
+  clearTimeout(showToast._timer);
+  showToast._timer = setTimeout(function() {
+    toast.classList.remove('show');
+  }, 4000);
+}
+
 async function saveCustomerFormToDrive() {
+  const btn = document.getElementById('btnSaveDrive');
+  if (btn) {
+    if (btn.disabled) return; // already saving
+    btn.disabled = true;
+    btn.textContent = '⏳ Saving...';
+  }
+
   showMessage('⏳ Saving to Drive... Please wait.', 'info');
   try {
     const { pdf, filename } = await _buildCustomerFormPdf();
@@ -356,8 +376,10 @@ async function saveCustomerFormToDrive() {
 
     if (r.success) {
       showMessage('✅ Saved to Drive — Customer Form / ' + (r.folderDate || ''), 'success');
+      showToast('✅ Saved to Drive — ' + (r.folderDate || ''), 'success');
     } else {
       showMessage('❌ ' + (r.message || 'Could not save to Drive'), 'error');
+      showToast('❌ ' + (r.message || 'Could not save to Drive'), 'error');
     }
   } catch (error) {
     console.error('Save to Drive error:', error);
@@ -365,6 +387,12 @@ async function saveCustomerFormToDrive() {
     if (error.message === 'NO_LIBRARY') { alert('PDF library not loaded — cannot save to Drive.'); return; }
     if (error.message === 'NO_PAGES') { alert('⚠️ No pages to save'); return; }
     showMessage('⚠️ Could not save to Drive: ' + error.message, 'error');
+    showToast('⚠️ Could not save to Drive: ' + error.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = '💾 Save to Drive';
+    }
   }
 }
 

@@ -555,6 +555,40 @@
       background: #667eea;
       color: white;
     }
+
+    /* Top-right toast notification */
+    .toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 99999;
+      background: #28a745;
+      color: white;
+      padding: 14px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+      max-width: 320px;
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: opacity 0.3s, transform 0.3s;
+      pointer-events: none;
+    }
+
+    .toast.error {
+      background: #dc3545;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .btn-action:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
   </style>
 </head>
 <body>
@@ -573,6 +607,7 @@
 
     <!-- Status Message -->
     <div id="statusMessage" class="message hidden no-print"></div>
+    <div id="toastNotification" class="toast no-print"></div>
 
     <!-- Filters -->
     <div class="filters-container no-print" style="background: white; padding: 15px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
@@ -624,7 +659,7 @@
     <button class="btn-action btn-pdf" onclick="shareAsPDF()">
       📄 Share as PDF
     </button>
-    <button class="btn-action btn-drive" onclick="saveCustomerFormToDrive()">
+    <button class="btn-action btn-drive" id="btnSaveDrive" onclick="saveCustomerFormToDrive()">
       💾 Save to Drive
     </button>
     <button class="btn-action btn-close" onclick="closeAllForms()">
