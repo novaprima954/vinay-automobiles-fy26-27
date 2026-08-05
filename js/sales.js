@@ -537,7 +537,17 @@ function showWhatsAppModal(data) {
   const r3 = parseFloat(data.receipt3Amount) || 0;
   const r4 = parseFloat(data.receipt4Amount) || 0;
   const totalCashCollected = r1 + r2 + r3 + r4;
-  
+
+  // Receipt No - only include receipt/amount pairs that have a receipt number
+  const receiptPairs = [
+    [data.receiptNo1, data.receipt1Amount],
+    [data.receiptNo2, data.receipt2Amount],
+    [data.receiptNo3, data.receipt3Amount],
+    [data.receiptNo4, data.receipt4Amount]
+  ].filter(([no]) => no && String(no).trim())
+   .map(([no, amt]) => String(no).trim() + '/' + (parseFloat(amt) || 0).toLocaleString('en-IN'));
+  const receiptLine = receiptPairs.length ? `Receipt No - ${receiptPairs.join(', ')}\n` : '';
+
   const message = `Customer Name - ${data.customerName}
 Variant - ${data.model} ${data.variant}
 Colour - ${data.colour}
@@ -546,7 +556,7 @@ Passing Date - ${data.deliveryDate}
 Cash Collected - ₹${totalCashCollected.toLocaleString('en-IN')}
 Final price after discount - ${data.finalPrice}
 Discount - ${data.discount}
-Accessories -
+${receiptLine}Accessories -
 ${accessoriesText}`;
   
   document.getElementById('whatsappMessage').textContent = message;

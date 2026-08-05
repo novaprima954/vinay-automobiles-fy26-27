@@ -784,6 +784,18 @@ function showWhatsAppModal(data) {
   message += '*Cash Collected* - Rs.' + cashTotal.toFixed(2) + '\n';
   message += '*Final price after discount* - Rs.' + finalPrice + '\n';
   message += '*Discount* - ' + (data.discount || '0') + '\n';
+
+  // Receipt No - only include receipt/amount pairs that have a receipt number
+  const receiptPairs = [
+    [record.receiptNo1, record.receipt1Amount],
+    [data.receiptNo2, data.receipt2Amount],
+    [data.receiptNo3, data.receipt3Amount],
+    [data.receiptNo4, data.receipt4Amount]
+  ].filter(function(pair) { return pair[0] && String(pair[0]).trim(); })
+   .map(function(pair) { return String(pair[0]).trim() + '/' + (parseFloat(pair[1]) || 0).toLocaleString('en-IN'); });
+  if (receiptPairs.length) {
+    message += '*Receipt No* - ' + receiptPairs.join(', ') + '\n';
+  }
   
   // Get PriceMaster details to check which accessories are available
   const pmCache = priceMasterCache[data.model + '|' + data.variant] || {};
