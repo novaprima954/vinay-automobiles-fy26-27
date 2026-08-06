@@ -5,95 +5,112 @@
 const API = {
   
   /**
-   * Make API call to Apps Script backend
+   * Make API call to Apps Script backend.
+   * GET (read) requests are auto-retried on failure since Apps Script's web app
+   * infrastructure is occasionally slow/flaky and a retry usually succeeds.
+   * POST (write) requests are never auto-retried, to avoid duplicate saves if
+   * the original request actually succeeded server-side but the response was lost.
    */
   async call(action, params = {}) {
-    try {
-      // Check if we should use POST (for large data like base64 or records array)
-      const hasArrayParam = Array.isArray(params.records);
-      const hasBase64 = !!params.base64Data;
-      const hasData = !!params.data;
-      const isTooLarge = JSON.stringify(params).length > 1000;
-      
-      const usePost = hasBase64 || hasData || hasArrayParam || isTooLarge;
-      // Use JSON body when payload has pdfBase64 (too large for form-encoding)
-      const useJsonBody = !!params.pdfBase64;
+    // Check if we should use POST (for large data like base64 or records array)
+    const hasArrayParam = Array.isArray(params.records);
+    const hasBase64 = !!params.base64Data;
+    const hasData = !!params.data;
+    const isTooLarge = JSON.stringify(params).length > 1000;
 
-      let response;
+    const usePost = hasBase64 || hasData || hasArrayParam || isTooLarge;
+    // Use JSON body when payload has pdfBase64 (too large for form-encoding)
+    const useJsonBody = !!params.pdfBase64;
 
-      if (usePost) {
-        // POST request for large data
-        console.log('API Call (POST):', action, Object.keys(params));
-        console.log('POST reason:', { hasBase64, hasData, hasArrayParam, isTooLarge, useJsonBody });
+    const maxAttempts = usePost ? 1 : 3;
+    let lastError;
 
-        if (useJsonBody) {
-          // Send as text/plain with JSON body — avoids CORS preflight (application/json triggers OPTIONS)
-          // GAS reads this from e.postData.contents
-          response = await fetch(CONFIG.API_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({ action, ...params }),
-            redirect: 'follow'
-          });
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        let response;
+
+        if (usePost) {
+          // POST request for large data
+          console.log('API Call (POST):', action, Object.keys(params));
+          console.log('POST reason:', { hasBase64, hasData, hasArrayParam, isTooLarge, useJsonBody });
+
+          if (useJsonBody) {
+            // Send as text/plain with JSON body — avoids CORS preflight (application/json triggers OPTIONS)
+            // GAS reads this from e.postData.contents
+            response = await fetch(CONFIG.API_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain' },
+              body: JSON.stringify({ action, ...params }),
+              redirect: 'follow'
+            });
+          } else {
+            const formData = new URLSearchParams();
+            formData.append('action', action);
+
+            for (const [key, value] of Object.entries(params)) {
+              if (value !== null && value !== undefined) {
+                if (typeof value === 'object') {
+                  formData.append(key, JSON.stringify(value));
+                } else {
+                  formData.append(key, value);
+                }
+              }
+            }
+
+            response = await fetch(CONFIG.API_ENDPOINT, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: formData.toString(),
+              redirect: 'follow'
+            });
+          }
+
         } else {
-          const formData = new URLSearchParams();
-          formData.append('action', action);
+          // GET request for small data
+          console.log('API Call (GET):', action, params, attempt > 1 ? '(retry ' + (attempt - 1) + ')' : '');
+
+          const url = new URL(CONFIG.API_ENDPOINT);
+          url.searchParams.append('action', action);
 
           for (const [key, value] of Object.entries(params)) {
             if (value !== null && value !== undefined) {
-              if (typeof value === 'object') {
-                formData.append(key, JSON.stringify(value));
-              } else {
-                formData.append(key, value);
-              }
+              url.searchParams.append(key, value);
             }
           }
 
-          response = await fetch(CONFIG.API_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: formData.toString(),
+          response = await fetch(url.toString(), {
+            method: 'GET',
             redirect: 'follow'
           });
         }
-        
-      } else {
-        // GET request for small data
-        console.log('API Call (GET):', action, params);
-        
-        const url = new URL(CONFIG.API_ENDPOINT);
-        url.searchParams.append('action', action);
-        
-        for (const [key, value] of Object.entries(params)) {
-          if (value !== null && value !== undefined) {
-            url.searchParams.append(key, value);
-          }
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
         }
-        
-        response = await fetch(url.toString(), {
-          method: 'GET',
-          redirect: 'follow'
-        });
+
+        const data = await response.json();
+        console.log('API Response:', data);
+
+        return data;
+
+      } catch (error) {
+        lastError = error;
+        console.error('API Error (attempt ' + attempt + '/' + maxAttempts + '):', error);
+
+        if (attempt < maxAttempts) {
+          // Short exponential backoff before retrying (Apps Script's web app
+          // infra is occasionally slow to spin up / respond)
+          await new Promise(resolve => setTimeout(resolve, 800 * attempt));
+        }
       }
-      
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      
-      const data = await response.json();
-      console.log('API Response:', data);
-      
-      return data;
-      
-    } catch (error) {
-      console.error('API Error:', error);
-      return {
-        success: false,
-        message: 'Network error: ' + error.message
-      };
     }
+
+    return {
+      success: false,
+      message: 'Network error: ' + lastError.message
+    };
   },
-  
+
   /**
    * Login user
    */
