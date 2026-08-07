@@ -36,8 +36,12 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Auto-calculate totals
   setupTotalCalculation();
   
-  // Auto-copy receipt number
+  // Auto-copy receipt number (mirrored on both 'input' and 'change' so it also
+  // stays in sync after autofill/paste interactions that don't fire 'input')
   document.getElementById('receiptNo').addEventListener('input', function() {
+    document.getElementById('receiptNo1').value = this.value;
+  });
+  document.getElementById('receiptNo').addEventListener('change', function() {
     document.getElementById('receiptNo1').value = this.value;
   });
 });
@@ -398,8 +402,15 @@ async function handleSubmit(e) {
   console.log('Helmet value:', accessories.helmet);
   console.log('=== END ACCESSORY VALUES ===');
   
+  // Receipt No 1 is normally auto-mirrored from Receipt No as you type (see the
+  // 'input' listener in the init block), but that mirror can fail to fire in some
+  // cases (autofill selection, programmatic value changes, etc.) — fall back to
+  // Receipt No's value here so column X is never blank when column A has a value.
+  const receiptNoValue = document.getElementById('receiptNo').value.trim();
+  const receiptNo1Value = document.getElementById('receiptNo1').value.trim() || receiptNoValue;
+
   const data = {
-    receiptNo: document.getElementById('receiptNo').value.trim(),
+    receiptNo: receiptNoValue,
     executiveName: document.getElementById('executiveName').value,
     bookingDate: document.getElementById('bookingDate').value,
     customerName: document.getElementById('customerName').value.trim(),
@@ -423,7 +434,7 @@ async function handleSubmit(e) {
     backrest: accessories.backrest,
     extendedwarranty: accessories.extendedwarranty,
     salesRemark: document.getElementById('salesRemark').value.trim(),
-    receiptNo1: document.getElementById('receiptNo1').value.trim(),
+    receiptNo1: receiptNo1Value,
     receipt1Amount: document.getElementById('receipt1Amount').value,
     receiptNo2: document.getElementById('receiptNo2').value.trim(),
     receipt2Amount: document.getElementById('receipt2Amount').value,
