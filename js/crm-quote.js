@@ -8,7 +8,7 @@ let priceDetails = null;
 let lastQuotNo = '';
 let customAccItems = [];    // { id, label, price }
 let pendingQuotData = null; // quotation data for reprint restoration
-let compareMode = false;
+let compareMode = true; // Comparison quotation is the default; staff can cancel per-quotation via the toggle button
 let priceDetails2 = null;   // vehicle 2 for comparison
 
 const ACC_CONFIG = [
@@ -296,6 +296,17 @@ async function onVariantChange() {
       // Show compare toggle now that vehicle 1 is loaded
       const compareCard = document.getElementById('compareToggleCard');
       if (compareCard) compareCard.style.display = '';
+      // Comparison quotation is mandatory by default — reveal Vehicle 2 and put
+      // the toggle button in its "on" state right away (staff can still cancel it)
+      if (compareMode) {
+        document.getElementById('vehicle2Card').style.display = '';
+        const btn = document.getElementById('btnToggleCompare');
+        if (btn) {
+          btn.innerHTML = '✕ Cancel Comparison';
+          btn.style.cssText += ';background:#fff0f0;color:#ef5350;border-color:#ef5350;';
+        }
+        _populateModelSelect2();
+      }
     } else {
       showMessage(response.message, 'error');
     }
