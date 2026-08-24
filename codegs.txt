@@ -152,6 +152,8 @@ function handleRequest(e) {
       case 'getFinancierDashboard':   result = getFinancierDashboard(params.sessionId);                                              break;
       case 'updateFinanceDetails':    result = updateFinanceDetails(params.sessionId, params.leadId, JSON.parse(params.data));       break;
       case 'getFinancierAnalytics':   result = getFinancierAnalytics(params.sessionId, params.months);                              break;
+      case 'getFinancierBookings':       result = getFinancierBookings(params.sessionId);                                            break;
+      case 'saveFinancierBookingScheme': result = saveFinancierBookingScheme(params.sessionId, params.receiptNo, params.scheme, params.downPayment, params.loanAmount, params.emi, params.tenure); break;
       case 'searchCRMLeads':        result = searchCRMLeads(params.sessionId, params.query);                                         break;
       case 'sendQuotationWhatsApp':
         result = sendQuotationWhatsApp(params.sessionId, params.pdfBase64, params.fileName, params.customerName, params.customerPhone, params.quotNo, params.modelVariant, params.execName, params.execMobile);
@@ -2958,6 +2960,132 @@ function getFinancierLeads(sessionId) {
     return { success: true, leads: leads };
   } catch(e) {
     Logger.log('getFinancierLeads: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Financier "My Bookings" — Data-sheet bookings (post Account Check) where this
+ * financier's Scheme/Down Payment/Loan Amount/EMI/Tenure can be logged.
+ * Admin sees every financier's bookings; financier sees only their own
+ * (Data-sheet financierName, column K, matching their login name).
+ */
+function getFinancierBookings(sessionId) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'financier' && user.role !== 'admin') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet(CONFIG.SHEETS.DATA);
+    var data = sheet.getDataRange().getValues();
+
+    var COL_FINANCIER     = 10; // K
+    var COL_ACCOUNT_CHECK = 21; // V
+    var COL_SCHEME        = 68; // BQ
+    var COL_DOWNPAYMENT   = 69; // BR
+    var COL_LOANAMOUNT    = 70; // BS
+    var COL_EMI           = 71; // BT
+    var COL_TENURE        = 72; // BU
+
+    var bookings = [];
+    for (var i = 1; i < data.length; i++) {
+      var row = data[i];
+      if (!row[0]) continue; // skip blank rows
+
+      var financierName = String(row[COL_FINANCIER] || '').trim();
+      if (!financierName) continue;
+      if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
+      if (user.role === 'financier' && financierName !== user.name) continue;
+
+      var scheme = row[COL_SCHEME];
+      bookings.push({
+        receiptNo:     row[0],
+        customerName:  row[3] || '',
+        mobileNo:      row[4] || '',
+        model:         row[5] || '',
+        variant:       row[6] || '',
+        bookingDate:   formatDate(row[2]),
+        deliveryDate:  row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
+        financierName: financierName,
+        scheme:        scheme || '',
+        downPayment:   row[COL_DOWNPAYMENT] || '',
+        loanAmount:    row[COL_LOANAMOUNT] || '',
+        emi:           row[COL_EMI] || '',
+        tenure:        row[COL_TENURE] || '',
+        locked:        !!(scheme && String(scheme).trim() !== '')
+      });
+    }
+
+    return { success: true, bookings: bookings };
+  } catch(e) {
+    Logger.log('getFinancierBookings: ' + e);
+    return { success: false, message: e.toString() };
+  }
+}
+
+/**
+ * Save Scheme/Down Payment/Loan Amount/EMI/Tenure for a booking (Data sheet).
+ * Financier: only their own bookings, Account Check must already be Yes, and the
+ * fields lock after the first save. Admin: can always save/edit, bypassing the lock.
+ */
+function saveFinancierBookingScheme(sessionId, receiptNo, scheme, downPayment, loanAmount, emi, tenure) {
+  try {
+    var validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+    var user = validation.user;
+    if (user.role !== 'financier' && user.role !== 'admin') {
+      return { success: false, message: 'Access denied' };
+    }
+
+    var sheet = getSheet(CONFIG.SHEETS.DATA);
+    var data = sheet.getDataRange().getValues();
+
+    var COL_FINANCIER     = 10; // K
+    var COL_ACCOUNT_CHECK = 21; // V
+    var COL_SCHEME        = 68; // BQ
+
+    var targetRow = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]) === String(receiptNo)) {
+        var row = data[i];
+
+        if (user.role === 'financier') {
+          var financierName = String(row[COL_FINANCIER] || '').trim();
+          if (financierName !== user.name) {
+            return { success: false, message: 'Access denied. Not your customer.' };
+          }
+          if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') {
+            return { success: false, message: 'Account check is not yet marked Yes for this customer.' };
+          }
+          var existingScheme = row[COL_SCHEME];
+          if (existingScheme && String(existingScheme).trim() !== '') {
+            return { success: false, message: 'Already saved and locked. Contact admin to make changes.' };
+          }
+        }
+
+        targetRow = i + 1;
+        break;
+      }
+    }
+
+    if (targetRow === -1) {
+      return { success: false, message: 'Receipt No not found: ' + receiptNo };
+    }
+
+    sheet.getRange(targetRow, 69).setValue(String(scheme || '').trim());   // BQ - Scheme
+    sheet.getRange(targetRow, 70).setValue(parseFloat(downPayment) || 0);  // BR - Down Payment
+    sheet.getRange(targetRow, 71).setValue(parseFloat(loanAmount) || 0);   // BS - Loan Amount
+    sheet.getRange(targetRow, 72).setValue(parseFloat(emi) || 0);          // BT - EMI
+    sheet.getRange(targetRow, 73).setValue(parseFloat(tenure) || 0);       // BU - Tenure
+
+    SpreadsheetApp.flush();
+
+    return { success: true, message: 'Finance scheme saved successfully' };
+  } catch(e) {
+    Logger.log('saveFinancierBookingScheme: ' + e);
     return { success: false, message: e.toString() };
   }
 }
