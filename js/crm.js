@@ -709,6 +709,7 @@ async function submitFinanceDetails() {
 // ── My Bookings (Financier finance-scheme entry on Data-sheet bookings) ──
 
 let financierBookingsAll = [];
+let currentBookingsSearch = '';
 
 async function loadFinancierBookings() {
   const loading = document.getElementById('myBookingsLoading');
@@ -725,13 +726,44 @@ async function loadFinancierBookings() {
   }
 }
 
+function filterFinancierBookings() {
+  currentBookingsSearch = (document.getElementById('myBookingsSearch').value || '').trim().toLowerCase();
+  renderFinancierBookings();
+}
+
+function _sortBookings(list) {
+  return list.slice().sort((a, b) => {
+    // Pending (not yet entered) first, entered/locked ones sink to the bottom
+    if (a.locked !== b.locked) return a.locked ? 1 : -1;
+    // Within each group, latest date first
+    const da = a.deliveryDate || a.bookingDate || '';
+    const db = b.deliveryDate || b.bookingDate || '';
+    return db.localeCompare(da);
+  });
+}
+
 function renderFinancierBookings() {
   const container = document.getElementById('myBookings');
-  if (financierBookingsAll.length === 0) {
-    container.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No bookings yet</div><div class="empty-sub">Account-checked customers will appear here</div></div>`;
+
+  let list = financierBookingsAll;
+  if (currentBookingsSearch) {
+    const q = currentBookingsSearch;
+    list = list.filter(b =>
+      String(b.customerName || '').toLowerCase().indexOf(q) !== -1 ||
+      String(b.mobileNo     || '').toLowerCase().indexOf(q) !== -1 ||
+      String(b.receiptNo    || '').toLowerCase().indexOf(q) !== -1 ||
+      String(b.model        || '').toLowerCase().indexOf(q) !== -1
+    );
+  }
+  list = _sortBookings(list);
+
+  if (list.length === 0) {
+    container.innerHTML = financierBookingsAll.length === 0
+      ? `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No bookings yet</div><div class="empty-sub">Account-checked customers will appear here</div></div>`
+      : `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">No matches</div><div class="empty-sub">Try a different search</div></div>`;
     return;
   }
-  container.innerHTML = financierBookingsAll.map(b => bookingCardHtml(b)).join('');
+  container.innerHTML = list.map(b => bookingCardHtml(b)).join('');
 }
 
 function bookingCardHtml(b) {

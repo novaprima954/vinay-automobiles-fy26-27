@@ -458,7 +458,13 @@
 
   <!-- ═══ MY BOOKINGS TAB (Financier) ═══ -->
   <div id="myBookingsTab" class="tab-content">
-    <p style="font-size:12px;color:#888;margin:10px 16px 0;">Bookings where Account Check is done — log the finance scheme once, then it locks.</p>
+    <p style="font-size:12px;color:#888;margin:10px 16px 0;">Bookings where Account Check is done — log the finance scheme once, then it locks. Pending ones stay on top, newest first.</p>
+    <div style="padding:8px 16px 0;">
+      <input type="text" id="myBookingsSearch" placeholder="🔍 Search name, mobile, receipt no..."
+        oninput="filterFinancierBookings()"
+        style="width:100%;padding:9px 12px;border:2px solid #e0e0e0;border-radius:10px;font-size:13px;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='#667eea'" onblur="this.style.borderColor='#e0e0e0'">
+    </div>
     <div class="loading" id="myBookingsLoading" style="padding-top:30px;display:none;">
       <div class="spinner"></div><div>Loading bookings...</div>
     </div>
@@ -977,6 +983,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js?v=2"></script>
-<script src="js/crm.js?v=12"></script>
+<script src="js/crm.js?v=13"></script>
 </body>
 </html>
