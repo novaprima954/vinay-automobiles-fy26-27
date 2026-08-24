@@ -456,6 +456,15 @@
     <div id="myLeads"></div>
   </div>
 
+  <!-- ═══ MY BOOKINGS TAB (Financier) ═══ -->
+  <div id="myBookingsTab" class="tab-content">
+    <p style="font-size:12px;color:#888;margin:10px 16px 0;">Bookings where Account Check is done — log the finance scheme once, then it locks.</p>
+    <div class="loading" id="myBookingsLoading" style="padding-top:30px;display:none;">
+      <div class="spinner"></div><div>Loading bookings...</div>
+    </div>
+    <div id="myBookings"></div>
+  </div>
+
   <!-- ═══ ALL LEADS TAB ═══ -->
   <div id="allLeadsTab" class="tab-content">
     <!-- Status filter -->
@@ -780,6 +789,39 @@
     </div>
   </div>
 
+  <!-- ═══ BOOKING SCHEME SHEET (Financier / Admin) ═══ -->
+  <div class="sheet-overlay" id="bookingSchemeSheet" onclick="handleSheetOverlayClick(event,'bookingSchemeSheet')">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <div class="sheet-title">💳 Finance Scheme <button class="sheet-close" onclick="closeSheet('bookingSchemeSheet')">✕</button></div>
+      <div class="sheet-body">
+        <input type="hidden" id="bkReceiptNo">
+        <p id="bkLockedNote" style="font-size:12px;color:#e65100;margin:0 0 14px;display:none;">🔒 Already saved and locked. Only admin can edit this.</p>
+        <label style="font-size:13px;font-weight:700;color:#555;display:block;margin-bottom:6px;">Scheme / Offer</label>
+        <input type="text" id="bkScheme" class="assign-select" style="margin-bottom:14px;" placeholder="e.g. 0% for 12 months">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;">
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Down Payment (₹)</label>
+            <input type="number" id="bkDownPayment" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Loan Amount (₹)</label>
+            <input type="number" id="bkLoanAmount" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">EMI (₹/month)</label>
+            <input type="number" id="bkEMI" class="assign-select" placeholder="0" min="0">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:700;color:#888;display:block;margin-bottom:4px;">Tenure (months)</label>
+            <input type="number" id="bkTenure" class="assign-select" placeholder="0" min="0" max="84">
+          </div>
+        </div>
+        <button class="btn-primary" id="bkSubmitBtn" onclick="submitBookingScheme()">Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- ═══ ASSIGN FINANCIER SHEET ═══ -->
   <div class="sheet-overlay" id="assignFinSheet" onclick="handleSheetOverlayClick(event,'assignFinSheet')">
     <div class="sheet">
@@ -829,6 +871,10 @@
     <button class="nav-item" onclick="switchTab('myLeads')" id="navMyLeads">
       <div class="nav-icon">📋</div>
       <div class="nav-label">My Leads</div>
+    </button>
+    <button class="nav-item" onclick="switchTab('myBookings')" id="navMyBookings" style="display:none;">
+      <div class="nav-icon">💳</div>
+      <div class="nav-label">Bookings</div>
     </button>
     <button class="nav-item" onclick="switchTab('allLeads')" id="navAllLeads" style="display:none;">
       <div class="nav-icon">📊</div>
@@ -931,6 +977,6 @@
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/api.js?v=2"></script>
-<script src="js/crm.js?v=11"></script>
+<script src="js/crm.js?v=12"></script>
 </body>
 </html>

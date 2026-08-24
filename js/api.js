@@ -555,6 +555,18 @@ const API = {
     const sessionId = SessionManager.getSessionId();
     return await this.call('updateFinanceDetails', { sessionId, leadId, data: JSON.stringify(data) });
   },
+  async getFinancierBookings() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getFinancierBookings', { sessionId });
+  },
+  async saveFinancierBookingScheme(receiptNo, data) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('saveFinancierBookingScheme', {
+      sessionId, receiptNo,
+      scheme: data.scheme, downPayment: data.downPayment,
+      loanAmount: data.loanAmount, emi: data.emi, tenure: data.tenure
+    });
+  },
   async getFinancierAnalytics(months) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('getFinancierAnalytics', { sessionId, months: months || '' });

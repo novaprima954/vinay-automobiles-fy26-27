@@ -43,6 +43,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (currentUser.role === 'admin') {
     document.getElementById('navAdmin').style.display = '';
     document.getElementById('adminAnalyticsSection').style.display = '';
+    document.getElementById('navMyBookings').style.display = '';
+    const bkLbl = document.querySelector('#navMyBookings .nav-label');
+    if (bkLbl) bkLbl.textContent = 'All Bookings';
   }
 
   // All Leads tab visible for all roles except financier
@@ -74,12 +77,13 @@ function switchTab(tab) {
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
 
   const tabMap = {
-    dashboard: ['dashboardTab', 'navDashboard'],
-    followups:  ['followupsTab', 'navFollowups'],
-    pool:       ['poolTab',      'navPool'],
-    myLeads:    ['myLeadsTab',   'navMyLeads'],
-    allLeads:   ['allLeadsTab',  'navAllLeads'],
-    admin:      ['adminTab',     'navAdmin'],
+    dashboard:   ['dashboardTab',   'navDashboard'],
+    followups:   ['followupsTab',   'navFollowups'],
+    pool:        ['poolTab',        'navPool'],
+    myLeads:     ['myLeadsTab',     'navMyLeads'],
+    myBookings:  ['myBookingsTab',  'navMyBookings'],
+    allLeads:    ['allLeadsTab',    'navAllLeads'],
+    admin:       ['adminTab',       'navAdmin'],
   };
 
   const [contentId, navId] = tabMap[tab] || tabMap.dashboard;
@@ -104,6 +108,7 @@ function switchTab(tab) {
     if (currentUser.role === 'financier') loadFinancierLeads();
     else loadMyLeads();
   }
+  if (tab === 'myBookings' && (currentUser.role === 'financier' || currentUser.role === 'admin')) loadFinancierBookings();
   // All Leads is load-on-demand (see the "Load List" button in the tab) — no auto-load here.
   if (tab === 'admin') {
     if (currentUser.role === 'admin') loadAdmin();
@@ -478,6 +483,9 @@ function _setupFinancierUI() {
   // Rename My Leads nav label
   const myLbl = document.querySelector('#navMyLeads .nav-label');
   if (myLbl) myLbl.textContent = 'My Leads';
+  // Show My Bookings tab (finance scheme entry for account-checked customers)
+  const navMyBookings = document.getElementById('navMyBookings');
+  if (navMyBookings) navMyBookings.style.display = '';
   // Hide source filter rows — show loan status filter instead
   ['myLeadsSourceFilter','myLeadsStatusFilter'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'none';
@@ -693,6 +701,94 @@ async function submitFinanceDetails() {
       if (currentUser.role === 'financier') loadFinancierLeads();
       else if (document.getElementById('myLeadsTab').classList.contains('active')) loadMyLeads();
       _bgRefreshDashboard();
+    } else { showMessage(r.message || 'Error saving', 'error'); }
+  } catch(e) { showMessage('Error: ' + e.message, 'error'); }
+  finally { btn.disabled = false; btn.textContent = 'Save'; }
+}
+
+// ── My Bookings (Financier finance-scheme entry on Data-sheet bookings) ──
+
+let financierBookingsAll = [];
+
+async function loadFinancierBookings() {
+  const loading = document.getElementById('myBookingsLoading');
+  loading.style.display = '';
+  try {
+    const r = await API.getFinancierBookings();
+    loading.style.display = 'none';
+    if (!r.success) { document.getElementById('myBookings').innerHTML = errorHtml(r.message); return; }
+    financierBookingsAll = r.bookings || [];
+    renderFinancierBookings();
+  } catch(e) {
+    loading.style.display = 'none';
+    document.getElementById('myBookings').innerHTML = errorHtml('Error loading bookings');
+  }
+}
+
+function renderFinancierBookings() {
+  const container = document.getElementById('myBookings');
+  if (financierBookingsAll.length === 0) {
+    container.innerHTML = `<div class="empty-state"><div class="empty-icon">💳</div><div class="empty-title">No bookings yet</div><div class="empty-sub">Account-checked customers will appear here</div></div>`;
+    return;
+  }
+  container.innerHTML = financierBookingsAll.map(b => bookingCardHtml(b)).join('');
+}
+
+function bookingCardHtml(b) {
+  const isAdmin = currentUser.role === 'admin';
+  return `<div class="lead-card" style="border-left-color:${b.locked ? '#388E3C' : '#9E9E9E'};">
+    <div class="lead-top">
+      <div class="lead-name">${esc(b.customerName)}</div>
+      <div class="lead-badges">
+        ${isAdmin ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:#f0f4ff;color:#667eea;">${esc(b.financierName)}</span>` : ''}
+        ${b.locked ? `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:#e8f5e9;color:#388E3C;">🔒 Saved</span>` : `<span style="font-size:11px;font-weight:700;padding:2px 8px;border-radius:8px;background:#fff3e0;color:#e65100;">Pending</span>`}
+      </div>
+    </div>
+    <div class="lead-info">
+      <div class="lead-info-row">📱 ${esc(b.mobileNo)} &nbsp;🚗 ${esc(b.model || '—')} ${esc(b.variant || '')}</div>
+      <div class="lead-info-row">🧾 Receipt: ${esc(b.receiptNo)} &nbsp;📅 ${esc(b.deliveryDate || b.bookingDate || '—')}</div>
+      ${b.locked ? `<div class="lead-info-row">💰 ${esc(b.scheme)} &nbsp;·&nbsp; Loan ₹${Number(b.loanAmount || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; EMI ₹${Number(b.emi || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; ${b.tenure || 0}m</div>` : ''}
+    </div>
+    <div class="lead-actions">
+      ${(!b.locked || isAdmin) ? `<button class="btn-act" style="flex:1;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;"
+        onclick="openBookingSchemeSheet('${b.receiptNo}')">💳 ${b.locked ? 'Edit (Admin)' : 'Enter Scheme'}</button>` : `<div style="flex:1;text-align:center;padding:8px;font-size:12px;font-weight:700;color:#388E3C;">🔒 Locked — contact admin to edit</div>`}
+    </div>
+  </div>`;
+}
+
+function _findBooking(receiptNo) {
+  return financierBookingsAll.find(b => String(b.receiptNo) === String(receiptNo)) || null;
+}
+
+function openBookingSchemeSheet(receiptNo) {
+  const b = _findBooking(receiptNo) || {};
+  document.getElementById('bkReceiptNo').value    = receiptNo;
+  document.getElementById('bkScheme').value       = b.scheme      || '';
+  document.getElementById('bkDownPayment').value  = b.downPayment || '';
+  document.getElementById('bkLoanAmount').value   = b.loanAmount  || '';
+  document.getElementById('bkEMI').value          = b.emi         || '';
+  document.getElementById('bkTenure').value       = b.tenure      || '';
+  document.getElementById('bkLockedNote').style.display = (b.locked && currentUser.role === 'admin') ? '' : 'none';
+  openSheet('bookingSchemeSheet');
+}
+
+async function submitBookingScheme() {
+  const receiptNo = document.getElementById('bkReceiptNo').value;
+  const btn = document.getElementById('bkSubmitBtn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  try {
+    const data = {
+      scheme:      document.getElementById('bkScheme').value.trim(),
+      downPayment: Number(document.getElementById('bkDownPayment').value) || 0,
+      loanAmount:  Number(document.getElementById('bkLoanAmount').value)  || 0,
+      emi:         Number(document.getElementById('bkEMI').value)        || 0,
+      tenure:      Number(document.getElementById('bkTenure').value)     || 0
+    };
+    const r = await API.saveFinancierBookingScheme(receiptNo, data);
+    if (r.success) {
+      closeSheet('bookingSchemeSheet');
+      showMessage('Finance scheme saved', 'success');
+      loadFinancierBookings();
     } else { showMessage(r.message || 'Error saving', 'error'); }
   } catch(e) { showMessage('Error: ' + e.message, 'error'); }
   finally { btn.disabled = false; btn.textContent = 'Save'; }
