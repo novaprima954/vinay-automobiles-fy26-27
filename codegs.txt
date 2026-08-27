@@ -3403,6 +3403,7 @@ function _getFinancierBookingAnalytics(monthSet) {
 
   // Model × Financier comparison — average Down Payment and average EMI, using
   // only completed bookings, with the lowest-value financier flagged per model.
+  // Each cell also carries its booking count, so a small sample size is visible.
   function _buildComparison(sumKey) {
     return Object.keys(modelFinSums).map(function(model) {
       var finSums = modelFinSums[model];
@@ -3412,7 +3413,7 @@ function _getFinancierBookingAnalytics(monthSet) {
         var s = finSums[fin];
         if (s.count === 0) return;
         var avg = Math.round(s[sumKey] / s.count);
-        avgs[fin] = avg;
+        avgs[fin] = { avg: avg, count: s.count };
         if (lowestVal === null || avg < lowestVal) { lowestVal = avg; lowestFin = fin; }
       });
       return { model: model, financiers: avgs, lowest: lowestFin, lowestValue: lowestVal };
