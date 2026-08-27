@@ -3000,7 +3000,12 @@ function getFinancierBookings(sessionId) {
       if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
       if (user.role === 'financier' && financierName !== user.name) continue;
 
-      var scheme = row[COL_SCHEME];
+      // Scheme/Offer is optional free text and doesn't gate the lock — a booking is
+      // "done" once the actual loan numbers (Down Payment/Loan Amount/EMI/Tenure) are saved.
+      var hasLoanDetails = (parseFloat(row[COL_DOWNPAYMENT]) || 0) > 0 ||
+                            (parseFloat(row[COL_LOANAMOUNT])  || 0) > 0 ||
+                            (parseFloat(row[COL_EMI])         || 0) > 0 ||
+                            (parseFloat(row[COL_TENURE])      || 0) > 0;
       bookings.push({
         receiptNo:     row[0],
         customerName:  row[3] || '',
@@ -3010,12 +3015,12 @@ function getFinancierBookings(sessionId) {
         bookingDate:   formatDate(row[2]),
         deliveryDate:  row[11] ? Utilities.formatDate(new Date(row[11]), 'Asia/Kolkata', 'yyyy-MM-dd') : '',
         financierName: financierName,
-        scheme:        scheme || '',
+        scheme:        row[COL_SCHEME] || '',
         downPayment:   row[COL_DOWNPAYMENT] || '',
         loanAmount:    row[COL_LOANAMOUNT] || '',
         emi:           row[COL_EMI] || '',
         tenure:        row[COL_TENURE] || '',
-        locked:        !!(scheme && String(scheme).trim() !== '')
+        locked:        hasLoanDetails
       });
     }
 
@@ -3045,7 +3050,10 @@ function saveFinancierBookingScheme(sessionId, receiptNo, scheme, downPayment, l
 
     var COL_FINANCIER     = 10; // K
     var COL_ACCOUNT_CHECK = 21; // V
-    var COL_SCHEME        = 68; // BQ
+    var COL_DOWNPAYMENT   = 69; // BR
+    var COL_LOANAMOUNT    = 70; // BS
+    var COL_EMI           = 71; // BT
+    var COL_TENURE        = 72; // BU
 
     var targetRow = -1;
     for (var i = 1; i < data.length; i++) {
@@ -3060,8 +3068,13 @@ function saveFinancierBookingScheme(sessionId, receiptNo, scheme, downPayment, l
           if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') {
             return { success: false, message: 'Account check is not yet marked Yes for this customer.' };
           }
-          var existingScheme = row[COL_SCHEME];
-          if (existingScheme && String(existingScheme).trim() !== '') {
+          // Scheme/Offer is optional and doesn't gate the lock — only actual loan
+          // numbers being already saved counts as "final" for a financier user.
+          var alreadyHasLoanDetails = (parseFloat(row[COL_DOWNPAYMENT]) || 0) > 0 ||
+                                      (parseFloat(row[COL_LOANAMOUNT])  || 0) > 0 ||
+                                      (parseFloat(row[COL_EMI])         || 0) > 0 ||
+                                      (parseFloat(row[COL_TENURE])      || 0) > 0;
+          if (alreadyHasLoanDetails) {
             return { success: false, message: 'Already saved and locked. Contact admin to make changes.' };
           }
         }
@@ -3291,7 +3304,6 @@ function _getFinancierBookingAnalytics(monthSet) {
   var COL_MODEL         = 5;
   var COL_FINANCIER     = 10;
   var COL_ACCOUNT_CHECK = 21;
-  var COL_SCHEME        = 68;
   var COL_DOWNPAYMENT   = 69;
   var COL_LOANAMOUNT    = 70;
   var COL_EMI           = 71;
@@ -3315,8 +3327,12 @@ function _getFinancierBookingAnalytics(monthSet) {
       if (!monthSet.has(rowMonth)) continue;
     }
 
-    var scheme = row[COL_SCHEME];
-    var isDone = !!(scheme && String(scheme).trim() !== '');
+    // Scheme/Offer is optional — a booking counts as "completed" once the actual
+    // loan numbers are saved, regardless of whether Scheme text was filled in.
+    var isDone = (parseFloat(row[COL_DOWNPAYMENT]) || 0) > 0 ||
+                 (parseFloat(row[COL_LOANAMOUNT])  || 0) > 0 ||
+                 (parseFloat(row[COL_EMI])         || 0) > 0 ||
+                 (parseFloat(row[COL_TENURE])      || 0) > 0;
 
     if (!finStats[fin]) finStats[fin] = { total:0, pending:0, completed:0, totalLoan:0, totalDP:0, sumEMI:0, sumTenure:0 };
     finStats[fin].total++;
