@@ -3311,6 +3311,7 @@ function _getFinancierBookingAnalytics(monthSet) {
 
   var finStats    = {}; // finName → { total, pending, completed, totalLoan, totalDP, sumEMI, sumTenure }
   var modelMatrix = {}; // model → { finName: count }
+  var modelFinSums = {}; // model → finName → { count, sumDP, sumEMI } — completed rows only
 
   for (var i = 1; i < data.length; i++) {
     var row = data[i];
@@ -3349,6 +3350,16 @@ function _getFinancierBookingAnalytics(monthSet) {
     var model = String(row[COL_MODEL] || '').trim() || 'Unknown';
     if (!modelMatrix[model]) modelMatrix[model] = {};
     modelMatrix[model][fin] = (modelMatrix[model][fin] || 0) + 1;
+
+    // Only completed bookings (actual loan numbers entered) count toward the
+    // Down Payment / EMI comparison — pending ones would skew the averages.
+    if (isDone) {
+      if (!modelFinSums[model]) modelFinSums[model] = {};
+      if (!modelFinSums[model][fin]) modelFinSums[model][fin] = { count:0, sumDP:0, sumEMI:0 };
+      modelFinSums[model][fin].count++;
+      modelFinSums[model][fin].sumDP  += parseFloat(row[COL_DOWNPAYMENT]) || 0;
+      modelFinSums[model][fin].sumEMI += parseFloat(row[COL_EMI]) || 0;
+    }
   }
 
   var financiers = Object.keys(finStats).map(function(n) {
@@ -3373,7 +3384,31 @@ function _getFinancierBookingAnalytics(monthSet) {
     return { model: model, financiers: counts, total: total };
   }).sort(function(a,b) { return b.total - a.total; });
 
-  return { financiers: financiers, overall: overall, modelBreakdown: modelBreakdown };
+  // Model × Financier comparison — average Down Payment and average EMI, using
+  // only completed bookings, with the lowest-value financier flagged per model.
+  function _buildComparison(sumKey) {
+    return Object.keys(modelFinSums).map(function(model) {
+      var finSums = modelFinSums[model];
+      var avgs = {};
+      var lowestFin = null, lowestVal = null;
+      Object.keys(finSums).forEach(function(fin) {
+        var s = finSums[fin];
+        if (s.count === 0) return;
+        var avg = Math.round(s[sumKey] / s.count);
+        avgs[fin] = avg;
+        if (lowestVal === null || avg < lowestVal) { lowestVal = avg; lowestFin = fin; }
+      });
+      return { model: model, financiers: avgs, lowest: lowestFin, lowestValue: lowestVal };
+    }).sort(function(a,b) { return a.model.localeCompare(b.model); });
+  }
+
+  var modelDPComparison  = _buildComparison('sumDP');
+  var modelEMIComparison = _buildComparison('sumEMI');
+
+  return {
+    financiers: financiers, overall: overall, modelBreakdown: modelBreakdown,
+    modelDPComparison: modelDPComparison, modelEMIComparison: modelEMIComparison
+  };
 }
 
 /**
