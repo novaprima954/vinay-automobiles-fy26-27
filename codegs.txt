@@ -3014,6 +3014,7 @@ function getFinancierBookings(sessionId) {
 
       var financierName = String(row[COL_FINANCIER] || '').trim();
       if (!financierName) continue;
+      if (financierName.toLowerCase() === 'cash') continue; // not an actual financier
       if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
       if (user.role === 'financier' && financierName !== _financierDataSheetName(user.name)) continue;
 
@@ -3336,6 +3337,7 @@ function _getFinancierBookingAnalytics(monthSet) {
 
     var fin = String(row[COL_FINANCIER] || '').trim();
     if (!fin) continue;
+    if (fin.toLowerCase() === 'cash') continue; // not an actual financier
     if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
 
     if (monthSet) {
