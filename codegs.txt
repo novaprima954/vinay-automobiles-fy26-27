@@ -3265,11 +3265,99 @@ function getFinancierAnalytics(sessionId, months) {
 
     var myStats = (user.role === 'financier' && finStats[user.name]) ? finStats[user.name] : null;
 
-    return { success:true, financiers:financiers, execReferrals:execReferrals, myStats:myStats };
+    // Booking finance-scheme analytics (Data sheet) — admin only
+    var bookingAnalytics = null;
+    if (user.role === 'admin') {
+      bookingAnalytics = _getFinancierBookingAnalytics(monthSet);
+    }
+
+    return { success:true, financiers:financiers, execReferrals:execReferrals, myStats:myStats, bookingAnalytics:bookingAnalytics };
   } catch(e) {
     Logger.log('getFinancierAnalytics: ' + e);
     return { success: false, message: e.toString() };
   }
+}
+
+/**
+ * Admin-only analytics on Data-sheet booking finance schemes: per-financier
+ * pending/completed counts, total loan/down-payment, average EMI/tenure, and
+ * a model × financier breakdown (which financier finances which models).
+ */
+function _getFinancierBookingAnalytics(monthSet) {
+  var sheet = getSheet(CONFIG.SHEETS.DATA);
+  var data = sheet.getDataRange().getValues();
+
+  var COL_BOOKING_DATE  = 2;
+  var COL_MODEL         = 5;
+  var COL_FINANCIER     = 10;
+  var COL_ACCOUNT_CHECK = 21;
+  var COL_SCHEME        = 68;
+  var COL_DOWNPAYMENT   = 69;
+  var COL_LOANAMOUNT    = 70;
+  var COL_EMI           = 71;
+  var COL_TENURE        = 72;
+
+  var finStats    = {}; // finName → { total, pending, completed, totalLoan, totalDP, sumEMI, sumTenure }
+  var modelMatrix = {}; // model → { finName: count }
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    if (!row[0]) continue;
+
+    var fin = String(row[COL_FINANCIER] || '').trim();
+    if (!fin) continue;
+    if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
+
+    if (monthSet) {
+      var bd = row[COL_BOOKING_DATE] ? new Date(row[COL_BOOKING_DATE]) : null;
+      if (!bd || isNaN(bd.getTime())) continue;
+      var rowMonth = Utilities.formatDate(bd, Session.getScriptTimeZone(), 'yyyy-MM');
+      if (!monthSet.has(rowMonth)) continue;
+    }
+
+    var scheme = row[COL_SCHEME];
+    var isDone = !!(scheme && String(scheme).trim() !== '');
+
+    if (!finStats[fin]) finStats[fin] = { total:0, pending:0, completed:0, totalLoan:0, totalDP:0, sumEMI:0, sumTenure:0 };
+    finStats[fin].total++;
+    if (isDone) {
+      finStats[fin].completed++;
+      finStats[fin].totalLoan += parseFloat(row[COL_LOANAMOUNT]) || 0;
+      finStats[fin].totalDP   += parseFloat(row[COL_DOWNPAYMENT]) || 0;
+      finStats[fin].sumEMI    += parseFloat(row[COL_EMI]) || 0;
+      finStats[fin].sumTenure += parseFloat(row[COL_TENURE]) || 0;
+    } else {
+      finStats[fin].pending++;
+    }
+
+    var model = String(row[COL_MODEL] || '').trim() || 'Unknown';
+    if (!modelMatrix[model]) modelMatrix[model] = {};
+    modelMatrix[model][fin] = (modelMatrix[model][fin] || 0) + 1;
+  }
+
+  var financiers = Object.keys(finStats).map(function(n) {
+    var s = finStats[n];
+    return {
+      financier: n, total: s.total, pending: s.pending, completed: s.completed,
+      totalLoan: s.totalLoan, totalDP: s.totalDP,
+      avgEMI:    s.completed > 0 ? Math.round(s.sumEMI / s.completed)    : 0,
+      avgTenure: s.completed > 0 ? Math.round(s.sumTenure / s.completed) : 0
+    };
+  }).sort(function(a,b) { return b.total - a.total; });
+
+  var overall = financiers.reduce(function(o, f) {
+    o.total += f.total; o.pending += f.pending; o.completed += f.completed;
+    o.totalLoan += f.totalLoan; o.totalDP += f.totalDP;
+    return o;
+  }, { total:0, pending:0, completed:0, totalLoan:0, totalDP:0 });
+
+  var modelBreakdown = Object.keys(modelMatrix).map(function(model) {
+    var counts = modelMatrix[model];
+    var total = Object.values(counts).reduce(function(s,v){ return s+v; }, 0);
+    return { model: model, financiers: counts, total: total };
+  }).sort(function(a,b) { return b.total - a.total; });
+
+  return { financiers: financiers, overall: overall, modelBreakdown: modelBreakdown };
 }
 
 /**
