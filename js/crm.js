@@ -18,6 +18,8 @@ let followupData = { overdue: [], today: [], week: [] };
 let selectedNoteType = '';
 let selectedStatusChange = '';
 let allExecutives = [];   // for admin assign
+let _bookingComparisonData = null;   // { dp: [...], emi: [...] } from last analytics load
+let _bookingComparisonMetric = 'dp'; // 'dp' | 'emi'
 
 // All Leads tab state
 let allLeadsAll = [];
@@ -1021,29 +1023,19 @@ async function loadFinancierAnalytics() {
             </tr>`).join('')}</tbody></table></div></div>`;
       }
 
-      // Model × Financier comparison — lowest Down Payment / lowest EMI per model
-      // (completed bookings only, lowest value per row highlighted)
-      const renderComparisonTable = (title, icon, comparison) => {
-        if (!comparison || comparison.length === 0) return '';
-        const allFins = [...new Set(comparison.flatMap(m => Object.keys(m.financiers)))];
-        return `<div class="analytics-card">
-          <div class="analytics-card-title">${icon} ${title}</div>
-          <div style="overflow-x:auto;">
-          <table class="analytics-table">
-            <thead><tr><th>Model</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}</tr></thead>
-            <tbody>${comparison.map(m => `<tr>
-              <td style="font-weight:700;">${esc(m.model)}</td>
-              ${allFins.map(f => {
-                const v = m.financiers[f];
-                if (v === undefined) return '<td>—</td>';
-                const isLowest = f === m.lowest;
-                return `<td>${isLowest ? `<span style="color:#388E3C;font-weight:800;">₹${v.toLocaleString('en-IN')} 🏆</span>` : `₹${v.toLocaleString('en-IN')}`}</td>`;
-              }).join('')}
-            </tr>`).join('')}</tbody></table></div></div>`;
-      };
-
-      html += renderComparisonTable('Lowest Down Payment by Model', '💵', ba.modelDPComparison);
-      html += renderComparisonTable('Lowest EMI by Model', '📉', ba.modelEMIComparison);
+      // Model × Financier comparison — Down Payment / EMI toggle, one combined table
+      // (completed bookings only; lowest value per row highlighted; count shown per cell)
+      _bookingComparisonData = { dp: ba.modelDPComparison, emi: ba.modelEMIComparison };
+      if ((ba.modelDPComparison && ba.modelDPComparison.length > 0) || (ba.modelEMIComparison && ba.modelEMIComparison.length > 0)) {
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">🏆 Model × Financier Comparison</div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button id="btnCompareDP"  class="filter-chip active" onclick="setBookingComparisonMetric('dp')"  style="cursor:pointer;">💵 Down Payment</button>
+            <button id="btnCompareEMI" class="filter-chip"        onclick="setBookingComparisonMetric('emi')" style="cursor:pointer;">📉 EMI</button>
+          </div>
+          <div id="bookingComparisonTable"></div>
+        </div>`;
+      }
     }
 
     // Exec → Financier referral matrix (admin only — not relevant to a single financier's view)
@@ -1061,10 +1053,46 @@ async function loadFinancierAnalytics() {
     }
 
     container.innerHTML = html || '<div style="padding:20px;color:#aaa;text-align:center;">No financier data yet</div>';
+    if (_bookingComparisonData) renderBookingComparisonTable();
   } catch(e) {
     if (btn) btn.disabled = false;
     container.innerHTML = errorHtml('Error loading analytics');
   }
+}
+
+function setBookingComparisonMetric(metric) {
+  _bookingComparisonMetric = metric;
+  const dpBtn  = document.getElementById('btnCompareDP');
+  const emiBtn = document.getElementById('btnCompareEMI');
+  if (dpBtn)  dpBtn.classList.toggle('active', metric === 'dp');
+  if (emiBtn) emiBtn.classList.toggle('active', metric === 'emi');
+  renderBookingComparisonTable();
+}
+
+function renderBookingComparisonTable() {
+  const container = document.getElementById('bookingComparisonTable');
+  if (!container || !_bookingComparisonData) return;
+
+  const comparison = _bookingComparisonData[_bookingComparisonMetric] || [];
+  if (comparison.length === 0) {
+    container.innerHTML = '<div style="padding:12px;color:#aaa;text-align:center;font-size:13px;">No completed bookings yet</div>';
+    return;
+  }
+
+  const allFins = [...new Set(comparison.flatMap(m => Object.keys(m.financiers)))];
+  container.innerHTML = `<div style="overflow-x:auto;">
+    <table class="analytics-table">
+      <thead><tr><th>Model</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}</tr></thead>
+      <tbody>${comparison.map(m => `<tr>
+        <td style="font-weight:700;">${esc(m.model)}</td>
+        ${allFins.map(f => {
+          const cell = m.financiers[f];
+          if (cell === undefined) return '<td>—</td>';
+          const isLowest = f === m.lowest;
+          const valueHtml = `₹${cell.avg.toLocaleString('en-IN')} <span style="font-size:10px;color:#999;">(${cell.count})</span>`;
+          return `<td>${isLowest ? `<span style="color:#388E3C;font-weight:800;">${valueHtml} 🏆</span>` : valueHtml}</td>`;
+        }).join('')}
+      </tr>`).join('')}</tbody></table></div>`;
 }
 
 // ── Executive-wise Analysis (admin) ──
