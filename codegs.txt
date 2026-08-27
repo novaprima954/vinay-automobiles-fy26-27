@@ -2965,6 +2965,23 @@ function getFinancierLeads(sessionId) {
 }
 
 /**
+ * The Data sheet's financierName (column K, from the Sales Entry dropdown) doesn't
+ * always spell a financier the same way as their login name in the Users sheet.
+ * This maps a login name to the exact Data-sheet spelling for matching purposes only
+ * — it does not rename anything in either sheet, and doesn't affect CRM_Leads matching
+ * (which already works fine since it compares against the same Users-sheet name).
+ */
+var FINANCIER_NAME_ALIASES = {
+  'Tata Capital': 'TATA Capital',
+  'Jana SMF':     'Janan SFB'
+};
+
+function _financierDataSheetName(loginName) {
+  var n = String(loginName || '').trim();
+  return FINANCIER_NAME_ALIASES[n] || n;
+}
+
+/**
  * Financier "My Bookings" — Data-sheet bookings (post Account Check) where this
  * financier's Scheme/Down Payment/Loan Amount/EMI/Tenure can be logged.
  * Admin sees every financier's bookings; financier sees only their own
@@ -2998,7 +3015,7 @@ function getFinancierBookings(sessionId) {
       var financierName = String(row[COL_FINANCIER] || '').trim();
       if (!financierName) continue;
       if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') continue;
-      if (user.role === 'financier' && financierName !== user.name) continue;
+      if (user.role === 'financier' && financierName !== _financierDataSheetName(user.name)) continue;
 
       // Scheme/Offer is optional free text and doesn't gate the lock — a booking is
       // "done" once the actual loan numbers (Down Payment/Loan Amount/EMI/Tenure) are saved.
@@ -3062,7 +3079,7 @@ function saveFinancierBookingScheme(sessionId, receiptNo, scheme, downPayment, l
 
         if (user.role === 'financier') {
           var financierName = String(row[COL_FINANCIER] || '').trim();
-          if (financierName !== user.name) {
+          if (financierName !== _financierDataSheetName(user.name)) {
             return { success: false, message: 'Access denied. Not your customer.' };
           }
           if (String(row[COL_ACCOUNT_CHECK] || '') !== 'Yes') {
