@@ -1020,6 +1020,30 @@ async function loadFinancierAnalytics() {
               <td><strong>${m.total}</strong></td>
             </tr>`).join('')}</tbody></table></div></div>`;
       }
+
+      // Model × Financier comparison — lowest Down Payment / lowest EMI per model
+      // (completed bookings only, lowest value per row highlighted)
+      const renderComparisonTable = (title, icon, comparison) => {
+        if (!comparison || comparison.length === 0) return '';
+        const allFins = [...new Set(comparison.flatMap(m => Object.keys(m.financiers)))];
+        return `<div class="analytics-card">
+          <div class="analytics-card-title">${icon} ${title}</div>
+          <div style="overflow-x:auto;">
+          <table class="analytics-table">
+            <thead><tr><th>Model</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}</tr></thead>
+            <tbody>${comparison.map(m => `<tr>
+              <td style="font-weight:700;">${esc(m.model)}</td>
+              ${allFins.map(f => {
+                const v = m.financiers[f];
+                if (v === undefined) return '<td>—</td>';
+                const isLowest = f === m.lowest;
+                return `<td>${isLowest ? `<span style="color:#388E3C;font-weight:800;">₹${v.toLocaleString('en-IN')} 🏆</span>` : `₹${v.toLocaleString('en-IN')}`}</td>`;
+              }).join('')}
+            </tr>`).join('')}</tbody></table></div></div>`;
+      };
+
+      html += renderComparisonTable('Lowest Down Payment by Model', '💵', ba.modelDPComparison);
+      html += renderComparisonTable('Lowest EMI by Model', '📉', ba.modelEMIComparison);
     }
 
     // Exec → Financier referral matrix (admin only — not relevant to a single financier's view)
