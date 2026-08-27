@@ -3372,10 +3372,15 @@ function _getFinancierBookingAnalytics(monthSet) {
     // Down Payment / EMI comparison — pending ones would skew the averages.
     if (isDone) {
       if (!modelFinSums[model]) modelFinSums[model] = {};
-      if (!modelFinSums[model][fin]) modelFinSums[model][fin] = { count:0, sumDP:0, sumEMI:0 };
-      modelFinSums[model][fin].count++;
-      modelFinSums[model][fin].sumDP  += parseFloat(row[COL_DOWNPAYMENT]) || 0;
-      modelFinSums[model][fin].sumEMI += parseFloat(row[COL_EMI]) || 0;
+      if (!modelFinSums[model][fin]) modelFinSums[model][fin] = { count:0, sumDP:0, sumEMI:0, minDP:null, minEMI:null };
+      var dpVal  = parseFloat(row[COL_DOWNPAYMENT]) || 0;
+      var emiVal = parseFloat(row[COL_EMI]) || 0;
+      var mfs = modelFinSums[model][fin];
+      mfs.count++;
+      mfs.sumDP  += dpVal;
+      mfs.sumEMI += emiVal;
+      if (mfs.minDP  === null || dpVal  < mfs.minDP)  mfs.minDP  = dpVal;
+      if (mfs.minEMI === null || emiVal < mfs.minEMI) mfs.minEMI = emiVal;
     }
   }
 
@@ -3404,24 +3409,23 @@ function _getFinancierBookingAnalytics(monthSet) {
   // Model × Financier comparison — average Down Payment and average EMI, using
   // only completed bookings, with the lowest-value financier flagged per model.
   // Each cell also carries its booking count, so a small sample size is visible.
-  function _buildComparison(sumKey) {
+  // Each cell carries both the average and the single lowest individual booking,
+  // so the frontend can toggle between the two views without re-fetching.
+  function _buildComparison(sumKey, minKey) {
     return Object.keys(modelFinSums).map(function(model) {
       var finSums = modelFinSums[model];
-      var avgs = {};
-      var lowestFin = null, lowestVal = null;
+      var cells = {};
       Object.keys(finSums).forEach(function(fin) {
         var s = finSums[fin];
         if (s.count === 0) return;
-        var avg = Math.round(s[sumKey] / s.count);
-        avgs[fin] = { avg: avg, count: s.count };
-        if (lowestVal === null || avg < lowestVal) { lowestVal = avg; lowestFin = fin; }
+        cells[fin] = { avg: Math.round(s[sumKey] / s.count), lowest: s[minKey], count: s.count };
       });
-      return { model: model, financiers: avgs, lowest: lowestFin, lowestValue: lowestVal };
+      return { model: model, financiers: cells };
     }).sort(function(a,b) { return a.model.localeCompare(b.model); });
   }
 
-  var modelDPComparison  = _buildComparison('sumDP');
-  var modelEMIComparison = _buildComparison('sumEMI');
+  var modelDPComparison  = _buildComparison('sumDP',  'minDP');
+  var modelEMIComparison = _buildComparison('sumEMI', 'minEMI');
 
   return {
     financiers: financiers, overall: overall, modelBreakdown: modelBreakdown,
