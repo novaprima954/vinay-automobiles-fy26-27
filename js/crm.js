@@ -713,6 +713,7 @@ async function submitFinanceDetails() {
 
 let financierBookingsAll = [];
 let currentBookingsSearch = '';
+let currentBookingsFinancierFilter = 'all';
 
 async function loadFinancierBookings() {
   const loading = document.getElementById('myBookingsLoading');
@@ -722,11 +723,35 @@ async function loadFinancierBookings() {
     loading.style.display = 'none';
     if (!r.success) { document.getElementById('myBookings').innerHTML = errorHtml(r.message); return; }
     financierBookingsAll = r.bookings || [];
+    _setupBookingsFinancierFilter();
     renderFinancierBookings();
   } catch(e) {
     loading.style.display = 'none';
     document.getElementById('myBookings').innerHTML = errorHtml('Error loading bookings');
   }
+}
+
+function _setupBookingsFinancierFilter() {
+  const row = document.getElementById('myBookingsFinancierFilter');
+  if (!row) return;
+
+  // Only useful for admin (a financier's own list is already just their own bookings)
+  if (currentUser.role !== 'admin') { row.style.display = 'none'; return; }
+
+  const fins = [...new Set(financierBookingsAll.map(b => b.financierName))].sort();
+  if (fins.length === 0) { row.style.display = 'none'; return; }
+
+  currentBookingsFinancierFilter = 'all';
+  row.style.display = '';
+  row.innerHTML = '<div class="filter-chip active" data-fin="all" onclick="setBookingsFinancierFilter(\'all\',this)">All</div>' +
+    fins.map(f => `<div class="filter-chip" data-fin="${esc(f)}" onclick="setBookingsFinancierFilter('${esc(f).replace(/'/g,"\\'")}',this)">${esc(f)}</div>`).join('');
+}
+
+function setBookingsFinancierFilter(fin, el) {
+  currentBookingsFinancierFilter = fin;
+  document.querySelectorAll('#myBookingsFinancierFilter .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderFinancierBookings();
 }
 
 function filterFinancierBookings() {
@@ -749,6 +774,9 @@ function renderFinancierBookings() {
   const container = document.getElementById('myBookings');
 
   let list = financierBookingsAll;
+  if (currentBookingsFinancierFilter !== 'all') {
+    list = list.filter(b => b.financierName === currentBookingsFinancierFilter);
+  }
   if (currentBookingsSearch) {
     const q = currentBookingsSearch;
     list = list.filter(b =>
