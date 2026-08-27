@@ -20,6 +20,7 @@ let selectedStatusChange = '';
 let allExecutives = [];   // for admin assign
 let _bookingComparisonData = null;   // { dp: [...], emi: [...] } from last analytics load
 let _bookingComparisonMetric = 'dp'; // 'dp' | 'emi'
+let _bookingComparisonStat = 'avg';  // 'avg' | 'lowest'
 
 // All Leads tab state
 let allLeadsAll = [];
@@ -1029,9 +1030,13 @@ async function loadFinancierAnalytics() {
       if ((ba.modelDPComparison && ba.modelDPComparison.length > 0) || (ba.modelEMIComparison && ba.modelEMIComparison.length > 0)) {
         html += `<div class="analytics-card">
           <div class="analytics-card-title">🏆 Model × Financier Comparison</div>
-          <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <div style="display:flex;gap:8px;margin-bottom:8px;">
             <button id="btnCompareDP"  class="filter-chip active" onclick="setBookingComparisonMetric('dp')"  style="cursor:pointer;">💵 Down Payment</button>
             <button id="btnCompareEMI" class="filter-chip"        onclick="setBookingComparisonMetric('emi')" style="cursor:pointer;">📉 EMI</button>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <button id="btnCompareAvg"     class="filter-chip active" onclick="setBookingComparisonStat('avg')"    style="cursor:pointer;">📊 Average</button>
+            <button id="btnCompareLowest"  class="filter-chip"        onclick="setBookingComparisonStat('lowest')" style="cursor:pointer;">⬇️ Lowest</button>
           </div>
           <div id="bookingComparisonTable"></div>
         </div>`;
@@ -1069,6 +1074,15 @@ function setBookingComparisonMetric(metric) {
   renderBookingComparisonTable();
 }
 
+function setBookingComparisonStat(stat) {
+  _bookingComparisonStat = stat;
+  const avgBtn    = document.getElementById('btnCompareAvg');
+  const lowestBtn = document.getElementById('btnCompareLowest');
+  if (avgBtn)    avgBtn.classList.toggle('active', stat === 'avg');
+  if (lowestBtn) lowestBtn.classList.toggle('active', stat === 'lowest');
+  renderBookingComparisonTable();
+}
+
 function renderBookingComparisonTable() {
   const container = document.getElementById('bookingComparisonTable');
   if (!container || !_bookingComparisonData) return;
@@ -1079,20 +1093,33 @@ function renderBookingComparisonTable() {
     return;
   }
 
+  const statKey = _bookingComparisonStat; // 'avg' | 'lowest'
   const allFins = [...new Set(comparison.flatMap(m => Object.keys(m.financiers)))];
   container.innerHTML = `<div style="overflow-x:auto;">
     <table class="analytics-table">
       <thead><tr><th>Model</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}</tr></thead>
-      <tbody>${comparison.map(m => `<tr>
+      <tbody>${comparison.map(m => {
+        // Row champion is computed per the currently selected stat (avg vs lowest),
+        // since the cheapest financier "on average" isn't always the same one that
+        // gave the single cheapest deal.
+        let bestFin = null, bestVal = null;
+        allFins.forEach(f => {
+          const cell = m.financiers[f];
+          if (!cell) return;
+          const v = cell[statKey];
+          if (bestVal === null || v < bestVal) { bestVal = v; bestFin = f; }
+        });
+        return `<tr>
         <td style="font-weight:700;">${esc(m.model)}</td>
         ${allFins.map(f => {
           const cell = m.financiers[f];
           if (cell === undefined) return '<td>—</td>';
-          const isLowest = f === m.lowest;
-          const valueHtml = `₹${cell.avg.toLocaleString('en-IN')} <span style="font-size:10px;color:#999;">(${cell.count})</span>`;
+          const isLowest = f === bestFin;
+          const valueHtml = `₹${cell[statKey].toLocaleString('en-IN')} <span style="font-size:10px;color:#999;">(${cell.count})</span>`;
           return `<td>${isLowest ? `<span style="color:#388E3C;font-weight:800;">${valueHtml} 🏆</span>` : valueHtml}</td>`;
         }).join('')}
-      </tr>`).join('')}</tbody></table></div>`;
+      </tr>`;
+      }).join('')}</tbody></table></div>`;
 }
 
 // ── Executive-wise Analysis (admin) ──
