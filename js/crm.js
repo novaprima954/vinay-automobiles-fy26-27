@@ -779,7 +779,7 @@ function bookingCardHtml(b) {
     <div class="lead-info">
       <div class="lead-info-row">📱 ${esc(b.mobileNo)} &nbsp;🚗 ${esc(b.model || '—')} ${esc(b.variant || '')}</div>
       <div class="lead-info-row">🧾 Receipt: ${esc(b.receiptNo)} &nbsp;📅 ${esc(b.deliveryDate || b.bookingDate || '—')}</div>
-      ${b.locked ? `<div class="lead-info-row">💰 ${esc(b.scheme)} &nbsp;·&nbsp; Loan ₹${Number(b.loanAmount || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; EMI ₹${Number(b.emi || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; ${b.tenure || 0}m</div>` : ''}
+      ${b.locked ? `<div class="lead-info-row">💰 ${esc(b.scheme || '—')} &nbsp;·&nbsp; Loan ₹${Number(b.loanAmount || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; EMI ₹${Number(b.emi || 0).toLocaleString('en-IN')} &nbsp;·&nbsp; ${b.tenure || 0}m</div>` : ''}
     </div>
     <div class="lead-actions">
       ${(!b.locked || isAdmin) ? `<button class="btn-act" style="flex:1;background:linear-gradient(135deg,#11998e,#38ef7d);color:white;border:none;border-radius:8px;padding:8px;font-size:12px;font-weight:700;cursor:pointer;"
