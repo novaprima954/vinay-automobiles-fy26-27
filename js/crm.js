@@ -974,6 +974,54 @@ async function loadFinancierAnalytics() {
           </tbody></table></div>`;
     }
 
+    // Booking finance-scheme summary (admin only)
+    if (currentUser.role === 'admin' && r.bookingAnalytics) {
+      const ba = r.bookingAnalytics;
+      const rupee = n => '₹' + Number(n || 0).toLocaleString('en-IN');
+      if (ba.financiers && ba.financiers.length > 0) {
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">💳 Booking Finance Scheme Summary</div>
+          <table class="analytics-table">
+            <thead><tr><th>Financier</th><th>Total</th><th>Pending</th><th>Completed</th><th>Total Loan</th><th>Total DP</th><th>Avg EMI</th><th>Avg Tenure</th></tr></thead>
+            <tbody>
+              ${ba.financiers.map(f => `<tr>
+                <td style="font-weight:700;">${esc(f.financier)}</td>
+                <td>${f.total}</td>
+                <td><span style="color:#e65100;font-weight:800;">${f.pending}</span></td>
+                <td><span style="color:#388E3C;font-weight:800;">${f.completed}</span></td>
+                <td>${rupee(f.totalLoan)}</td>
+                <td>${rupee(f.totalDP)}</td>
+                <td>${rupee(f.avgEMI)}</td>
+                <td>${f.avgTenure}m</td>
+              </tr>`).join('')}
+              <tr style="background:#f8f9fa;font-weight:800;">
+                <td>All Financiers</td>
+                <td>${ba.overall.total}</td>
+                <td style="color:#e65100;">${ba.overall.pending}</td>
+                <td style="color:#388E3C;">${ba.overall.completed}</td>
+                <td>${rupee(ba.overall.totalLoan)}</td>
+                <td>${rupee(ba.overall.totalDP)}</td>
+                <td colspan="2">—</td>
+              </tr>
+            </tbody></table></div>`;
+      }
+
+      // Model × Financier breakdown
+      if (ba.modelBreakdown && ba.modelBreakdown.length > 0) {
+        const allFins = [...new Set(ba.modelBreakdown.flatMap(m => Object.keys(m.financiers)))];
+        html += `<div class="analytics-card">
+          <div class="analytics-card-title">🚗 Model × Financier Breakdown</div>
+          <div style="overflow-x:auto;">
+          <table class="analytics-table">
+            <thead><tr><th>Model</th>${allFins.map(f => `<th style="font-size:10px;">${esc(f)}</th>`).join('')}<th>Total</th></tr></thead>
+            <tbody>${ba.modelBreakdown.map(m => `<tr>
+              <td style="font-weight:700;">${esc(m.model)}</td>
+              ${allFins.map(f => `<td>${m.financiers[f] || '—'}</td>`).join('')}
+              <td><strong>${m.total}</strong></td>
+            </tr>`).join('')}</tbody></table></div></div>`;
+      }
+    }
+
     // Exec → Financier referral matrix (admin only — not relevant to a single financier's view)
     if (currentUser.role === 'admin' && r.execReferrals && r.execReferrals.length > 0) {
       const allFins = [...new Set(r.execReferrals.flatMap(e => Object.keys(e.referrals)))];
