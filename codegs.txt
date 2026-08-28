@@ -5697,6 +5697,8 @@ function getDiscountAnalysis(sessionId, dateFilter) {
     const byModel = {};
     const byExec  = {};
     const byExecNoApache = {};
+    const byExecNoEV = {};
+    const byExecNoApacheNoEV = {};
     const buckets = { zero: 0, small: 0, medium: 0, large: 0 };
     const allDeals = [];
     const monthlyMap = {};
@@ -5739,11 +5741,30 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         if (disc > byExec[executive].maxDiscount) byExec[executive].maxDiscount = disc;
 
         // byExecNoApache: same but exclude rows where model contains 'Apache'
-        if (model.toLowerCase().indexOf('apache') === -1) {
+        const modelUpper = model.toUpperCase();
+        const isApache = model.toLowerCase().indexOf('apache') !== -1;
+        const isEV = modelUpper.indexOf('IQUBE') !== -1 || modelUpper.indexOf('ORBITER') !== -1;
+        if (!isApache) {
           if (!byExecNoApache[executive]) byExecNoApache[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
           byExecNoApache[executive].count++;
           byExecNoApache[executive].totalDiscount += disc;
           if (disc > byExecNoApache[executive].maxDiscount) byExecNoApache[executive].maxDiscount = disc;
+        }
+
+        // byExecNoEV: same but exclude rows where model is iQube or Orbiter (EV models)
+        if (!isEV) {
+          if (!byExecNoEV[executive]) byExecNoEV[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+          byExecNoEV[executive].count++;
+          byExecNoEV[executive].totalDiscount += disc;
+          if (disc > byExecNoEV[executive].maxDiscount) byExecNoEV[executive].maxDiscount = disc;
+        }
+
+        // byExecNoApacheNoEV: both toggles combined (excludes Apache AND EV models)
+        if (!isApache && !isEV) {
+          if (!byExecNoApacheNoEV[executive]) byExecNoApacheNoEV[executive] = { count: 0, totalDiscount: 0, maxDiscount: 0 };
+          byExecNoApacheNoEV[executive].count++;
+          byExecNoApacheNoEV[executive].totalDiscount += disc;
+          if (disc > byExecNoApacheNoEV[executive].maxDiscount) byExecNoApacheNoEV[executive].maxDiscount = disc;
         }
       }
 
@@ -5789,6 +5810,22 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         maxDiscount:   d.maxDiscount };
     }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
 
+    const byExecNoEVArr = Object.keys(byExecNoEV).map(function(e) {
+      var d = byExecNoEV[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
+    const byExecNoApacheNoEVArr = Object.keys(byExecNoApacheNoEV).map(function(e) {
+      var d = byExecNoApacheNoEV[e];
+      return { executive: e, deals: d.count,
+        totalDiscount: Math.round(d.totalDiscount),
+        avgDiscount:   Math.round(d.totalDiscount / d.count),
+        maxDiscount:   d.maxDiscount };
+    }).sort(function(a, b) { return b.totalDiscount - a.totalDiscount; });
+
     const top10 = allDeals.filter(function(d) { return d.discount > 0; })
       .sort(function(a, b) { return b.discount - a.discount; }).slice(0, 10);
 
@@ -5811,6 +5848,8 @@ function getDiscountAnalysis(sessionId, dateFilter) {
         byModel:                     byModelArr,
         byExecutive:                 byExecArr,
         byExecutiveNoApache:         byExecNoApacheArr,
+        byExecutiveNoEV:             byExecNoEVArr,
+        byExecutiveNoApacheNoEV:     byExecNoApacheNoEVArr,
         buckets:                     buckets,
         top10:                       top10,
         monthly:                     monthly
