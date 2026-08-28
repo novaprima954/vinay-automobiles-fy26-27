@@ -15,6 +15,7 @@ function _isEvModelClient(model) {
 }
 let discountUnlocked = false; // persists within session so filter changes don't re-lock
 let discountExcludeApache = false;         // Apache toggle state (admin)
+let discountExcludeEV = false;             // EV (iQube/Orbiter) toggle state (admin)
 let lastDiscountData = null;               // cached discount data for re-render on toggle (admin)
 let discountExcludeApacheAccounts = false; // Apache toggle state (accounts)
 let lastAccountsDiscountData = null;       // cached discount data for accounts
@@ -1475,6 +1476,14 @@ function toggleApacheFilter() {
 }
 
 /**
+ * Toggle EV (iQube/Orbiter) filter on discount by executive table
+ */
+function toggleEVFilter() {
+  discountExcludeEV = !discountExcludeEV;
+  if (lastDiscountData) renderDiscountAnalysis(lastDiscountData);
+}
+
+/**
  * Render all discount analysis sections
  */
 function renderDiscountAnalysis(d) {
@@ -1530,7 +1539,13 @@ function renderDiscountAnalysis(d) {
       '</tr>';
   }).join('');
 
-  const activeExecData = discountExcludeApache ? (d.byExecutiveNoApache || d.byExecutive) : d.byExecutive;
+  const activeExecData = discountExcludeApache && discountExcludeEV
+    ? (d.byExecutiveNoApacheNoEV || d.byExecutive)
+    : discountExcludeApache
+      ? (d.byExecutiveNoApache || d.byExecutive)
+      : discountExcludeEV
+        ? (d.byExecutiveNoEV || d.byExecutive)
+        : d.byExecutive;
   const execRows = activeExecData.map(function(e) {
     return '<tr style="border-bottom:1px solid #f0f0f0;">' +
       '<td style="padding:8px;font-weight:600;">' + e.executive + '</td>' +
@@ -1617,6 +1632,12 @@ function renderDiscountAnalysis(d) {
         <span style="font-size:12px;color:#666;">Excl. Apache</span>
         <div style="width:36px;height:20px;background:${discountExcludeApache ? '#667eea' : '#ccc'};border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;">
           <div style="position:absolute;top:2px;left:${discountExcludeApache ? '16' : '2'}px;width:16px;height:16px;background:white;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
+        </div>
+      </label>
+      <label onclick="toggleEVFilter()" style="display:flex;align-items:center;gap:6px;cursor:pointer;background:#f8f9fa;padding:4px 10px;border-radius:20px;border:1px solid #ddd;user-select:none;">
+        <span style="font-size:12px;color:#666;">Excl. EV</span>
+        <div style="width:36px;height:20px;background:${discountExcludeEV ? '#667eea' : '#ccc'};border-radius:10px;position:relative;transition:background 0.2s;flex-shrink:0;">
+          <div style="position:absolute;top:2px;left:${discountExcludeEV ? '16' : '2'}px;width:16px;height:16px;background:white;border-radius:50%;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3);"></div>
         </div>
       </label>
     </div>
