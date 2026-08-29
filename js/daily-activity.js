@@ -77,11 +77,38 @@ async function loadTodayEntry() {
       } else {
         setProposedSaleUnlocked();
       }
+
+      document.getElementById('inp-mismatch-reason').value = res.entry.mismatchReason || '';
     } else {
       setProposedSaleUnlocked();
     }
+
+    checkMismatch();
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
   finally     { setFormDisabled(false); }
+}
+
+/**
+ * Shows the mismatch-reason field whenever a locked Proposed Sale Plan doesn't
+ * match today's system-verified delivered sale count. Returns true if a
+ * mismatch exists (used to require the reason before saving).
+ */
+function checkMismatch() {
+  const card = document.getElementById('mismatchCard');
+  if (!_proposedSaleLocked || !_systemData) { card.style.display = 'none'; return false; }
+
+  const proposed = parseInt(document.getElementById('inp-proposed-sale').value) || 0;
+  const delivered = _systemData.salesToday || 0;
+  const mismatch = proposed !== delivered;
+
+  if (mismatch) {
+    document.getElementById('mismatchLabel').textContent =
+      '⚠️ Proposed (' + proposed + ') vs Delivered (' + delivered + ') don\'t match — reason required';
+    card.style.display = 'block';
+  } else {
+    card.style.display = 'none';
+  }
+  return mismatch;
 }
 
 function setProposedSaleLocked(value) {
@@ -149,6 +176,14 @@ async function saveProposedSalePlan() {
 }
 
 async function saveActivity() {
+  const mismatchReasonEl = document.getElementById('inp-mismatch-reason');
+
+  if (checkMismatch() && !mismatchReasonEl.value.trim()) {
+    showMsg('Proposed vs Delivered sale don\'t match — please enter a reason', 'error');
+    mismatchReasonEl.focus();
+    return;
+  }
+
   const btn = document.getElementById('btnSave');
   btn.disabled = true; btn.textContent = 'Saving…';
   try {
@@ -157,7 +192,8 @@ async function saveActivity() {
       bookingsManual: getNum('inp-bookings-manual'),
       sales:          getNum('inp-sales'),
       googleRatings:  getNum('inp-google'),
-      testRides:      getNum('inp-testrides')
+      testRides:      getNum('inp-testrides'),
+      mismatchReason: mismatchReasonEl.value.trim()
     };
     const res = await API.saveDailyActivity(data);
     if (!res.success) { showMsg('Save failed: ' + res.message, 'error'); return; }
@@ -169,6 +205,7 @@ async function saveActivity() {
       const fresh = await API.getDailyActivity();
       if (fresh.success) _systemData = fresh.systemData || _systemData;
     } catch(e) {}
+    checkMismatch();
 
     document.getElementById('savedBadge').style.display = 'inline-flex';
     showMsg('✅ Activity saved!', 'success');
@@ -203,6 +240,8 @@ function buildEveningMessage(proposedSale, data) {
     : '—';
 
   const proposedSaleText = proposedSale === null ? 'Not entered' : pad2(proposedSale);
+  const mismatchReason = (data.mismatchReason || '').trim();
+  const mismatchLine = mismatchReason ? ('⚠️ Reason: ' + mismatchReason + '\n\n') : '';
 
   return fmtDDMMYYYY(new Date()) + '\n'
     + 'Name : *' + currentUser.name + '*\n\n'
@@ -213,6 +252,7 @@ function buildEveningMessage(proposedSale, data) {
     + '*Booking Vehicle Name* : \n\n'
     + variantLines + '\n\n\n'
     + '*Today\'s Final Sale : ' + pad2(sd.salesToday) + '*\n\n'
+    + mismatchLine
     + 'Total ICE Sale : ' + sd.iceMonthToDate + '\n'
     + 'Total EV Sale : ' + pad2(sd.evMonthToDate) + '\n\n'
     + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*';
