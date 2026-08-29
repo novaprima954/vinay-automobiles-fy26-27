@@ -13229,7 +13229,7 @@ function _ensureDailyActivitySheet() {
       sheet.getRange(1, nextCol + 1).setValue('ConfirmedAt')
         .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
     }
-    \ Migration v3: add ProposedSale (morning "Today Proposed Sale Plan", locks after first save)
+    // Migration v3: add ProposedSale (morning "Today Proposed Sale Plan", locks after first save)
     const fresh2 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
     if (fresh2.indexOf('ProposedSale') === -1) {
       const nextCol2 = sheet.getLastColumn() + 1;
