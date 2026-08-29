@@ -370,6 +370,7 @@ case 'getPendingAccountCheck': result = getPendingAccountCheck(params, params.se
 case 'getExecutiveNames':      result = getExecutiveNames(params.sessionId);              break;
 case 'getDailyActivity':          result = getDailyActivity(params.sessionId);               break;
 case 'saveDailyActivity':         result = saveDailyActivity(params.sessionId, JSON.parse(params.data)); break;
+case 'saveProposedSalePlan':      result = saveProposedSalePlan(params.sessionId, params.proposedSale);  break;
 case 'getDailyActivityReport':    result = getDailyActivityReport(params.sessionId, params.dateFrom, params.dateTo); break;
 case 'getMonthlyEngagementReport': result = getMonthlyEngagementReport(params.sessionId, params.month); break;
 case 'adminUpdateDailyActivity':    result = adminUpdateDailyActivity(params.sessionId, params.date, params.executiveName, JSON.parse(params.data)); break;
@@ -13228,6 +13229,13 @@ function _ensureDailyActivitySheet() {
       sheet.getRange(1, nextCol + 1).setValue('ConfirmedAt')
         .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
     }
+    \ Migration v3: add ProposedSale (morning "Today Proposed Sale Plan", locks after first save)
+    const fresh2 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (fresh2.indexOf('ProposedSale') === -1) {
+      const nextCol2 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol2).setValue('ProposedSale')
+        .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    }
   }
   return sheet;
 }
@@ -13260,12 +13268,87 @@ function _parseDailyRow(r) {
     testRides:      Number(r[7]) || 0,         // H
     // I=SubmittedAt J=UpdatedAt skipped (indices 8,9)
     confirmedBy:    String(r[10] || ''),       // K
-    confirmedAt:    r[11] ? Utilities.formatDate(new Date(r[11]), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm') : ''  // L
+    confirmedAt:    r[11] ? Utilities.formatDate(new Date(r[11]), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm') : '', // L
+    // ProposedSale (col M): null = not yet entered (unlocked), any number (including 0) once saved = locked
+    proposedSale:   (r[12] === '' || r[12] === undefined || r[12] === null) ? null : Number(r[12])  // M
+  };
+}
+
+function _isEvModelName(model) {
+  const m = String(model || '').toUpperCase();
+  return m.indexOf('IQUBE') !== -1 || m.indexOf('ORBITER') !== -1;
+}
+
+/**
+ * System-derived data for the evening WhatsApp report: enquiry/booking counts as
+ * per system (CRM_Leads / Data sheet, today only, this executive), the booking
+ * variant breakdown, today's delivered-sale count, and this executive's
+ * month-to-date ICE/EV delivered-sale split.
+ */
+function _getDailySystemData(execName, today) {
+  const monthPrefix = today.substring(0, 7); // 'yyyy-MM'
+
+  // CRM walk-in enquiries today
+  const crmRows = getSheet('CRM_Leads').getDataRange().getValues();
+  let crmWalkIns = 0;
+  for (let i = 1; i < crmRows.length; i++) {
+    const row = crmRows[i];
+    if (!row[0]) continue;
+    if ((String(row[6] || '')).toLowerCase() !== 'walk-in') continue;
+    if (String(row[8] || '').trim() !== execName) continue;
+    if (formatDate(row[13]) !== today) continue;
+    crmWalkIns++;
+  }
+
+  // Data sheet: today's bookings (variant breakdown) + today's delivered sales +
+  // month-to-date delivered sales split by ICE/EV
+  const dataRows = getSheet(CONFIG.SHEETS.DATA).getDataRange().getValues();
+  let bookingsSystemCount = 0;
+  const variantCounts = {}; // variant → qty
+  let salesToday = 0;
+  let iceMonthToDate = 0, evMonthToDate = 0;
+
+  for (let i = 1; i < dataRows.length; i++) {
+    const row = dataRows[i];
+    if (!row[0]) continue;
+    if (String(row[64] || '') === 'CANCELLED') continue;
+    if (String(row[1] || '').trim() !== execName) continue;
+
+    const model   = String(row[5] || '').trim();
+    const variant = String(row[6] || '').trim();
+
+    if (formatDate(row[2]) === today) {
+      bookingsSystemCount++;
+      const label = [model, variant].filter(Boolean).join(' ') || 'Unknown';
+      variantCounts[label] = (variantCounts[label] || 0) + 1;
+    }
+
+    if (String(row[21] || '') === 'Yes' && row[11]) {
+      const delDate = formatDate(row[11]);
+      if (delDate === today) salesToday++;
+      if (delDate.substring(0, 7) === monthPrefix) {
+        if (_isEvModelName(model)) evMonthToDate++; else iceMonthToDate++;
+      }
+    }
+  }
+
+  const bookingVariants = Object.keys(variantCounts).map(function(v) {
+    return { variant: v, qty: variantCounts[v] };
+  }).sort(function(a, b) { return b.qty - a.qty; });
+
+  return {
+    crmWalkIns: crmWalkIns,
+    bookingsSystemCount: bookingsSystemCount,
+    bookingVariants: bookingVariants,
+    salesToday: salesToday,
+    iceMonthToDate: iceMonthToDate,
+    evMonthToDate: evMonthToDate,
+    totalMonthToDate: iceMonthToDate + evMonthToDate
   };
 }
 
 /**
- * Get today's activity entry for the current exec + live booking count.
+ * Get today's activity entry for the current exec + live booking count + system data.
  */
 function getDailyActivity(sessionId) {
   try {
@@ -13277,16 +13360,60 @@ function getDailyActivity(sessionId) {
     const execName     = user.name;
     const today        = formatDate(new Date());
     const bookingsLive = _getTodayBookingCount(execName);
+    const systemData   = _getDailySystemData(execName, today);
 
     const sheet = _ensureDailyActivitySheet();
     const rows  = sheet.getDataRange().getValues();
     for (let i = 1; i < rows.length; i++) {
       const parsed = _parseDailyRow(rows[i]);
       if (parsed.date === today && parsed.executiveName === execName) {
-        return { success: true, entry: parsed, bookingsLive: bookingsLive };
+        return { success: true, entry: parsed, bookingsLive: bookingsLive, systemData: systemData };
       }
     }
-    return { success: true, entry: null, bookingsLive: bookingsLive };
+    return { success: true, entry: null, bookingsLive: bookingsLive, systemData: systemData };
+  } catch(e) { return { success: false, message: e.toString() }; }
+}
+
+/**
+ * Save the morning "Today Proposed Sale Plan" — locks after the first save
+ * (including saving a value of 0), can only be set once per day per executive.
+ */
+function saveProposedSalePlan(sessionId, proposedSale) {
+  try {
+    const v = validateSession(sessionId);
+    if (!v.success) return { success: false, message: v.message };
+    const user = v.user;
+    if (user.role !== 'sales' && user.role !== 'admin') return { success: false, message: 'Access denied' };
+
+    const execName = user.name;
+    const today    = formatDate(new Date());
+    const now      = new Date();
+
+    const sheet = _ensureDailyActivitySheet();
+    const rows  = sheet.getDataRange().getValues();
+
+    for (let i = 1; i < rows.length; i++) {
+      const parsed = _parseDailyRow(rows[i]);
+      if (parsed.date === today && parsed.executiveName === execName) {
+        if (parsed.proposedSale !== null) {
+          return { success: false, message: 'Already saved and locked for today.' };
+        }
+        sheet.getRange(i + 1, 13).setValue(Number(proposedSale) || 0); // M
+        SpreadsheetApp.flush();
+        return { success: true };
+      }
+    }
+
+    // New row — proposed sale entered before anything else today
+    sheet.appendRow([
+      today, execName,
+      0, 0, 0, 0, 0, 0,          // Enquiries..TestRides default 0
+      now, now,                  // SubmittedAt, UpdatedAt
+      '', '',                    // ConfirmedBy, ConfirmedAt
+      Number(proposedSale) || 0  // ProposedSale
+    ]);
+    SpreadsheetApp.flush();
+    return { success: true };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
