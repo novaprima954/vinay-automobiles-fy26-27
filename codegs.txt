@@ -13236,6 +13236,13 @@ function _ensureDailyActivitySheet() {
       sheet.getRange(1, nextCol2).setValue('ProposedSale')
         .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
     }
+    // Migration v4: add MismatchReason (why Proposed Sale Plan != today's delivered sales)
+    const fresh3 = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    if (fresh3.indexOf('MismatchReason') === -1) {
+      const nextCol3 = sheet.getLastColumn() + 1;
+      sheet.getRange(1, nextCol3).setValue('MismatchReason')
+        .setFontWeight('bold').setBackground('#1565C0').setFontColor('#FFFFFF');
+    }
   }
   return sheet;
 }
@@ -13270,7 +13277,8 @@ function _parseDailyRow(r) {
     confirmedBy:    String(r[10] || ''),       // K
     confirmedAt:    r[11] ? Utilities.formatDate(new Date(r[11]), 'Asia/Kolkata', 'dd-MMM-yyyy HH:mm') : '', // L
     // ProposedSale (col M): null = not yet entered (unlocked), any number (including 0) once saved = locked
-    proposedSale:   (r[12] === '' || r[12] === undefined || r[12] === null) ? null : Number(r[12])  // M
+    proposedSale:   (r[12] === '' || r[12] === undefined || r[12] === null) ? null : Number(r[12]), // M
+    mismatchReason: String(r[13] || '')  // N — why Proposed Sale Plan != today's delivered sales
   };
 }
 
@@ -13456,6 +13464,9 @@ function saveDailyActivity(sessionId, data) {
           rows[i][8] || now,                 // I SubmittedAt (keep original)
           now                                // J UpdatedAt
         ]]);
+        if (data.mismatchReason !== undefined) {
+          sheet.getRange(i + 1, 14).setValue(String(data.mismatchReason || '')); // N MismatchReason
+        }
         SpreadsheetApp.flush();
         return { success: true, bookingsLive: bookingsLive };
       }
@@ -13470,7 +13481,9 @@ function saveDailyActivity(sessionId, data) {
       Number(data.sales)         || 0,
       Number(data.googleRatings) || 0,
       Number(data.testRides)     || 0,
-      now, now
+      now, now,
+      '', '', '',                          // ConfirmedBy, ConfirmedAt, ProposedSale (unset on a fresh row)
+      String(data.mismatchReason || '')    // MismatchReason
     ]);
     SpreadsheetApp.flush();
     return { success: true, bookingsLive: bookingsLive };
