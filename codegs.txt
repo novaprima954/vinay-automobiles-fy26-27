@@ -13361,16 +13361,18 @@ function getDailyActivity(sessionId) {
     const today        = formatDate(new Date());
     const bookingsLive = _getTodayBookingCount(execName);
     const systemData   = _getDailySystemData(execName, today);
+    const hour         = parseInt(Utilities.formatDate(new Date(), 'Asia/Kolkata', 'HH'), 10);
+    const planWindowOpen = hour < 12;
 
     const sheet = _ensureDailyActivitySheet();
     const rows  = sheet.getDataRange().getValues();
     for (let i = 1; i < rows.length; i++) {
       const parsed = _parseDailyRow(rows[i]);
       if (parsed.date === today && parsed.executiveName === execName) {
-        return { success: true, entry: parsed, bookingsLive: bookingsLive, systemData: systemData };
+        return { success: true, entry: parsed, bookingsLive: bookingsLive, systemData: systemData, planWindowOpen: planWindowOpen };
       }
     }
-    return { success: true, entry: null, bookingsLive: bookingsLive, systemData: systemData };
+    return { success: true, entry: null, bookingsLive: bookingsLive, systemData: systemData, planWindowOpen: planWindowOpen };
   } catch(e) { return { success: false, message: e.toString() }; }
 }
 
@@ -13388,6 +13390,11 @@ function saveProposedSalePlan(sessionId, proposedSale) {
     const execName = user.name;
     const today    = formatDate(new Date());
     const now      = new Date();
+
+    const hour = parseInt(Utilities.formatDate(now, 'Asia/Kolkata', 'HH'), 10);
+    if (hour >= 12) {
+      return { success: false, message: 'Proposed Sale Plan can only be saved before 12 PM.' };
+    }
 
     const sheet = _ensureDailyActivitySheet();
     const rows  = sheet.getDataRange().getValues();
