@@ -5,6 +5,7 @@
 let currentUser  = null;
 let _reportCache = [];
 let _proposedSaleLocked = false;
+let _planWindowOpen = true;
 let _systemData = null;
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -61,6 +62,7 @@ async function loadTodayEntry() {
     }
 
     _systemData = res.systemData || null;
+    _planWindowOpen = res.planWindowOpen !== false;
 
     if (res.entry) {
       setField('inp-enquiries',       res.entry.enquiries);
@@ -88,24 +90,36 @@ function setProposedSaleLocked(value) {
   inp.value = value;
   inp.disabled = true;
   document.getElementById('planLockedNote').style.display = 'block';
+  document.getElementById('planLockedNote').textContent = '🔒 Saved — locked for today';
   document.getElementById('btnSave').textContent = "💾 Save Today's Log";
 }
 
 function setProposedSaleUnlocked() {
   _proposedSaleLocked = false;
   const inp = document.getElementById('inp-proposed-sale');
-  inp.disabled = false;
-  document.getElementById('planLockedNote').style.display = 'none';
-  document.getElementById('btnSave').textContent = '💾 Save Plan & Share';
+  const note = document.getElementById('planLockedNote');
+
+  if (!_planWindowOpen) {
+    // Morning window (before 12 PM) has passed and nothing was entered
+    inp.value = '';
+    inp.disabled = true;
+    note.style.display = 'block';
+    note.textContent = '⏰ Morning window (before 12 PM) closed — not entered';
+  } else {
+    inp.disabled = false;
+    note.style.display = 'none';
+  }
+  document.getElementById('btnSave').textContent = _planWindowOpen ? '💾 Save Plan & Share' : "💾 Save Today's Log";
 }
 
 /**
- * Smart save button: before the Proposed Sale Plan is locked, saves+shares the
- * morning plan only. Once locked, saves the regular fields and shares the full
- * evening report (system data + ICE/EV totals).
+ * Smart save button: before the Proposed Sale Plan is locked (and while the
+ * before-noon window is still open), saves+shares the morning plan only. Once
+ * locked, or once the morning window has closed, it saves the regular fields
+ * and shares the full evening report (system data + ICE/EV totals).
  */
 async function handleSaveClick() {
-  if (!_proposedSaleLocked) {
+  if (!_proposedSaleLocked && _planWindowOpen) {
     await saveProposedSalePlan();
   } else {
     await saveActivity();
@@ -159,7 +173,8 @@ async function saveActivity() {
     document.getElementById('savedBadge').style.display = 'inline-flex';
     showMsg('✅ Activity saved!', 'success');
 
-    const proposedSale = parseInt(document.getElementById('inp-proposed-sale').value) || 0;
+    // null when the morning plan was never entered (window closed without an entry)
+    const proposedSale = _proposedSaleLocked ? (parseInt(document.getElementById('inp-proposed-sale').value) || 0) : null;
     showWhatsAppModal(buildEveningMessage(proposedSale, data));
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
   finally {
@@ -187,10 +202,12 @@ function buildEveningMessage(proposedSale, data) {
     ? sd.bookingVariants.map(function(v, i) { return (i+1) + '. ' + v.variant + ' - ' + v.qty; }).join('\n')
     : '—';
 
+  const proposedSaleText = proposedSale === null ? 'Not entered' : pad2(proposedSale);
+
   return fmtDDMMYYYY(new Date()) + '\n'
     + 'Name : *' + currentUser.name + '*\n\n'
-    + '*Today Proposed Sale Plan* : ' + pad2(proposedSale) + '\n\n'
-    + '*Enquiry* : ' + pad2(sd.crmWalkIns) + '\n'
+    + '*Today Proposed Sale Plan* : ' + proposedSaleText + '\n\n'
+    + '*Enquiry as per System* : ' + pad2(sd.crmWalkIns) + '\n'
     + '*Booking* : ' + pad2(data.bookingsManual) + '\n'
     + '*Booking as per System* : ' + pad2(sd.bookingsSystemCount) + '\n'
     + '*Booking Vehicle Name* : \n\n'
