@@ -4,6 +4,8 @@
 
 let currentUser  = null;
 let _reportCache = [];
+let _proposedSaleLocked = false;
+let _systemData = null;
 
 document.addEventListener('DOMContentLoaded', async function () {
   const session = SessionManager.getSession();
@@ -58,6 +60,8 @@ async function loadTodayEntry() {
       setLiveCount(res.bookingsLive);
     }
 
+    _systemData = res.systemData || null;
+
     if (res.entry) {
       setField('inp-enquiries',       res.entry.enquiries);
       setField('inp-bookings-manual', res.entry.bookingsManual);
@@ -65,9 +69,69 @@ async function loadTodayEntry() {
       setField('inp-google',          res.entry.googleRatings);
       setField('inp-testrides',       res.entry.testRides);
       document.getElementById('savedBadge').style.display = 'inline-flex';
+
+      if (res.entry.proposedSale !== null) {
+        setProposedSaleLocked(res.entry.proposedSale);
+      } else {
+        setProposedSaleUnlocked();
+      }
+    } else {
+      setProposedSaleUnlocked();
     }
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
   finally     { setFormDisabled(false); }
+}
+
+function setProposedSaleLocked(value) {
+  _proposedSaleLocked = true;
+  const inp = document.getElementById('inp-proposed-sale');
+  inp.value = value;
+  inp.disabled = true;
+  document.getElementById('planLockedNote').style.display = 'block';
+  document.getElementById('btnSave').textContent = "💾 Save Today's Log";
+}
+
+function setProposedSaleUnlocked() {
+  _proposedSaleLocked = false;
+  const inp = document.getElementById('inp-proposed-sale');
+  inp.disabled = false;
+  document.getElementById('planLockedNote').style.display = 'none';
+  document.getElementById('btnSave').textContent = '💾 Save Plan & Share';
+}
+
+/**
+ * Smart save button: before the Proposed Sale Plan is locked, saves+shares the
+ * morning plan only. Once locked, saves the regular fields and shares the full
+ * evening report (system data + ICE/EV totals).
+ */
+async function handleSaveClick() {
+  if (!_proposedSaleLocked) {
+    await saveProposedSalePlan();
+  } else {
+    await saveActivity();
+  }
+}
+
+async function saveProposedSalePlan() {
+  const inp = document.getElementById('inp-proposed-sale');
+  const val = inp.value.trim();
+  if (val === '') { showMsg('Enter today\'s proposed sale plan first', 'error'); inp.focus(); return; }
+
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const proposedSale = parseInt(val) || 0;
+    const res = await API.saveProposedSalePlan(proposedSale);
+    if (!res.success) { showMsg('Save failed: ' + res.message, 'error'); return; }
+
+    setProposedSaleLocked(proposedSale);
+    showMsg('✅ Plan saved!', 'success');
+    showWhatsAppModal(buildMorningMessage(proposedSale));
+  } catch(e) { showMsg('Error: ' + e.message, 'error'); }
+  finally {
+    btn.disabled = false;
+    if (!_proposedSaleLocked) btn.textContent = '💾 Save Plan & Share';
+  }
 }
 
 async function saveActivity() {
@@ -86,12 +150,75 @@ async function saveActivity() {
 
     if (currentUser.role === 'admin') setLiveCount(res.bookingsLive);
 
+    // Refresh system data (booking/sales counts can change through the day)
+    try {
+      const fresh = await API.getDailyActivity();
+      if (fresh.success) _systemData = fresh.systemData || _systemData;
+    } catch(e) {}
+
     document.getElementById('savedBadge').style.display = 'inline-flex';
     showMsg('✅ Activity saved!', 'success');
+
+    const proposedSale = parseInt(document.getElementById('inp-proposed-sale').value) || 0;
+    showWhatsAppModal(buildEveningMessage(proposedSale, data));
   } catch(e) { showMsg('Error: ' + e.message, 'error'); }
   finally {
-    btn.disabled = false; btn.textContent = '💾 Save Today\'s Log';
+    btn.disabled = false; btn.textContent = "💾 Save Today's Log";
   }
+}
+
+// ── WhatsApp message building + share modal ────────────────────────────────
+
+function fmtDDMMYYYY(d) {
+  return String(d.getDate()).padStart(2,'0') + '/' + String(d.getMonth()+1).padStart(2,'0') + '/' + d.getFullYear();
+}
+function pad2(n) { return String(n).padStart(2, '0'); }
+
+function buildMorningMessage(proposedSale) {
+  return fmtDDMMYYYY(new Date()) + '\n'
+    + 'Name : *' + currentUser.name + '*\n\n'
+    + '*Today Proposed Sale Plan* : ' + pad2(proposedSale);
+}
+
+function buildEveningMessage(proposedSale, data) {
+  const sd = _systemData || { crmWalkIns:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
+
+  const variantLines = sd.bookingVariants.length
+    ? sd.bookingVariants.map(function(v, i) { return (i+1) + '. ' + v.variant + ' - ' + v.qty; }).join('\n')
+    : '—';
+
+  return fmtDDMMYYYY(new Date()) + '\n'
+    + 'Name : *' + currentUser.name + '*\n\n'
+    + '*Today Proposed Sale Plan* : ' + pad2(proposedSale) + '\n\n'
+    + '*Enquiry* : ' + pad2(sd.crmWalkIns) + '\n'
+    + '*Booking* : ' + pad2(data.bookingsManual) + '\n'
+    + '*Booking as per System* : ' + pad2(sd.bookingsSystemCount) + '\n'
+    + '*Booking Vehicle Name* : \n\n'
+    + variantLines + '\n\n\n'
+    + '*Today\'s Final Sale : ' + pad2(sd.salesToday) + '*\n\n'
+    + 'Total ICE Sale : ' + sd.iceMonthToDate + '\n'
+    + 'Total EV Sale : ' + pad2(sd.evMonthToDate) + '\n\n'
+    + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*';
+}
+
+function showWhatsAppModal(message) {
+  document.getElementById('whatsappMessage').textContent = message;
+  document.getElementById('whatsappModal').classList.add('show');
+  window.currentWhatsAppMessage = message;
+}
+
+function closeWhatsAppModal() {
+  document.getElementById('whatsappModal').classList.remove('show');
+}
+
+function shareOnWhatsApp() {
+  const message = window.currentWhatsAppMessage || '';
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = isMobile
+    ? 'whatsapp://send?text=' + encodeURIComponent(message)
+    : 'https://web.whatsapp.com/send?text=' + encodeURIComponent(message);
+  window.open(url, '_blank');
+  closeWhatsAppModal();
 }
 
 function setLiveCount(n) {
@@ -99,10 +226,17 @@ function setLiveCount(n) {
   if (el) el.textContent = (n != null ? n : '—');
 }
 function setFormDisabled(on) {
+  // inp-proposed-sale is deliberately excluded — its disabled state is owned by
+  // setProposedSaleLocked/Unlocked, which run after this and would otherwise get
+  // clobbered by the setFormDisabled(false) in loadTodayEntry's finally block.
   ['inp-enquiries','inp-bookings-manual','inp-sales','inp-google','inp-testrides','btnSave'].forEach(function(id) {
     const el = document.getElementById(id);
     if (el) el.disabled = on;
   });
+  if (on) {
+    const proposedEl = document.getElementById('inp-proposed-sale');
+    if (proposedEl) proposedEl.disabled = true;
+  }
 }
 
 // ── Admin Report ──────────────────────────────────────────────────────────────

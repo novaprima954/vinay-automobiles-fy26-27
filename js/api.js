@@ -1230,6 +1230,10 @@ const API = {
     return await this.call('saveDailyActivity', { sessionId: SessionManager.getSessionId(), data: JSON.stringify(data) });
   },
 
+  async saveProposedSalePlan(proposedSale) {
+    return await this.call('saveProposedSalePlan', { sessionId: SessionManager.getSessionId(), proposedSale });
+  },
+
   async getDailyActivityReport(dateFrom, dateTo) {
     return await this.call('getDailyActivityReport', { sessionId: SessionManager.getSessionId(), dateFrom, dateTo });
   },

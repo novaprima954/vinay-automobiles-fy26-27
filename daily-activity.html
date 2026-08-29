@@ -126,6 +126,23 @@
     .empty-state { text-align:center; padding:30px; color:#aaa; font-size:14px; }
     .legend { font-size:11px; color:#999; margin-top:10px; line-height:1.7; }
     .legend strong { color:#555; }
+
+    /* Proposed Sale Plan card */
+    .plan-card { background:white; border-radius:14px; padding:16px; margin-bottom:16px; box-shadow:0 1px 6px rgba(0,0,0,0.07); border-top:3px solid #FF9800; }
+    .plan-card-label { font-size:12px; font-weight:700; color:#888; text-transform:uppercase; letter-spacing:.5px; margin-bottom:8px; }
+    .plan-card input[type="number"] { width:100%; padding:10px; border:2px solid #FF9800; border-radius:8px; font-size:16px; font-weight:700; box-sizing:border-box; }
+    .plan-card input[type="number"]:disabled { border-color:#ddd; background:#f8f9fa; color:#555; }
+    .plan-locked-note { font-size:11px; color:#2e7d32; font-weight:600; margin-top:6px; }
+
+    /* WhatsApp share modal */
+    .whatsapp-modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.7); z-index:9999; align-items:center; justify-content:center; padding:16px; }
+    .whatsapp-modal.show { display:flex; }
+    .whatsapp-content { background:white; border-radius:15px; padding:24px; max-width:480px; width:100%; max-height:85vh; overflow-y:auto; }
+    .whatsapp-title { font-size:17px; font-weight:700; color:#333; margin-bottom:12px; text-align:center; }
+    .whatsapp-message { background:#f8f9fa; border:2px solid #e0e0e0; border-radius:10px; padding:14px; white-space:pre-wrap; font-size:13px; line-height:1.7; font-family:monospace; margin-bottom:16px; }
+    .whatsapp-buttons { display:flex; gap:10px; }
+    .btn-whatsapp { flex:1; padding:12px; background:#25D366; color:white; border:none; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; }
+    .btn-close-modal { padding:12px 18px; background:#f0f0f0; color:#666; border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer; }
   </style>
 </head>
 <body>
@@ -151,6 +168,13 @@
     </div>
 
     <div id="msg" class="msg"></div>
+
+    <!-- ── Proposed Sale Plan (morning, locks after first save) ─────── -->
+    <div class="plan-card" id="planCard">
+      <div class="plan-card-label">🌅 Today Proposed Sale Plan</div>
+      <input type="number" id="inp-proposed-sale" value="" min="0" max="999" placeholder="How many sales do you plan today?">
+      <div class="plan-locked-note" id="planLockedNote" style="display:none;">🔒 Saved — locked for today</div>
+    </div>
 
     <!-- ── Entry form (sales + admin self-log) ─────────────────────── -->
     <div class="metrics-grid">
@@ -198,7 +222,19 @@
 
     </div>
 
-    <button class="btn-save" id="btnSave" onclick="saveActivity()">💾 Save Today's Log</button>
+    <button class="btn-save" id="btnSave" onclick="handleSaveClick()">💾 Save Plan & Share</button>
+
+    <!-- ── WhatsApp share modal ───────────────────────────────────── -->
+    <div class="whatsapp-modal" id="whatsappModal">
+      <div class="whatsapp-content">
+        <div class="whatsapp-title">📱 Share on WhatsApp</div>
+        <div class="whatsapp-message" id="whatsappMessage"></div>
+        <div class="whatsapp-buttons">
+          <button class="btn-whatsapp" onclick="shareOnWhatsApp()">📱 Share on WhatsApp</button>
+          <button class="btn-close-modal" onclick="closeWhatsAppModal()">✖ Close</button>
+        </div>
+      </div>
+    </div>
 
 
     <!-- ── Admin comparison report ─────────────────────────────────── -->
@@ -320,6 +356,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js?v=2"></script>
   <script src="js/auth.js"></script>
-  <script src="js/daily-activity.js?v=5"></script>
+  <script src="js/daily-activity.js?v=6"></script>
 </body>
 </html>
