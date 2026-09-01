@@ -127,11 +127,11 @@ function setProposedSaleUnlocked() {
   const note = document.getElementById('planLockedNote');
 
   if (!_planWindowOpen) {
-    // Morning window (before 12 PM) has passed and nothing was entered
+    // Morning window (before 11:30 AM) has passed and nothing was entered
     inp.value = '';
     inp.disabled = true;
     note.style.display = 'block';
-    note.textContent = '⏰ Morning window (before 12 PM) closed — not entered';
+    note.textContent = '⏰ Morning window (before 11:30 AM) closed — not entered';
   } else {
     inp.disabled = false;
     note.style.display = 'none';
