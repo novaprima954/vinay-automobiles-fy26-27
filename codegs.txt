@@ -13282,6 +13282,14 @@ function _parseDailyRow(r) {
   };
 }
 
+/**
+ * Proposed Sale Plan can only be entered before 11:30 AM (Asia/Kolkata).
+ */
+function _isProposedSalePlanWindowOpen() {
+  const nowStr = Utilities.formatDate(new Date(), 'Asia/Kolkata', 'HH:mm');
+  return nowStr < '11:30';
+}
+
 function _isEvModelName(model) {
   const m = String(model || '').toUpperCase();
   return m.indexOf('IQUBE') !== -1 || m.indexOf('ORBITER') !== -1;
@@ -13324,10 +13332,11 @@ function _getDailySystemData(execName, today) {
 
     const model   = String(row[5] || '').trim();
     const variant = String(row[6] || '').trim();
+    const colour  = String(row[7] || '').trim();
 
     if (formatDate(row[2]) === today) {
       bookingsSystemCount++;
-      const label = [model, variant].filter(Boolean).join(' ') || 'Unknown';
+      const label = [variant, colour].filter(Boolean).join(' ') || 'Unknown';
       variantCounts[label] = (variantCounts[label] || 0) + 1;
     }
 
@@ -13369,8 +13378,7 @@ function getDailyActivity(sessionId) {
     const today        = formatDate(new Date());
     const bookingsLive = _getTodayBookingCount(execName);
     const systemData   = _getDailySystemData(execName, today);
-    const hour         = parseInt(Utilities.formatDate(new Date(), 'Asia/Kolkata', 'HH'), 10);
-    const planWindowOpen = hour < 12;
+    const planWindowOpen = _isProposedSalePlanWindowOpen();
 
     const sheet = _ensureDailyActivitySheet();
     const rows  = sheet.getDataRange().getValues();
@@ -13399,9 +13407,8 @@ function saveProposedSalePlan(sessionId, proposedSale) {
     const today    = formatDate(new Date());
     const now      = new Date();
 
-    const hour = parseInt(Utilities.formatDate(now, 'Asia/Kolkata', 'HH'), 10);
-    if (hour >= 12) {
-      return { success: false, message: 'Proposed Sale Plan can only be saved before 12 PM.' };
+    if (!_isProposedSalePlanWindowOpen()) {
+      return { success: false, message: 'Proposed Sale Plan can only be saved before 11:30 AM.' };
     }
 
     const sheet = _ensureDailyActivitySheet();
