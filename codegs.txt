@@ -13408,7 +13408,7 @@ function saveProposedSalePlan(sessionId, proposedSale) {
     const now      = new Date();
 
     if (!_isProposedSalePlanWindowOpen()) {
-      return { success: false, message: 'Proposed Sale Plan can only be saved before 11:30 AM.' };
+      return { success: false, message: 'Proposed Booking can only be saved before 11:30 AM.' };
     }
 
     const sheet = _ensureDailyActivitySheet();
