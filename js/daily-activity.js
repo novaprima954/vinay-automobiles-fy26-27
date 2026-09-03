@@ -90,7 +90,7 @@ async function loadTodayEntry() {
 
 /**
  * Shows the mismatch-reason field whenever a locked Proposed Sale Plan doesn't
- * match today's system-verified delivered sale count. Returns true if a
+ * match today's system-verified booking count. Returns true if a
  * mismatch exists (used to require the reason before saving).
  */
 function checkMismatch() {
@@ -98,12 +98,12 @@ function checkMismatch() {
   if (!_proposedSaleLocked || !_systemData) { card.style.display = 'none'; return false; }
 
   const proposed = parseInt(document.getElementById('inp-proposed-sale').value) || 0;
-  const delivered = _systemData.salesToday || 0;
-  const mismatch = proposed !== delivered;
+  const booked = _systemData.bookingsSystemCount || 0;
+  const mismatch = proposed !== booked;
 
   if (mismatch) {
     document.getElementById('mismatchLabel').textContent =
-      '⚠️ Proposed (' + proposed + ') vs Delivered (' + delivered + ') don\'t match — reason required';
+      '⚠️ Proposed (' + proposed + ') vs Booking (' + booked + ') don\'t match — reason required';
     card.style.display = 'block';
   } else {
     card.style.display = 'none';
@@ -156,7 +156,7 @@ async function handleSaveClick() {
 async function saveProposedSalePlan() {
   const inp = document.getElementById('inp-proposed-sale');
   const val = inp.value.trim();
-  if (val === '') { showMsg('Enter today\'s proposed sale plan first', 'error'); inp.focus(); return; }
+  if (val === '') { showMsg('Enter today\'s proposed booking first', 'error'); inp.focus(); return; }
 
   const btn = document.getElementById('btnSave');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -179,7 +179,7 @@ async function saveActivity() {
   const mismatchReasonEl = document.getElementById('inp-mismatch-reason');
 
   if (checkMismatch() && !mismatchReasonEl.value.trim()) {
-    showMsg('Proposed vs Delivered sale don\'t match — please enter a reason', 'error');
+    showMsg('Proposed vs Booking don\'t match — please enter a reason', 'error');
     mismatchReasonEl.focus();
     return;
   }
@@ -229,7 +229,7 @@ function pad2(n) { return String(n).padStart(2, '0'); }
 function buildMorningMessage(proposedSale) {
   return fmtDDMMYYYY(new Date()) + '\n'
     + 'Name : *' + currentUser.name + '*\n\n'
-    + '*Today Proposed Sale Plan* : ' + pad2(proposedSale);
+    + '*Today Proposed Booking* : ' + pad2(proposedSale);
 }
 
 function buildEveningMessage(proposedSale, data) {
@@ -245,7 +245,7 @@ function buildEveningMessage(proposedSale, data) {
 
   return fmtDDMMYYYY(new Date()) + '\n'
     + 'Name : *' + currentUser.name + '*\n\n'
-    + '*Today Proposed Sale Plan* : ' + proposedSaleText + '\n\n'
+    + '*Today Proposed Booking* : ' + proposedSaleText + '\n\n'
     + '*Enquiry as per System* : ' + pad2(sd.crmWalkIns) + '\n'
     + '*Booking* : ' + pad2(data.bookingsManual) + '\n'
     + '*Booking as per System* : ' + pad2(sd.bookingsSystemCount) + '\n'

@@ -171,8 +171,8 @@
 
     <!-- ── Proposed Sale Plan (morning, locks after first save) ─────── -->
     <div class="plan-card" id="planCard">
-      <div class="plan-card-label">🌅 Today Proposed Sale Plan</div>
-      <input type="number" id="inp-proposed-sale" value="" min="0" max="999" placeholder="How many sales do you plan today?">
+      <div class="plan-card-label">🌅 Today Proposed Booking</div>
+      <input type="number" id="inp-proposed-sale" value="" min="0" max="999" placeholder="How many bookings do you plan today?">
       <div class="plan-locked-note" id="planLockedNote" style="display:none;">🔒 Saved — locked for today</div>
     </div>
 
@@ -222,10 +222,10 @@
 
     </div>
 
-    <!-- ── Mismatch reason (shown only when Proposed Sale Plan ≠ Today's Final Sale) ─ -->
+    <!-- ── Mismatch reason (shown only when Proposed Booking ≠ Booking as per System) ─ -->
     <div class="plan-card" id="mismatchCard" style="display:none;border-top-color:#e53935;">
-      <div class="plan-card-label" id="mismatchLabel">⚠️ Proposed vs Delivered Sale Mismatch</div>
-      <textarea id="inp-mismatch-reason" rows="2" placeholder="Why doesn't today's delivered sale match the morning plan?"
+      <div class="plan-card-label" id="mismatchLabel">⚠️ Proposed vs Booking Mismatch</div>
+      <textarea id="inp-mismatch-reason" rows="2" placeholder="Why doesn't today's booking count match the morning plan?"
         style="width:100%;padding:10px;border:2px solid #e53935;border-radius:8px;font-size:14px;box-sizing:border-box;font-family:inherit;"></textarea>
     </div>
 
@@ -363,6 +363,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js?v=2"></script>
   <script src="js/auth.js"></script>
-  <script src="js/daily-activity.js?v=9"></script>
+  <script src="js/daily-activity.js?v=10"></script>
 </body>
 </html>
