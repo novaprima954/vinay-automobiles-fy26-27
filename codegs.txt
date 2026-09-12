@@ -232,6 +232,9 @@ function handleRequest(e) {
       case 'getPriceMasterDetails':
         result = getPriceMasterDetails(params.sessionId, params.model, params.variant);
         break;
+      case 'getPriceMasterAll':
+        result = getPriceMasterAll(params.sessionId);
+        break;
       case 'calculatePrice':
         result = calculatePrice(params.sessionId, params.receiptNo);
         break;
@@ -1937,6 +1940,72 @@ function getPriceMasterDetails(sessionId, model, variant) {
     return {
       success: false,
       message: 'Error loading details: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Get the entire PriceMaster in one call — all models, their variants, and
+ * full price details keyed by "model|variant". Lets the frontend (CRM Quote)
+ * cache this once client-side instead of re-fetching models/variants/details
+ * on every selection throughout the day.
+ */
+function getPriceMasterAll(sessionId) {
+  try {
+    const validation = validateSession(sessionId);
+    if (!validation.success) return validation;
+
+    const sheet = getSheet('PriceMaster');
+    const data = sheet.getDataRange().getValues();
+
+    const models = [];
+    const seenModels = {};
+    const variantsByModel = {};
+    const details = {};
+
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const model = row[0];
+      const variant = row[1];
+      if (!model || !variant) continue;
+
+      if (!seenModels[model]) { seenModels[model] = true; models.push(model); }
+      if (!variantsByModel[model]) variantsByModel[model] = [];
+      variantsByModel[model].push(variant);
+
+      details[model + '|' + variant] = {
+        model: model,
+        variant: variant,
+        exShowroom: row[2] || 0,
+        rto: row[3] || 0,
+        insurance: row[4] || 0,
+        serviceCharge: row[5] || 0,
+        mandAccessories: row[6] || 0,
+        guardPrice: row[7] || null,
+        gripPrice: row[8] || null,
+        seatCoverPrice: row[9] || null,
+        matinPrice: row[10] || null,
+        tankCoverPrice: row[11] || null,
+        handleHookPrice: row[12] || null,
+        helmetPrice: row[13] || null,
+        rainCoverPrice: row[15] || null,
+        buzzerPrice: row[16] || null,
+        backRestPrice: row[17] || null,
+        extendedWarrantyPrice: row[18] || null
+      };
+    }
+
+    return {
+      success: true,
+      models: models.sort(),
+      variantsByModel: variantsByModel,
+      details: details
+    };
+  } catch (error) {
+    Logger.log('Error in getPriceMasterAll: ' + error.toString());
+    return {
+      success: false,
+      message: 'Error loading PriceMaster: ' + error.toString()
     };
   }
 }
