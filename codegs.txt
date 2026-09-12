@@ -3981,10 +3981,12 @@ function testFileHosts() {
 
   Logger.log('=== Testing catbox.moe ===');
   try {
+    const cfg = _getMainConfig();
+    Logger.log('catbox_userhash configured: ' + (cfg['catbox_userhash'] ? 'YES (length ' + cfg['catbox_userhash'].length + ')' : 'NO — not set in Config sheet'));
     const r1 = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-      method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: testBlob }, muteHttpExceptions: true
+      method: 'POST', payload: _catboxPayload(testBlob), muteHttpExceptions: true
     });
-    Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | body: ' + r1.getContentText().substring(0, 300));
+    Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | full body: [' + r1.getContentText() + ']');
   } catch(e) { Logger.log('catbox EXCEPTION: ' + e); }
 
   Logger.log('=== Done — check each host above for HTTP code / response body ===');
@@ -4054,7 +4056,7 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
     if (fileUrl === driveUrl) {
       try {
         const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+          method: 'POST', payload: _catboxPayload(uploadBlob), muteHttpExceptions: true
         });
         const u = r.getContentText().trim();
         const ok = r.getResponseCode() === 200 && u.startsWith('https://');
@@ -4257,7 +4259,7 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
     if (fileUrl === driveUrl) {
       try {
         const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-          method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+          method: 'POST', payload: _catboxPayload(uploadBlob), muteHttpExceptions: true
         });
         Logger.log('[brochure/catbox] HTTP ' + r.getResponseCode() + ' | ' + r.getContentText().substring(0, 200));
         const u = r.getContentText().trim();
@@ -4523,7 +4525,7 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
       if (fileUrl === driveUrl) {
         try {
           const r = UrlFetchApp.fetch('https://catbox.moe/user/api.php', {
-            method: 'POST', payload: { reqtype: 'fileupload', fileToUpload: uploadBlob }, muteHttpExceptions: true
+            method: 'POST', payload: _catboxPayload(uploadBlob), muteHttpExceptions: true
           });
           const u = r.getContentText().trim();
           if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
@@ -4598,6 +4600,20 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
     Logger.log('sendBulkWhatsAppBatch error: ' + e.toString());
     return { success: false, message: e.toString() };
   }
+}
+
+/**
+ * Catbox.moe payload for a file upload. Includes the account userhash (Config
+ * sheet key: catbox_userhash) when set, which turns an anonymous "412 Invalid
+ * uploader" rejection into a real authenticated upload. Falls back to the
+ * anonymous shape (still rejected by catbox, but harmless) if not configured.
+ */
+function _catboxPayload(uploadBlob) {
+  const cfg = _getMainConfig();
+  const userhash = cfg['catbox_userhash'];
+  const payload = { reqtype: 'fileupload', fileToUpload: uploadBlob };
+  if (userhash) payload.userhash = userhash;
+  return payload;
 }
 
 function _uploadToFirebaseStorage(pdfBytes, fileName) {
