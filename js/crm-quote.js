@@ -906,7 +906,7 @@ function buildQuotationHTML(d) {
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
       <div class="quot-company-sub">Authorised TVS Dealer</div>
       <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>
-        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · ' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
+        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · 📞' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
     </div>
     <div style="text-align:right;">
       <div class="quot-brand">TVS</div>
@@ -936,7 +936,7 @@ function buildQuotationHTML(d) {
           <div class="quot-field"><strong>Model :</strong> <span>${d.model} ${d.variant}</span></div>
           <div class="quot-field"><strong>Color :</strong> <span>${d.color}</span></div>
           ${getMandatoryAccDescription(d.model) ? `<div style="margin-top:8px;font-size:11px;color:#444;">Standard Accessories: ${getMandatoryAccDescription(d.model)}</div>` : ''}
-          ${d.execName ? `<div style="margin-top:8px;padding-top:7px;border-top:1.5px dashed #bbb;font-size:12px;color:#222;font-weight:700;">Executive : ${d.execName}${d.execMobile ? '<span style="font-weight:500;color:#444;"> · ' + d.execMobile + '</span>' : ''}</div>` : ''}
+          ${d.execName ? `<div style="margin-top:8px;padding-top:7px;border-top:1.5px dashed #bbb;font-size:12px;color:#222;font-weight:700;">Executive : ${d.execName}${d.execMobile ? '<span style="font-weight:500;color:#444;"> · 📞' + d.execMobile + '</span>' : ''}</div>` : ''}
         </div>
       </div>
     </div>
@@ -960,7 +960,6 @@ function buildQuotationHTML(d) {
               ` : ''}
               ${d.hypothecationCharge > 0 ? `<tr><td>Hypothecation Charge</td><td>₹ ${fmt(d.hypothecationCharge)}</td></tr>` : ''}
               ${d.discount > 0 ? `<tr><td style="color:#ef5350;"><strong>Discount</strong></td><td style="color:#ef5350;"><strong>- ₹ ${fmt(d.discount)}</strong></td></tr>` : ''}
-              <tr class="total-row"><td><strong>Final Total</strong></td><td><strong>₹ ${fmt(d.grandTotal)}</strong></td></tr>
             </tbody>
           </table>
         </div>
@@ -1021,7 +1020,7 @@ function buildComparisonQuotationHTML(d) {
       <div class="quot-company-name">VINAY AUTOMOBILES</div>
       <div class="quot-company-sub">Authorised TVS Dealer</div>
       <div class="quot-company-addr">Darwha Road, Yavatmal, Maharashtra<br>
-        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · ' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
+        ${d.execName ? `<strong>${d.execName}</strong>${d.execMobile ? ' · 📞' + d.execMobile : ''}<br>` : ''}📞 9130040050</div>
     </div>
     <div style="text-align:right;">
       <div class="quot-brand">TVS</div>
@@ -1043,7 +1042,7 @@ function buildComparisonQuotationHTML(d) {
   </div>
 
   <!-- Comparison Table -->
-  <table class="quot-price-table" style="width:100%;">
+  <table class="quot-price-table quot-compare-table" style="width:100%;">
     <thead>
       <tr>
         <th style="width:38%;">Item</th>
@@ -1070,11 +1069,6 @@ function buildComparisonQuotationHTML(d) {
       ${accRows}
       ${v1.hypothecationCharge > 0 || v2.hypothecationCharge > 0 ? showRow('Hypothecation Charge', v1.hypothecationCharge, v2.hypothecationCharge) : ''}
       ${v1.discount > 0 || v2.discount > 0 ? `<tr><td><strong>Discount</strong></td><td><strong>- ₹ ${fmt(v1.discount)}</strong></td><td><strong>- ₹ ${fmt(v2.discount)}</strong></td></tr>` : ''}
-      <tr class="total-row">
-        <td><strong>Final Total</strong></td>
-        <td><strong>₹ ${fmt(v1.grandTotal)}</strong></td>
-        <td><strong>₹ ${fmt(v2.grandTotal)}</strong></td>
-      </tr>
     </tbody>
   </table>
 

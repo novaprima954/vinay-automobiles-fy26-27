@@ -241,6 +241,12 @@
     .quot-price-table tr.total-row td { font-weight: 800; font-size: 12.5px; background: #f0f4ff; border-top: 2px solid #667eea; }
     .quot-price-table tr.grand-total td { font-weight: 900; font-size: 14px; background: #222; color: white; }
 
+    /* Comparison quotation: vehicle-value columns centered under their vehicle heading
+       (overrides the single-quotation td:last-child right-align, which doesn't fit a
+       3-column layout) */
+    .quot-compare-table td:nth-child(2),
+    .quot-compare-table td:nth-child(3) { text-align: center; white-space: nowrap; }
+
     /* Description box (full width) */
     .quot-desc {
       margin-top: 14px;
