@@ -3989,6 +3989,12 @@ function testFileHosts() {
     Logger.log('catbox HTTP ' + r1.getResponseCode() + ' | full body: [' + r1.getContentText() + ']');
   } catch(e) { Logger.log('catbox EXCEPTION: ' + e); }
 
+  Logger.log('=== Testing tmpfile.link ===');
+  try {
+    const res = _uploadToTmpfileLink(testBlob);
+    Logger.log('tmpfilelink HTTP ' + res.code + ' | full body: [' + res.body + ']');
+  } catch(e) { Logger.log('tmpfilelink EXCEPTION: ' + e); }
+
   Logger.log('=== Done — check each host above for HTTP code / response body ===');
 }
 
@@ -4086,9 +4092,19 @@ function sendQuotationWhatsApp(sessionId, pdfBase64, fileName, customerName, cus
       }
     }
 
+    // ── Attempt 4: tmpfile.link (anonymous, no account needed, supports PDFs) ──
+    if (fileUrl === driveUrl) {
+      try {
+        const res = _uploadToTmpfileLink(uploadBlob);
+        if (res.ok) fileUrl = res.url;
+        uploadAttempts.push({ host: 'tmpfilelink', success: res.ok, detail: 'HTTP ' + res.code + ' | ' + res.body.slice(0, 150) });
+      } catch(e) {
+        uploadAttempts.push({ host: 'tmpfilelink', success: false, detail: String(e).slice(0, 200) });
+      }
+    }
+
     // tmpfiles.org removed — confirmed it still shows a download/confirmation page even via
     // the /dl/ direct-download variant, unsuitable for WhatsApp media fetching. Falls to Drive.
-
     Logger.log('[whatsapp] final fileUrl: ' + fileUrl);
 
     // 3. Build AiSensy payload
@@ -4278,6 +4294,14 @@ function sendBrochureWhatsApp(sessionId, leadId, brochureName, driveFileId, cust
         const u = r.getContentText().trim();
         if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
       } catch(e) { Logger.log('[brochure/litterbox] exception: ' + e); }
+    }
+
+    if (fileUrl === driveUrl) {
+      try {
+        const res = _uploadToTmpfileLink(uploadBlob);
+        Logger.log('[brochure/tmpfilelink] HTTP ' + res.code + ' | ' + res.body.substring(0, 200));
+        if (res.ok) fileUrl = res.url;
+      } catch(e) { Logger.log('[brochure/tmpfilelink] exception: ' + e); }
     }
 
     // tmpfiles.org removed — confirmed unreliable (download/confirmation page even via /dl/)
@@ -4531,6 +4555,12 @@ function sendBulkWhatsAppBatch(sessionId, leadIdsJson, templateKey) {
           if (r.getResponseCode() === 200 && u.startsWith('https://')) fileUrl = u;
         } catch(e) { Logger.log('[bulk-wa/catbox] exception: ' + e); }
       }
+      if (fileUrl === driveUrl) {
+        try {
+          const res = _uploadToTmpfileLink(uploadBlob);
+          if (res.ok) fileUrl = res.url;
+        } catch(e) { Logger.log('[bulk-wa/tmpfilelink] exception: ' + e); }
+      }
       // tmpfiles.org removed — confirmed unreliable (download/confirmation page even via /dl/)
     }
 
@@ -4616,6 +4646,23 @@ function _catboxPayload(uploadBlob) {
   return payload;
 }
 
+/**
+ * tmpfile.link — anonymous upload, no account needed, explicitly supports PDFs,
+ * links expire after 7 days (fine for a quotation/brochure meant to be viewed
+ * right after sending). Returns { ok, url, code, body }.
+ */
+function _uploadToTmpfileLink(uploadBlob) {
+  const r = UrlFetchApp.fetch('https://tmpfile.link/api/upload', {
+    method: 'POST', payload: { file: uploadBlob }, muteHttpExceptions: true
+  });
+  const body = r.getContentText();
+  let url = null;
+  try {
+    const j = JSON.parse(body);
+    if (j && j.downloadLink) url = j.downloadLink;
+  } catch (e) {}
+  return { ok: !!url, url: url, code: r.getResponseCode(), body: body };
+}
 function _uploadToFirebaseStorage(pdfBytes, fileName) {
   // Try both bucket name formats (old: .appspot.com, new: .firebasestorage.app)
   const buckets = [
