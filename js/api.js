@@ -781,6 +781,11 @@ const API = {
       variant
     });
   },
+
+  async getPriceMasterAll() {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getPriceMasterAll', { sessionId });
+  },
   
   /**
    * Calculate Price for a sale record

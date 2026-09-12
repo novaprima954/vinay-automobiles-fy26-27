@@ -11,6 +11,11 @@ let pendingQuotData = null; // quotation data for reprint restoration
 let compareMode = true; // Comparison quotation is the default; staff can cancel per-quotation via the toggle button
 let priceDetails2 = null;   // vehicle 2 for comparison
 
+// PriceMaster cache — loaded once (from localStorage if fresh, else the server) and
+// reused for every model/variant selection all day, instead of hitting the server
+// (which can be slow) on every dropdown change.
+let _pmCache = null; // { models: [...], variantsByModel: { model: [variant,...] }, details: { "model|variant": {...} } }
+const PM_CACHE_KEY = 'pm_cache_v1';
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
   { key: 'gripPrice',       label: 'Grip Cover' },
@@ -181,24 +186,56 @@ function toggleSearch() {
 
 // ── MODELS ──────────────────────────────────
 
-async function loadModels(modelHint) {
+/**
+ * Ensure the PriceMaster cache is populated before models/variants are needed.
+ * Uses a cached copy from localStorage instantly if one exists (any age), then
+ * always refreshes it quietly in the background so later page loads (and the
+ * next day) pick up any admin price changes — this avoids re-fetching models/
+ * variants/details from the server on every single dropdown change all day.
+ */
+async function _ensurePriceMasterCache() {
   try {
-    const response = await API.getPriceMasterModels();
-    const sel = document.getElementById('modelSelect');
-    if (response.success && response.models) {
-      response.models.forEach(function(m) {
-        const opt = document.createElement('option');
-        opt.value = m; opt.textContent = m;
-        sel.appendChild(opt);
-      });
-      // Try to pre-select from hint
-      if (modelHint) {
-        const matched = setModelValue(modelHint);
-        if (matched) await onModelChange(modelHint);
+    const cached = localStorage.getItem(PM_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (parsed && parsed.data) {
+        _pmCache = parsed.data;
+        _refreshPriceMasterCacheInBackground();
+        return;
       }
     }
-  } catch (e) {
-    showMessage('Error loading models', 'error');
+  } catch (e) {}
+
+  // No usable cache yet — fetch now (first load of the day pays this cost once)
+  await _fetchAndCachePriceMaster();
+}
+
+async function _refreshPriceMasterCacheInBackground() {
+  try { await _fetchAndCachePriceMaster(); } catch (e) {}
+}
+
+async function _fetchAndCachePriceMaster() {
+  const r = await API.getPriceMasterAll();
+  if (r.success) {
+    _pmCache = { models: r.models || [], variantsByModel: r.variantsByModel || {}, details: r.details || {} };
+    try { localStorage.setItem(PM_CACHE_KEY, JSON.stringify({ data: _pmCache, ts: Date.now() })); } catch (e) {}
+  }
+}
+
+async function loadModels(modelHint) {
+  await _ensurePriceMasterCache();
+  if (!_pmCache) { showMessage('Error loading models', 'error'); return; }
+
+  const sel = document.getElementById('modelSelect');
+  _pmCache.models.forEach(function(m) {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    sel.appendChild(opt);
+  });
+  // Try to pre-select from hint
+  if (modelHint) {
+    const matched = setModelValue(modelHint);
+    if (matched) await onModelChange(modelHint);
   }
 }
 
@@ -241,34 +278,28 @@ async function onModelChange(variantHint) {
   priceDetails = null;
   if (!model) return;
 
-  try {
-    const response = await API.getPriceMasterVariants(model);
-    if (response.success && response.variants) {
-      response.variants.forEach(function(v) {
-        const opt = document.createElement('option');
-        opt.value = v; opt.textContent = v;
-        varSel.appendChild(opt);
-      });
-      varSel.disabled = false;
+  const variants = (_pmCache && _pmCache.variantsByModel[model]) || [];
+  variants.forEach(function(v) {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    varSel.appendChild(opt);
+  });
+  varSel.disabled = false;
 
-      // Auto-select if only one variant
-      if (response.variants.length === 1) {
-        varSel.value = response.variants[0];
-        await onVariantChange();
-      } else if (variantHint) {
-        // Try to match variant from hint
-        const h = String(variantHint).toLowerCase();
-        const match = response.variants.find(function(v) {
-          return v.toLowerCase().includes(h) || h.includes(v.toLowerCase());
-        });
-        if (match) {
-          varSel.value = match;
-          await onVariantChange();
-        }
-      }
+  // Auto-select if only one variant
+  if (variants.length === 1) {
+    varSel.value = variants[0];
+    await onVariantChange();
+  } else if (variantHint) {
+    // Try to match variant from hint
+    const h = String(variantHint).toLowerCase();
+    const match = variants.find(function(v) {
+      return v.toLowerCase().includes(h) || h.includes(v.toLowerCase());
+    });
+    if (match) {
+      varSel.value = match;
+      await onVariantChange();
     }
-  } catch (e) {
-    showMessage('Error loading variants', 'error');
   }
 }
 
@@ -282,42 +313,43 @@ async function onVariantChange() {
   document.getElementById('accessoriesCard').style.display = 'block';
   document.getElementById('btnGenerate').disabled = true;
 
-  try {
-    const response = await API.getPriceMasterDetails(model, variant);
-    if (response.success) {
-      priceDetails = response.details;
-      renderAccessories(priceDetails);
-      if (pendingQuotData) {
-        restoreQuotData(pendingQuotData);
-        pendingQuotData = null;
-      }
-      recalculate();
-      document.getElementById('btnGenerate').disabled = false;
-      // Show compare toggle now that vehicle 1 is loaded
-      const compareCard = document.getElementById('compareToggleCard');
-      if (compareCard) compareCard.style.display = '';
-      // Comparison quotation is mandatory by default — reveal Vehicle 2 and put
-      // the toggle button in its "on" state right away (staff can still cancel it)
-      if (compareMode) {
-        document.getElementById('vehicle2Card').style.display = '';
-        const btn = document.getElementById('btnToggleCompare');
-        if (btn) {
-          btn.innerHTML = '✕ Cancel Comparison';
-          btn.style.cssText += ';background:#fff0f0;color:#ef5350;border-color:#ef5350;';
-        }
-        _populateModelSelect2();
-      }
-    } else {
-      showMessage(response.message, 'error');
+  const details = _pmCache && _pmCache.details[model + '|' + variant];
+  if (details) {
+    priceDetails = details;
+    renderAccessories(priceDetails);
+    if (pendingQuotData) {
+      restoreQuotData(pendingQuotData);
+      pendingQuotData = null;
     }
-  } catch (e) {
-    showMessage('Error loading price details', 'error');
+    recalculate();
+    document.getElementById('btnGenerate').disabled = false;
+    // Show compare toggle now that vehicle 1 is loaded
+    const compareCard = document.getElementById('compareToggleCard');
+    if (compareCard) compareCard.style.display = '';
+    // Comparison quotation is mandatory by default — reveal Vehicle 2 and put
+    // the toggle button in its "on" state right away (staff can still cancel it)
+    if (compareMode) {
+      document.getElementById('vehicle2Card').style.display = '';
+      const btn = document.getElementById('btnToggleCompare');
+      if (btn) {
+        btn.innerHTML = '✕ Cancel Comparison';
+        btn.style.cssText += ';background:#fff0f0;color:#ef5350;border-color:#ef5350;';
+      }
+      _populateModelSelect2();
+    }
+  } else {
+    showMessage('Model/Variant not found in PriceMaster', 'error');
   }
 }
 
 // ── VEHICLE 2 (COMPARISON) ──────────────────
 
 function toggleCompareMode() {
+  // Only confirm when actually cancelling an active comparison, not when turning it on
+  if (compareMode) {
+    if (!confirm('Cancel the comparison? Vehicle 2 details will be cleared.')) return;
+  }
+
   compareMode = !compareMode;
   const card  = document.getElementById('vehicle2Card');
   const btn   = document.getElementById('btnToggleCompare');
@@ -334,50 +366,41 @@ function toggleCompareMode() {
   }
 }
 
-async function _populateModelSelect2() {
+function _populateModelSelect2() {
   const sel = document.getElementById('modelSelect2');
-  if (sel.options.length > 1) return;  // already loaded
-  try {
-    const r = await API.getPriceMasterModels();
-    if (r.success && r.models) {
-      r.models.forEach(function(m) {
-        const opt = document.createElement('option');
-        opt.value = m; opt.textContent = m;
-        sel.appendChild(opt);
-      });
-    }
-  } catch(e) {}
+  if (sel.options.length > 1 || !_pmCache) return;  // already loaded
+  _pmCache.models.forEach(function(m) {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = m;
+    sel.appendChild(opt);
+  });
 }
 
-async function onModelChange2() {
+function onModelChange2() {
   const model  = document.getElementById('modelSelect2').value;
   const varSel = document.getElementById('variantSelect2');
   varSel.innerHTML = '<option value="">-- Select Variant --</option>';
   varSel.disabled  = true;
   priceDetails2    = null;
   if (!model) return;
-  try {
-    const r = await API.getPriceMasterVariants(model);
-    if (r.success && r.variants) {
-      r.variants.forEach(function(v) {
-        const opt = document.createElement('option');
-        opt.value = v; opt.textContent = v;
-        varSel.appendChild(opt);
-      });
-      varSel.disabled = false;
-      if (r.variants.length === 1) { varSel.value = r.variants[0]; await onVariantChange2(); }
-    }
-  } catch(e) {}
+
+  const variants = (_pmCache && _pmCache.variantsByModel[model]) || [];
+  variants.forEach(function(v) {
+    const opt = document.createElement('option');
+    opt.value = v; opt.textContent = v;
+    varSel.appendChild(opt);
+  });
+  varSel.disabled = false;
+  if (variants.length === 1) { varSel.value = variants[0]; onVariantChange2(); }
 }
 
-async function onVariantChange2() {
+function onVariantChange2() {
   const model   = document.getElementById('modelSelect2').value;
   const variant = document.getElementById('variantSelect2').value;
   if (!model || !variant) return;
-  try {
-    const r = await API.getPriceMasterDetails(model, variant);
-    if (r.success) { priceDetails2 = r.details; showMessage('Vehicle 2 loaded — ready to compare', 'success'); }
-  } catch(e) {}
+
+  const details = _pmCache && _pmCache.details[model + '|' + variant];
+  if (details) { priceDetails2 = details; showMessage('Vehicle 2 loaded — ready to compare', 'success'); }
 }
 
 // ── ACCESSORIES ─────────────────────────────
