@@ -3,7 +3,29 @@
 // ==========================================
 
 const API = {
-  
+
+  /**
+   * fetch() with a hard timeout. A hung request (server never responds, as
+   * opposed to responding with an error) can otherwise wait indefinitely in
+   * the browser — since our retry logic only triggers on an actual error, a
+   * hang would never retry and the user would just be stuck until they
+   * manually refresh the page. This turns a hang into a real, retriable error.
+   */
+  async _fetchWithTimeout(url, options, timeoutMs = 25000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        throw new Error('Request timed out after ' + Math.round(timeoutMs / 1000) + 's');
+      }
+      throw err;
+    } finally {
+      clearTimeout(timer);
+    }
+  },
+
   /**
    * Make API call to Apps Script backend.
    * GET (read) requests are auto-retried on failure since Apps Script's web app
@@ -37,7 +59,7 @@ const API = {
           if (useJsonBody) {
             // Send as text/plain with JSON body — avoids CORS preflight (application/json triggers OPTIONS)
             // GAS reads this from e.postData.contents
-            response = await fetch(CONFIG.API_ENDPOINT, {
+            response = await this._fetchWithTimeout(CONFIG.API_ENDPOINT, {
               method: 'POST',
               headers: { 'Content-Type': 'text/plain' },
               body: JSON.stringify({ action, ...params }),
@@ -57,7 +79,7 @@ const API = {
               }
             }
 
-            response = await fetch(CONFIG.API_ENDPOINT, {
+            response = await this._fetchWithTimeout(CONFIG.API_ENDPOINT, {
               method: 'POST',
               headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
               body: formData.toString(),
@@ -78,7 +100,7 @@ const API = {
             }
           }
 
-          response = await fetch(url.toString(), {
+          response = await this._fetchWithTimeout(url.toString(), {
             method: 'GET',
             redirect: 'follow'
           });
