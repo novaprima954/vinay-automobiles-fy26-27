@@ -616,7 +616,7 @@ function buildHaritaExcel(records, startVoucher) {
 // ==========================================
 // BPCL EXPORT (frontend-only)
 // Input: BPCL Sale Transaction history xlsx
-// Col C(2)=Date, Col V(21)=Qty Litres (narration), Col Z(25)=Total Amount
+// Col C(2)=Date, Col V(21)=Qty Litres (narration), Col AA(26)=Total Amount
 // Header row at index 11, data starts at index 12
 // ==========================================
 
@@ -646,7 +646,7 @@ async function generateBPCLExport() {
     for (var i = 12; i < rawData.length; i++) {
       var row = rawData[i];
       var dateVal = row[2];   // Col C: Transaction Date
-      var amount  = row[25];  // Col Z: Total Transaction Amount
+      var amount  = row[26];  // Col AA: Total Transaction Amount
       if (!dateVal && !amount) continue;
 
       records.push({
