@@ -451,7 +451,7 @@ function buildStdAccessoriesExcel(vaRecords, nonVaRecords) {
 // ==========================================
 // HARITA INSURANCE EXPORT (frontend-only)
 // Input: RazorPay statement xlsx
-// Col J=Date, Col K=Narration, Col R=AccName, Col V=Amount
+// Col I=Date, Col N=Narration (Policy Number), Col P=AccName, Col T=Amount
 // ==========================================
 
 async function generateHaritaInsuranceExport() {
@@ -480,15 +480,15 @@ async function generateHaritaInsuranceExport() {
     for (var i = 1; i < rawData.length; i++) {
       var row = rawData[i];
       // Skip empty rows (no date and no acc name)
-      var dateVal = row[9];  // Col J
-      var accName = (row[17] || '').toString().trim(); // Col R
+      var dateVal = row[8];  // Col I
+      var accName = (row[15] || '').toString().trim(); // Col P
       if (!dateVal && !accName) continue;
 
       records.push({
         date:      formatDateDDMMYYYY(dateVal),
-        narration: (row[10] || '').toString().trim(), // Col K
+        narration: (row[13] || '').toString().trim(), // Col N (Policy Number)
         accName:   accName,
-        amount:    row[21] || ''                       // Col V
+        amount:    row[19] || ''                       // Col T
       });
     }
 
