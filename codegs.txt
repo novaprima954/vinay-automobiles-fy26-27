@@ -12285,12 +12285,22 @@ const user = validation.user;
     if (!skuId || !locationId || !qty) return { success: false, message: 'Missing fields' };
     const q = parseInt(qty);
 
-    const skuName = getSkuName(skuId);
-    const locName = getLocationName(locationId);
+    // Lock around the stock read-modify-write so two concurrent requests (e.g. a fast
+    // double-click while the server is slow to respond) can't race each other.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      return { success: false, message: 'System is busy processing another update — please try again.' };
+    }
+    try {
+      const skuName = getSkuName(skuId);
+      const locName = getLocationName(locationId);
 
-    updateInvStock(skuId, locationId, q);
-    logInvTransaction('STOCK_IN', skuId, skuName, '', locName, q, '', '', '', '', '', '', remarks || '', user.name, '', '', invoiceNo || '');
-    return { success: true };
+      updateInvStock(skuId, locationId, q);
+      logInvTransaction('STOCK_IN', skuId, skuName, '', locName, q, '', '', '', '', '', '', remarks || '', user.name, '', '', invoiceNo || '');
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
   } catch(e) { return { success: false, message: e.message }; }
 }
 
@@ -12301,26 +12311,36 @@ if (!validation.success) return { success: false, message: validation.message ||
 const user = validation.user;
     const { skuId, fromLocationId, toLocationId, qty, remarks } = params;
     const q = parseInt(qty);
-    
-    // Check available stock
-    const stockSheet = getSheet('InvStock');
-    const stockData = stockSheet.getDataRange().getValues();
-    let available = 0;
-    for (let i = 1; i < stockData.length; i++) {
-      if (String(stockData[i][0]) === String(skuId) && String(stockData[i][1]) === String(fromLocationId)) {
-        available = parseInt(stockData[i][2]) || 0; break;
-      }
+
+    // Lock around the whole check-then-deduct sequence so two concurrent requests
+    // (e.g. a fast double-click while the server is slow to respond) can't race each other.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      return { success: false, message: 'System is busy processing another update — please try again.' };
     }
-    if (available < q) return { success: false, message: 'Insufficient stock. Available: ' + available };
-    
-    const skuName = getSkuName(skuId);
-    const fromName = getLocationName(fromLocationId);
-    const toName = getLocationName(toLocationId);
-    
-    updateInvStock(skuId, fromLocationId, -q);
-    updateInvStock(skuId, toLocationId, q);
-    logInvTransaction('TRANSFER', skuId, skuName, fromName, toName, q, '', '', '', '', '', '', remarks || '', user.name);
-    return { success: true };
+    try {
+      // Check available stock
+      const stockSheet = getSheet('InvStock');
+      const stockData = stockSheet.getDataRange().getValues();
+      let available = 0;
+      for (let i = 1; i < stockData.length; i++) {
+        if (String(stockData[i][0]) === String(skuId) && String(stockData[i][1]) === String(fromLocationId)) {
+          available = parseInt(stockData[i][2]) || 0; break;
+        }
+      }
+      if (available < q) return { success: false, message: 'Insufficient stock. Available: ' + available };
+
+      const skuName = getSkuName(skuId);
+      const fromName = getLocationName(fromLocationId);
+      const toName = getLocationName(toLocationId);
+
+      updateInvStock(skuId, fromLocationId, -q);
+      updateInvStock(skuId, toLocationId, q);
+      logInvTransaction('TRANSFER', skuId, skuName, fromName, toName, q, '', '', '', '', '', '', remarks || '', user.name);
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
   } catch(e) { return { success: false, message: e.message }; }
 }
 
@@ -12460,65 +12480,78 @@ function invIssueToBooking(params, sessionId) {
     }
   } catch(e) {}
 
-  // Guard against duplicate issuance: skip any SKU already issued for this receipt
-  const txnSheet = getSheet('InvTransactions');
-  const txnData  = txnSheet.getDataRange().getValues();
-  const alreadyIssued = {}; // skuId → true
-  for (let i = 1; i < txnData.length; i++) {
-    if (String(txnData[i][2]) === 'ISSUE' && String(txnData[i][8]).trim() === String(receiptNo).trim()) {
-      alreadyIssued[String(txnData[i][3])] = true;
-    }
+  // Lock around the duplicate-check + deduct + log sequence. Without this, two
+  // concurrent requests for the same receipt (e.g. a fast double-click while the
+  // server is slow to respond) can both read "not yet issued" before either writes
+  // its result, defeating the duplicate guard below and causing a double deduction
+  // (or a lost update, depending on write order).
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) {
+    return { success: false, message: 'System is busy processing another update — please try again.' };
   }
-
-  const skippedItems = [];
-
-  // Process each item (each has its own skuId, qty, locationId)
-  for (const item of items) {
-    const q          = parseInt(item.qty) || 1;
-    const skuId      = item.skuId;
-    const locationId = item.locationId;
-    if (!skuId || !locationId || !q) continue;
-
-    if (alreadyIssued[String(skuId)]) {
-      skippedItems.push(getSkuName(skuId));
-      continue; // already issued for this receipt — do not deduct again
-    }
-
-    // Check and deduct stock
-    const stockSheet = getSheet('InvStock');
-    const stockData  = stockSheet.getDataRange().getValues();
-    let stockRowIndex = -1;
-    let currentQty    = 0;
-    for (let i = 1; i < stockData.length; i++) {
-      if (String(stockData[i][0]) === String(skuId) && String(stockData[i][1]) === String(locationId)) {
-        stockRowIndex = i + 1; // 1-based sheet row
-        currentQty    = parseInt(stockData[i][2]) || 0;
-        break;
+  try {
+    // Guard against duplicate issuance: skip any SKU already issued for this receipt
+    const txnSheet = getSheet('InvTransactions');
+    const txnData  = txnSheet.getDataRange().getValues();
+    const alreadyIssued = {}; // skuId → true
+    for (let i = 1; i < txnData.length; i++) {
+      if (String(txnData[i][2]) === 'ISSUE' && String(txnData[i][8]).trim() === String(receiptNo).trim()) {
+        alreadyIssued[String(txnData[i][3])] = true;
       }
     }
-    if (stockRowIndex === -1) {
-      return { success: false, message: 'No stock record found for ' + getSkuName(skuId) + ' at selected location' };
-    }
-    if (currentQty < q) {
-      return { success: false, message: 'Insufficient stock for ' + getSkuName(skuId) + '. Available: ' + currentQty };
-    }
-    stockSheet.getRange(stockRowIndex, 3).setValue(currentQty - q);
 
-    // Log with correct column order: date first, then type
-    logInvTransaction(
-      'ISSUE', skuId, getSkuName(skuId),
-      getLocationName(locationId), '',   // fromLocation, toLocation
-      q, receiptNo,
-      params.customerName || '', params.executiveName || '',
-      '', '', '', remarks, user.name || user.email || '',
-      variant, frameNo, ''
-    );
-  }
+    const skippedItems = [];
 
-  if (skippedItems.length > 0) {
-    return { success: true, message: 'Accessories issued successfully (already issued earlier, skipped: ' + skippedItems.join(', ') + ')' };
+    // Process each item (each has its own skuId, qty, locationId)
+    for (const item of items) {
+      const q          = parseInt(item.qty) || 1;
+      const skuId      = item.skuId;
+      const locationId = item.locationId;
+      if (!skuId || !locationId || !q) continue;
+
+      if (alreadyIssued[String(skuId)]) {
+        skippedItems.push(getSkuName(skuId));
+        continue; // already issued for this receipt — do not deduct again
+      }
+
+      // Check and deduct stock
+      const stockSheet = getSheet('InvStock');
+      const stockData  = stockSheet.getDataRange().getValues();
+      let stockRowIndex = -1;
+      let currentQty    = 0;
+      for (let i = 1; i < stockData.length; i++) {
+        if (String(stockData[i][0]) === String(skuId) && String(stockData[i][1]) === String(locationId)) {
+          stockRowIndex = i + 1; // 1-based sheet row
+          currentQty    = parseInt(stockData[i][2]) || 0;
+          break;
+        }
+      }
+      if (stockRowIndex === -1) {
+        return { success: false, message: 'No stock record found for ' + getSkuName(skuId) + ' at selected location' };
+      }
+      if (currentQty < q) {
+        return { success: false, message: 'Insufficient stock for ' + getSkuName(skuId) + '. Available: ' + currentQty };
+      }
+      stockSheet.getRange(stockRowIndex, 3).setValue(currentQty - q);
+
+      // Log with correct column order: date first, then type
+      logInvTransaction(
+        'ISSUE', skuId, getSkuName(skuId),
+        getLocationName(locationId), '',   // fromLocation, toLocation
+        q, receiptNo,
+        params.customerName || '', params.executiveName || '',
+        '', '', '', remarks, user.name || user.email || '',
+        variant, frameNo, ''
+      );
+    }
+
+    if (skippedItems.length > 0) {
+      return { success: true, message: 'Accessories issued successfully (already issued earlier, skipped: ' + skippedItems.join(', ') + ')' };
+    }
+    return { success: true, message: 'Accessories issued successfully' };
+  } finally {
+    lock.releaseLock();
   }
-  return { success: true, message: 'Accessories issued successfully' };
 }
 
 
@@ -12530,24 +12563,34 @@ const user = validation.user;
     const { customerName, mobileNo, otcReceiptNo, saleAmount, date, locationId, items, remarks } = params;
     const itemList = JSON.parse(items || '[]');
     if (!itemList.length) return { success: false, message: 'No items' };
-    
-    const locName = getLocationName(locationId);
-    
-    // Check stock
-    for (const item of itemList) {
-      const avail = getStockQty(item.skuId, locationId);
-      if (avail < item.qty) {
-        return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+
+    // Lock around the check-then-deduct sequence so two concurrent requests (e.g. a
+    // fast double-click while the server is slow to respond) can't race each other.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      return { success: false, message: 'System is busy processing another update — please try again.' };
+    }
+    try {
+      const locName = getLocationName(locationId);
+
+      // Check stock
+      for (const item of itemList) {
+        const avail = getStockQty(item.skuId, locationId);
+        if (avail < item.qty) {
+          return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+        }
       }
+
+      for (const item of itemList) {
+        const skuName = getSkuName(item.skuId);
+        updateInvStock(item.skuId, locationId, -item.qty);
+        logInvTransaction('OTC_SALE', item.skuId, skuName, locName, '', item.qty,
+          '', customerName, '', otcReceiptNo, saleAmount, '', remarks || '', user.name);
+      }
+      return { success: true };
+    } finally {
+      lock.releaseLock();
     }
-    
-    for (const item of itemList) {
-      const skuName = getSkuName(item.skuId);
-      updateInvStock(item.skuId, locationId, -item.qty);
-      logInvTransaction('OTC_SALE', item.skuId, skuName, locName, '', item.qty,
-        '', customerName, '', otcReceiptNo, saleAmount, '', remarks || '', user.name);
-    }
-    return { success: true };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
@@ -12561,25 +12604,35 @@ function invAdSale(params, sessionId) {
     if (!itemList.length) return { success: false, message: 'No items' };
     if (!adName) return { success: false, message: 'AD Name is required' };
 
-    const locName = getLocationName(locationId);
+    // Lock around the check-then-deduct sequence so two concurrent requests (e.g. a
+    // fast double-click while the server is slow to respond) can't race each other.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      return { success: false, message: 'System is busy processing another update — please try again.' };
+    }
+    try {
+      const locName = getLocationName(locationId);
 
-    // Check stock for all items first
-    for (const item of itemList) {
-      const avail = getStockQty(item.skuId, locationId);
-      if (avail < item.qty) {
-        return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+      // Check stock for all items first
+      for (const item of itemList) {
+        const avail = getStockQty(item.skuId, locationId);
+        if (avail < item.qty) {
+          return { success: false, message: 'Insufficient stock for ' + getSkuName(item.skuId) + '. Available: ' + avail };
+        }
       }
-    }
 
-    // Deduct stock and log each item
-    for (const item of itemList) {
-      const skuName = getSkuName(item.skuId);
-      updateInvStock(item.skuId, locationId, -item.qty);
-      logInvTransaction('AD_SALE', item.skuId, skuName, locName, '', item.qty,
-        '', adName, '', '', saleAmount, '', remarks || '', user.name,
-        '', '', busyInvoiceNo || '');
+      // Deduct stock and log each item
+      for (const item of itemList) {
+        const skuName = getSkuName(item.skuId);
+        updateInvStock(item.skuId, locationId, -item.qty);
+        logInvTransaction('AD_SALE', item.skuId, skuName, locName, '', item.qty,
+          '', adName, '', '', saleAmount, '', remarks || '', user.name,
+          '', '', busyInvoiceNo || '');
+      }
+      return { success: true };
+    } finally {
+      lock.releaseLock();
     }
-    return { success: true };
   } catch(e) { return { success: false, message: e.message }; }
 }
 
@@ -12663,18 +12716,28 @@ const user = validation.user;
     const { refNo, refType, toLocationId, items, reason, date } = params;
     const itemList = JSON.parse(items || '[]');
     if (!itemList.length) return { success: false, message: 'No items' };
-    
-    const locName = getLocationName(toLocationId);
-    
-    for (const item of itemList) {
-      const skuName = getSkuName(item.skuId);
-      updateInvStock(item.skuId, toLocationId, item.qty);
-      logInvTransaction('RETURN', item.skuId, skuName, '', locName, item.qty,
-        refType === 'booking' ? refNo : '',
-        '', '', refType === 'otc' ? refNo : '',
-        '', '', reason || '', user.name);
+
+    // Lock around the stock read-modify-write so two concurrent requests (e.g. a fast
+    // double-click while the server is slow to respond) can't race each other.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(15000)) {
+      return { success: false, message: 'System is busy processing another update — please try again.' };
     }
-    return { success: true };
+    try {
+      const locName = getLocationName(toLocationId);
+
+      for (const item of itemList) {
+        const skuName = getSkuName(item.skuId);
+        updateInvStock(item.skuId, toLocationId, item.qty);
+        logInvTransaction('RETURN', item.skuId, skuName, '', locName, item.qty,
+          refType === 'booking' ? refNo : '',
+          '', '', refType === 'otc' ? refNo : '',
+          '', '', reason || '', user.name);
+      }
+      return { success: true };
+    } finally {
+      lock.releaseLock();
+    }
   } catch(e) { return { success: false, message: e.message }; }
 }
 
