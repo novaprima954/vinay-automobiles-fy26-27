@@ -392,7 +392,7 @@
               <input type="text" id="trRemarks" placeholder="Reason for transfer">
             </div>
           </div>
-          <button class="btn-primary" onclick="submitTransfer()">🔄 Transfer Stock</button>
+          <button class="btn-primary" id="trSubmitBtn" onclick="submitTransfer()">🔄 Transfer Stock</button>
         </div>
       </div>
 
@@ -507,7 +507,7 @@
                 <input type="text" id="otcRemarks">
               </div>
             </div>
-            <button class="btn-primary" onclick="submitOtcSale()" style="margin-top:12px;">🛒 Record Sale</button>
+            <button class="btn-primary" id="otcSubmitBtn" onclick="submitOtcSale()" style="margin-top:12px;">🛒 Record Sale</button>
           </div>
         </div>
 
@@ -564,7 +564,7 @@
                 <input type="text" id="adRemarks">
               </div>
             </div>
-            <button class="btn-primary" onclick="submitAdSale()" style="margin-top:12px;">🏪 Record AD Sale</button>
+            <button class="btn-primary" id="adSubmitBtn" onclick="submitAdSale()" style="margin-top:12px;">🏪 Record AD Sale</button>
           </div>
         </div>
       </div>
@@ -614,7 +614,7 @@
                 <input type="text" id="returnReason" placeholder="e.g. Customer changed mind">
               </div>
             </div>
-            <button class="btn-primary" onclick="submitReturn()">↩ Process Return</button>
+            <button class="btn-primary" id="returnSubmitBtn" onclick="submitReturn()">↩ Process Return</button>
           </div>
         </div>
       </div>
@@ -815,6 +815,6 @@
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js?v=4"></script>
-  <script src="js/inventory.js"></script>
+  <script src="js/inventory.js?v=2"></script>
 </body>
 </html>

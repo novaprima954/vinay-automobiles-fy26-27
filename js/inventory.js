@@ -386,20 +386,34 @@ async function submitTransfer() {
     showMessage('Insufficient stock at selected location', 'error'); return;
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invTransfer', {
-    sessionId: invSessionId,
-    skuId, fromLocationId: fromId, toLocationId: toId, qty, remarks
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('trSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Transferring...';
+  }
 
-  if (res.success) {
-    showMessage('Transfer completed', 'success');
-    await loadStock();
-    renderDashboard();
-    showTransferStock();
-  } else {
-    showMessage(res.message || 'Transfer failed', 'error');
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invTransfer', {
+      sessionId: invSessionId,
+      skuId, fromLocationId: fromId, toLocationId: toId, qty, remarks
+    });
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('Transfer completed', 'success');
+      await loadStock();
+      renderDashboard();
+      showTransferStock();
+    } else {
+      showMessage(res.message || 'Transfer failed', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🔄 Transfer Stock';
+    }
   }
 }
 
@@ -644,27 +658,41 @@ async function submitIssue() {
     if (!item.locationId) { showMessage('Select a location for every accessory row', 'error'); return; }
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invIssueToBooking', {
-    sessionId: invSessionId,
-    receiptNo: currentBooking.receiptNo,
-    customerName: currentBooking.customerName,
-    executiveName: currentBooking.executiveName,
-    deliveryDate: document.getElementById('issueDeliveryDate').value,
-    items: JSON.stringify(items),
-    remarks: document.getElementById('issueRemarks').value
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('issueSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Issuing...';
+  }
 
-  if (res.success) {
-    showMessage('Accessories issued successfully', 'success');
-    await loadStock();
-    renderDashboard();
-    resetBookingSearch();
-    document.getElementById('issueSearchText').value = '';
-    document.getElementById('issueRemarks').value = '';
-  } else {
-    showMessage(res.message || 'Issue failed', 'error');
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invIssueToBooking', {
+      sessionId: invSessionId,
+      receiptNo: currentBooking.receiptNo,
+      customerName: currentBooking.customerName,
+      executiveName: currentBooking.executiveName,
+      deliveryDate: document.getElementById('issueDeliveryDate').value,
+      items: JSON.stringify(items),
+      remarks: document.getElementById('issueRemarks').value
+    });
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('Accessories issued successfully', 'success');
+      await loadStock();
+      renderDashboard();
+      resetBookingSearch();
+      document.getElementById('issueSearchText').value = '';
+      document.getElementById('issueRemarks').value = '';
+    } else {
+      showMessage(res.message || 'Issue failed', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '✅ Confirm Issue';
+    }
   }
 }
 
@@ -679,32 +707,46 @@ async function submitOtcSale() {
     showMessage('Fill Customer Name, Receipt No, Location, and at least one item', 'error'); return;
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invOtcSale', {
-    sessionId: invSessionId,
-    customerName: customer,
-    mobileNo: document.getElementById('otcMobile').value,
-    otcReceiptNo: receiptNo,
-    saleAmount: amount,
-    date: document.getElementById('otcDate').value,
-    locationId,
-    items: JSON.stringify(items),
-    remarks: document.getElementById('otcRemarks').value
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('otcSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Recording...';
+  }
 
-  if (res.success) {
-    showMessage('OTC sale recorded', 'success');
-    await loadStock();
-    renderDashboard();
-    ['otcCustomer','otcMobile','otcReceiptNo','otcAmount','otcRemarks'].forEach(id => {
-      document.getElementById(id).value = '';
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invOtcSale', {
+      sessionId: invSessionId,
+      customerName: customer,
+      mobileNo: document.getElementById('otcMobile').value,
+      otcReceiptNo: receiptNo,
+      saleAmount: amount,
+      date: document.getElementById('otcDate').value,
+      locationId,
+      items: JSON.stringify(items),
+      remarks: document.getElementById('otcRemarks').value
     });
-    document.getElementById('otcSkuList').innerHTML = '';
-    otcSkuRowCount = 0;
-    addOtcSkuRow();
-  } else {
-    showMessage(res.message || 'OTC sale failed', 'error');
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('OTC sale recorded', 'success');
+      await loadStock();
+      renderDashboard();
+      ['otcCustomer','otcMobile','otcReceiptNo','otcAmount','otcRemarks'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('otcSkuList').innerHTML = '';
+      otcSkuRowCount = 0;
+      addOtcSkuRow();
+    } else {
+      showMessage(res.message || 'OTC sale failed', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🛒 Record Sale';
+    }
   }
 }
 
@@ -749,32 +791,46 @@ async function submitAdSale() {
     showMessage('Select AD Name, Location, and add at least one item', 'error'); return;
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invAdSale', {
-    sessionId: invSessionId,
-    adName,
-    busyInvoiceNo: invoiceNo,
-    saleAmount: amount,
-    date: document.getElementById('adDate').value,
-    locationId,
-    items: JSON.stringify(items),
-    remarks: document.getElementById('adRemarks').value
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('adSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Recording...';
+  }
 
-  if (res.success) {
-    showMessage('AD sale recorded', 'success');
-    await loadStock();
-    renderDashboard();
-    document.getElementById('adName').value = '';
-    ['adInvoiceNo', 'adAmount', 'adRemarks'].forEach(id => {
-      document.getElementById(id).value = '';
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invAdSale', {
+      sessionId: invSessionId,
+      adName,
+      busyInvoiceNo: invoiceNo,
+      saleAmount: amount,
+      date: document.getElementById('adDate').value,
+      locationId,
+      items: JSON.stringify(items),
+      remarks: document.getElementById('adRemarks').value
     });
-    document.getElementById('adSkuList').innerHTML = '';
-    adSkuRowCount = 0;
-    addAdSkuRow();
-  } else {
-    showMessage(res.message || 'AD sale failed', 'error');
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('AD sale recorded', 'success');
+      await loadStock();
+      renderDashboard();
+      document.getElementById('adName').value = '';
+      ['adInvoiceNo', 'adAmount', 'adRemarks'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('adSkuList').innerHTML = '';
+      adSkuRowCount = 0;
+      addAdSkuRow();
+    } else {
+      showMessage(res.message || 'AD sale failed', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '🏪 Record AD Sale';
+    }
   }
 }
 
@@ -855,29 +911,43 @@ async function submitReturn() {
     showMessage('Fill all fields and add items to return', 'error'); return;
   }
 
-  showLoading(true);
-  const res = await API.inventoryCall('invReturn', {
-    sessionId: invSessionId,
-    refNo,
-    refType: type,
-    toLocationId: locationId,
-    items: JSON.stringify(items),
-    reason,
-    date: document.getElementById('returnDate').value
-  });
-  showLoading(false);
+  const submitBtn = document.getElementById('returnSubmitBtn');
+  if (submitBtn) {
+    if (submitBtn.disabled) return; // guard against double-click / double-submit
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Processing...';
+  }
 
-  if (res.success) {
-    showMessage('Return processed successfully', 'success');
-    await loadStock();
-    renderDashboard();
-    document.getElementById('returnRefNo').value = '';
-    document.getElementById('returnInfoBox').classList.remove('show');
-    document.getElementById('returnItemsSection').style.display = 'none';
-    document.getElementById('returnSkuList').innerHTML = '';
-    returnSkuRowCount = 0;
-  } else {
-    showMessage(res.message || 'Return failed', 'error');
+  showLoading(true);
+  try {
+    const res = await API.inventoryCall('invReturn', {
+      sessionId: invSessionId,
+      refNo,
+      refType: type,
+      toLocationId: locationId,
+      items: JSON.stringify(items),
+      reason,
+      date: document.getElementById('returnDate').value
+    });
+    showLoading(false);
+
+    if (res.success) {
+      showMessage('Return processed successfully', 'success');
+      await loadStock();
+      renderDashboard();
+      document.getElementById('returnRefNo').value = '';
+      document.getElementById('returnInfoBox').classList.remove('show');
+      document.getElementById('returnItemsSection').style.display = 'none';
+      document.getElementById('returnSkuList').innerHTML = '';
+      returnSkuRowCount = 0;
+    } else {
+      showMessage(res.message || 'Return failed', 'error');
+    }
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '↩ Process Return';
+    }
   }
 }
 
