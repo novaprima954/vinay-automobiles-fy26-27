@@ -1080,7 +1080,7 @@ function buildComparisonQuotationHTML(d) {
         <td style="text-align:center;">${v2.color}</td>
       </tr>
       ${showRow('Ex-Showroom Price', v1.exShowroom, v2.exShowroom)}
-      ${showRow('Insurance', v1.insurance, v2.insurance)}
+      ${showRow('Insurance (1Y PA, 1Y OD, 5Y TP)', v1.insurance, v2.insurance)}
       ${showRow('Road Tax', v1.rto, v2.rto)}
       ${v1.mandAcc > 0 || v2.mandAcc > 0 ? `<tr><td>Standard Accessories<br><span style="font-size:10px;color:#555;">${getMandatoryAccDescription(v1.model)}</span></td><td>${fmtOrDash(v1.mandAcc)}</td><td>${fmtOrDash(v2.mandAcc)}</td></tr>` : ''}
       ${showRow('Service Charge', v1.pdi, v2.pdi)}
