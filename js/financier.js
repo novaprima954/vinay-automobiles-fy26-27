@@ -280,13 +280,13 @@ function renderTable(data) {
     html += '<td><input type="number" id="disb-' + idx + '" value="' + (record.disbursalAmount !== '' && record.disbursalAmount !== null && record.disbursalAmount !== undefined ? record.disbursalAmount : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
     html += '<td><input type="number" id="rcvd-' + idx + '" value="' + (record.amountReceived  !== '' && record.amountReceived  !== null && record.amountReceived  !== undefined ? record.amountReceived  : '') + '" oninput="updateDiff(' + idx + ')" style="' + inputStyle() + 'min-width:100px;" placeholder="0"></td>';
     html += '<td><input type="date"   id="rcvdate-' + idx + '" value="' + (record.receivedDate || '') + '" style="' + inputStyle() + 'min-width:120px;"></td>';
+    html += '<td style="text-align:center;"><button id="savebtn-' + idx + '" onclick="saveRow(' + idx + ')" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button></td>';
     html += '<td style="white-space:nowrap;">' + (record.mobileNo || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.modelName || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.refCustomer || '—') + '</td>';
     html += '<td style="white-space:nowrap;">' + (record.financier || '—') + '</td>';
     html += '<td style="text-align:center;font-weight:700;white-space:nowrap;" id="diff-' + idx + '">' + diffText + '</td>';
-    html += '<td style="text-align:center;"><button id="savebtn-' + idx + '" onclick="saveRow(' + idx + ')" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;">Save</button></td>';
-    // (Mobile=cells[9], Model=cells[10], RefCust=cells[11], Financier=cells[12], Diff=cells[13], Save=cells[14])
+        // (Save=cells[9], Mobile=cells[10], Model=cells[11], RefCust=cells[12], Financier=cells[13], Diff=cells[14])
     html += '</tr>';
   });
 
@@ -446,10 +446,10 @@ function exportToExcel() {
       disbVal  !== '' ? parseFloat(disbVal)  : '',
       rcvdVal  !== '' ? parseFloat(rcvdVal)  : '',
       rcvDate,
-      cells[9].textContent.trim(),   // Mobile (shifted +1)
-      cells[10].textContent.trim(),  // Model  (shifted +1)
-      cells[11].textContent.trim(),  // Ref Customer (shifted +1)
-      cells[12].textContent.trim(),  // Financier (shifted +1)
+      cells[10].textContent.trim(),  // Mobile
+      cells[11].textContent.trim(),  // Model
+      cells[12].textContent.trim(),  // Ref Customer
+      cells[13].textContent.trim(),  // Financier
       diffDisplay
     ]);
   });
