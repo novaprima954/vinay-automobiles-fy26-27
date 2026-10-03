@@ -233,7 +233,7 @@ function buildMorningMessage(proposedSale) {
 }
 
 function buildEveningMessage(proposedSale, data) {
-  const sd = _systemData || { crmWalkIns:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
+  const sd = _systemData || { crmWalkIns:0, crmWalkInsMonth:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
 
   const variantLines = sd.bookingVariants.length
     ? sd.bookingVariants.map(function(v, i) { return (i+1) + '. ' + v.variant + ' - ' + v.qty; }).join('\n')
@@ -255,7 +255,8 @@ function buildEveningMessage(proposedSale, data) {
     + mismatchLine
     + 'Total ICE Sale : ' + sd.iceMonthToDate + '\n'
     + 'Total EV Sale : ' + pad2(sd.evMonthToDate) + '\n\n'
-    + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*';
+    + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*'
+    + '\n*Total All Enquiry: ' + pad2(sd.crmWalkInsMonth || 0) + '*';
 }
 
 function showWhatsAppModal(message) {
