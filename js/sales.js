@@ -559,6 +559,10 @@ function showWhatsAppModal(data) {
    .map(([no, amt]) => String(no).trim() + '/' + (parseFloat(amt) || 0).toLocaleString('en-IN'));
   const receiptLine = receiptPairs.length ? `Receipt No - ${receiptPairs.join(', ')}\n` : '';
 
+  const remarkText = (data.salesRemark || '').trim();
+  const salesRemarkLine = remarkText ? `
+Sales Remark - ${remarkText}` : '';
+
   const message = `Customer Name - ${data.customerName}
 Variant - ${data.model} ${data.variant}
 Colour - ${data.colour}
@@ -568,7 +572,7 @@ Cash Collected - ₹${totalCashCollected.toLocaleString('en-IN')}
 Final price after discount - ${data.finalPrice}
 Discount - ${data.discount}
 ${receiptLine}Accessories -
-${accessoriesText}`;
+${accessoriesText}${salesRemarkLine}`;
   
   document.getElementById('whatsappMessage').textContent = message;
   document.getElementById('whatsappModal').classList.add('show');

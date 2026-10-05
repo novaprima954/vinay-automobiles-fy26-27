@@ -824,6 +824,12 @@ function showWhatsAppModal(data) {
       message += acc.name + ' - ' + value + '\n';
     }
   });
+
+  // Sales Remark (column T) - only if entered
+  const remarkText = (data.salesRemark || '').trim();
+  if (remarkText) {
+    message += '*Sales Remark* - ' + remarkText + '\n';
+  }
   
   // Display message
   document.getElementById('whatsappMessagePreview').textContent = message;
