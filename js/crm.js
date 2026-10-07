@@ -1419,8 +1419,9 @@ async function findBulkWaCandidates() {
     }
     listEl.innerHTML = bulkWaCandidates.map((c, idx) =>
       '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f3f3f3;cursor:pointer;font-size:13px;">' +
-      '<input type="checkbox" class="bulk-wa-cust-cb" value="' + idx + '" checked>' +
-      '<span style="flex:1;"><strong>' + esc(c.customerName) + '</strong><br>' +
+      '<input type="checkbox" class="bulk-wa-cust-cb" value="' + idx + '"' + (c.sentToday ? ' disabled' : ' checked') + '>' +
+      '<span style="flex:1;"><strong>' + esc(c.customerName) + '</strong>' +
+      (c.sentToday ? ' <span style="background:#e8f5e9;color:#2e7d32;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;">✅ Sent today</span>' : '') + '<br>' +
       '<span style="color:#888;font-size:11px;">' + esc(c.mobileNo) + ' · ' + esc(c.model || '—') + ' · ' + esc(c.assignedTo || 'Pool') + '</span></span>' +
       '</label>'
     ).join('');
@@ -1433,14 +1434,14 @@ async function findBulkWaCandidates() {
 
 function toggleBulkWaSelectAll() {
   const checked = document.getElementById('bulkWaSelectAll').checked;
-  document.querySelectorAll('.bulk-wa-cust-cb').forEach(cb => cb.checked = checked);
+  document.querySelectorAll('.bulk-wa-cust-cb').forEach(cb => { if (!cb.disabled) cb.checked = checked; });
 }
 
 async function sendBulkWaMessages() {
   const templateKey = document.getElementById('bulkWaTemplateSelect').value;
   if (!templateKey) { showMessage('Please select a message template', 'error'); return; }
 
-  const selectedIdx = Array.from(document.querySelectorAll('.bulk-wa-cust-cb')).filter(cb => cb.checked).map(cb => parseInt(cb.value));
+  const selectedIdx = Array.from(document.querySelectorAll('.bulk-wa-cust-cb')).filter(cb => cb.checked && !cb.disabled).map(cb => parseInt(cb.value));
   if (selectedIdx.length === 0) { showMessage('Select at least one customer', 'error'); return; }
 
   const selectedLeads = selectedIdx.map(i => bulkWaCandidates[i]);
@@ -1456,7 +1457,7 @@ async function sendBulkWaMessages() {
   progressEl.style.display = 'block';
 
   const BATCH_SIZE = 20;
-  let sentCount = 0, failCount = 0;
+  let sentCount = 0, failCount = 0, skippedCount = 0;
   const failedNames = [];
 
   for (let i = 0; i < leadIds.length; i += BATCH_SIZE) {
@@ -1468,7 +1469,17 @@ async function sendBulkWaMessages() {
       const r = await API.sendBulkWhatsAppBatch(batch, templateKey);
       if (r.success && r.results) {
         r.results.forEach(res => {
-          if (res.success) sentCount++;
+          if (res.success) {
+            sentCount++;
+            // Lock this customer out for the rest of the day in the list too
+            const ci = bulkWaCandidates.findIndex(c => c.leadId === res.leadId);
+            if (ci >= 0) {
+              bulkWaCandidates[ci].sentToday = true;
+              const cb = document.querySelector('.bulk-wa-cust-cb[value="' + ci + '"]');
+              if (cb) { cb.checked = false; cb.disabled = true; }
+            }
+          }
+          else if (res.skipped) skippedCount++;
           else { failCount++; failedNames.push(res.customerName || res.leadId); }
         });
       } else {
@@ -1487,6 +1498,7 @@ async function sendBulkWaMessages() {
   const summaryEl = document.getElementById('bulkWaResultSummary');
   summaryEl.innerHTML =
     '<div style="color:#166534;font-weight:700;">✅ Sent: ' + sentCount + '</div>' +
+    (skippedCount > 0 ? '<div style="color:#b26a00;font-weight:700;margin-top:4px;">⏭️ Skipped (already sent today): ' + skippedCount + '</div>' : '') +
     (failCount > 0 ? '<div style="color:#dc3545;font-weight:700;margin-top:4px;">❌ Failed: ' + failCount +
       (failedNames.length ? ' (' + failedNames.slice(0, 5).map(esc).join(', ') + (failedNames.length > 5 ? '…' : '') + ')' : '') + '</div>' : '');
 }
