@@ -16,6 +16,9 @@ let priceDetails2 = null;   // vehicle 2 for comparison
 // (which can be slow) on every dropdown change.
 let _pmCache = null; // { models: [...], variantsByModel: { model: [variant,...] }, details: { "model|variant": {...} } }
 const PM_CACHE_KEY = 'pm_cache_v1';
+// Accessories that allow an optional manual "other" price, shown beside the PriceMaster price
+// on the quote (display only, never added to any total). key -> name used in the label.
+const MANUAL_ACC = { guardPrice: 'guard', helmetPrice: 'helmet' };
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
   { key: 'gripPrice',       label: 'Grip Cover' },
@@ -358,13 +361,13 @@ function toggleCompareMode() {
     btn.innerHTML = '✕ Cancel Comparison';
     btn.style.cssText += ';background:#fff0f0;color:#ef5350;border-color:#ef5350;';
     _populateModelSelect2();
-    _syncGuardManual2();
+    _syncAccManual2();
   } else {
     card.style.display = 'none';
     btn.innerHTML = '⚖️ Compare with Another Vehicle';
     btn.style.cssText += ';background:#f0f4ff;color:#667eea;border-color:#667eea;';
     priceDetails2 = null;
-    _syncGuardManual2();
+    _syncAccManual2();
   }
 }
 
@@ -384,7 +387,7 @@ function onModelChange2() {
   varSel.innerHTML = '<option value="">-- Select Variant --</option>';
   varSel.disabled  = true;
   priceDetails2    = null;
-  _syncGuardManual2();
+  _syncAccManual2();
   if (!model) return;
 
   const variants = (_pmCache && _pmCache.variantsByModel[model]) || [];
@@ -404,7 +407,7 @@ function onVariantChange2() {
 
   const details = _pmCache && _pmCache.details[model + '|' + variant];
   if (details) { priceDetails2 = details; showMessage('Vehicle 2 loaded — ready to compare', 'success'); }
-  _syncGuardManual2();
+  _syncAccManual2();
 }
 
 // ── ACCESSORIES ─────────────────────────────
@@ -427,13 +430,11 @@ function renderAccessories(details) {
         <div class="acc-item-info">
           <div class="acc-item-name">${acc.label}</div>
           <div class="acc-item-price">₹${fmt(price)}</div>
-          ${acc.key === 'guardPrice' ? `
+          ${MANUAL_ACC[acc.key] ? `
           <div onclick="event.stopPropagation()" style="margin-top:6px;font-size:12px;color:#555;">
-            Other guard price (optional)
-            <div style="display:flex;gap:6px;margin-top:3px;">
-              <input type="number" id="guardManual1" min="0" placeholder="Vehicle 1 ₹" style="width:110px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
-              <input type="number" id="guardManual2" min="0" placeholder="Vehicle 2 ₹" class="guard-manual-v2" style="width:110px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;display:none;">
-            </div>
+            Other ${MANUAL_ACC[acc.key]} price (optional)
+            <input type="number" id="accManual1-${acc.key}" min="0" placeholder="Vehicle 1 ₹" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
+            <input type="number" id="accManual2-${acc.key}" min="0" placeholder="Vehicle 2 ₹" class="acc-manual-v2" style="display:none;width:100%;box-sizing:border-box;margin-top:4px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
           </div>` : ''}
         </div>
       `;
@@ -453,6 +454,7 @@ function renderAccessories(details) {
     </button>`;
   grid.appendChild(customSection);
 
+  _syncAccManual2();
   document.getElementById('summaryBar').style.display = 'block';
 }
 
@@ -517,10 +519,12 @@ function restoreQuotData(qd) {
   }
 
   // 2b. Restore manual guard price
-  if (qd.guardManual1) {
-    const gm = document.getElementById('guardManual1');
-    if (gm) gm.value = qd.guardManual1;
-  }
+  const savedManual = Object.assign({}, qd.accManual1 || {});
+  if (qd.guardManual1 && !savedManual.guardPrice) savedManual.guardPrice = qd.guardManual1; // older saved quotes
+  Object.keys(savedManual).forEach(function(key) {
+    const el = document.getElementById('accManual1-' + key);
+    if (el && savedManual[key]) el.value = savedManual[key];
+  });
 
   // 3. Restore discount
   if (qd.discount != null) {
@@ -545,23 +549,25 @@ function restoreQuotData(qd) {
   }
 }
 
-// Manual "other guard" price for vehicle n (1 or 2) - display only, never added to any total.
-// Ignored when the Guard accessory itself is not ticked.
-// Vehicle 2's manual guard box shows only in comparison mode AND when vehicle 2 itself
-// has a guard price in PriceMaster (same rule as the Guard option for vehicle 1).
-function _syncGuardManual2() {
-  const el = document.getElementById('guardManual2');
-  if (!el) return;
-  const show = compareMode && priceDetails2 && Number(priceDetails2.guardPrice) > 0;
-  el.style.display = show ? '' : 'none';
-  if (!show) el.value = '';
-}
-
-function _guardManualPrice(n) {
-  const cb = document.querySelector('#accGrid input[data-key="guardPrice"]');
-  const inp = document.getElementById('guardManual' + n);
+// Manual "other" price for accessory `key` on vehicle n (1 or 2) - display only, never added
+// to any total. Ignored when that accessory itself is not ticked.
+function _accManualPrice(key, n) {
+  const cb = document.querySelector('#accGrid input[data-key="' + key + '"]');
+  const inp = document.getElementById('accManual' + n + '-' + key);
   if (!cb || !cb.checked || !inp) return 0;
   return Math.max(0, Number(inp.value) || 0);
+}
+
+// Vehicle 2's manual box shows only in comparison mode AND when vehicle 2 itself has that
+// accessory priced in PriceMaster (same rule as the accessory option for vehicle 1).
+function _syncAccManual2() {
+  Object.keys(MANUAL_ACC).forEach(function(key) {
+    const el = document.getElementById('accManual2-' + key);
+    if (!el) return;
+    const show = compareMode && priceDetails2 && Number(priceDetails2[key]) > 0;
+    el.style.display = show ? 'block' : 'none';
+    if (!show) el.value = '';
+  });
 }
 
 function toggleAcc(el) {
@@ -662,7 +668,7 @@ async function generateQuotation() {
     const selectedAcc = [];
     document.querySelectorAll('#accGrid input[type="checkbox"]:checked').forEach(function(cb) {
       const acc = ACC_CONFIG.find(function(a) { return a.key === cb.dataset.key; });
-      if (acc) selectedAcc.push({ label: acc.label, price: Number(cb.dataset.price), manualPrice: acc.key === 'guardPrice' ? _guardManualPrice(1) : 0 });
+      if (acc) selectedAcc.push({ label: acc.label, price: Number(cb.dataset.price), manualPrice: MANUAL_ACC[acc.key] ? _accManualPrice(acc.key, 1) : 0 });
     });
     // Include custom accessories (non-empty name + price > 0)
     const customAcc = customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; });
@@ -693,7 +699,7 @@ async function generateQuotation() {
         if (!acc) return;
         const p1 = Number(cb.dataset.price) || 0;
         const p2 = Number(pd2[acc.key]) || 0;
-        compAcc.push({ label: acc.label, p1: p1, p2: p2, m1: acc.key === 'guardPrice' ? _guardManualPrice(1) : 0, m2: acc.key === 'guardPrice' ? _guardManualPrice(2) : 0 });
+        compAcc.push({ label: acc.label, p1: p1, p2: p2, m1: MANUAL_ACC[acc.key] ? _accManualPrice(acc.key, 1) : 0, m2: MANUAL_ACC[acc.key] ? _accManualPrice(acc.key, 2) : 0 });
       });
       // Custom accessories — same price for both
       customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; })
@@ -771,7 +777,7 @@ async function generateQuotation() {
     const quotDataObj = {
       selectedAccKeys: selectedAccKeys,
       customAcc: customAccItems.filter(function(a) { return a.label && Number(a.price) > 0; }),
-      guardManual1: _guardManualPrice(1),
+      accManual1: Object.keys(MANUAL_ACC).reduce(function(o, k) { o[k] = _accManualPrice(k, 1); return o; }, {}),
       discount:   discount,
       isFinanced: financed,
       color:      color,
