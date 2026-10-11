@@ -1023,7 +1023,7 @@ function buildQuotationHTML(d) {
               ${d.pdi > 0 ? `<tr><td>Service Charge</td><td>₹ ${fmt(d.pdi)}</td></tr>` : ''}
               <tr class="grand-total"><td><strong>On Road Price</strong></td><td><strong>₹ ${fmt(d.productTotal)}</strong></td></tr>
               ${d.selectedAcc.length > 0 ? `
-                <tr class="section-header"><td colspan="2"><strong>Extra Accessories</strong></td></tr>
+                <tr class="section-header"><td colspan="2"><strong>Optional Accessories</strong></td></tr>
                 ${accRows}
               ` : ''}
               ${d.hypothecationCharge > 0 ? `<tr><td>Hypothecation Charge</td><td>₹ ${fmt(d.hypothecationCharge)}</td></tr>` : ''}
@@ -1068,7 +1068,7 @@ function buildComparisonQuotationHTML(d) {
   // Build accessory rows
   let accRows = '';
   if (d.compAcc && d.compAcc.length > 0) {
-    accRows += `<tr class="section-header"><td colspan="3"><strong>Extra Accessories</strong></td></tr>`;
+    accRows += `<tr class="section-header"><td colspan="3"><strong>Optional Accessories</strong></td></tr>`;
     d.compAcc.forEach(function(a) {
       const withManual = function(p, m) {
         if (!(m > 0)) return fmtOrDash(p);
