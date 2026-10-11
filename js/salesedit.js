@@ -375,7 +375,8 @@ async function loadRecord(record) {
   setValue('discount', record.discount || '');
   setValue('finalPrice', record.finalPrice || '');
   setValue('deliveryDate', record.deliveryDate || '');
-  setValue('salesRemark', record.salesRemark || '');
+  // The auto "Guard ₹…" line is shown locked above the box; the box holds only the extra remarks
+  setValue('salesRemark', document.getElementById('guardAmount') ? GuardOption.parse(record.salesRemark).extra : (record.salesRemark || ''));
   setValue('receiptNo2', record.receiptNo2 || '');
   setValue('receipt2Amount', record.receipt2Amount || '');
   setValue('receiptNo3', record.receiptNo3 || '');
@@ -437,6 +438,7 @@ async function handleModelChange() {
     updateVariantDropdown([]);
   }
   
+  GuardOption.refresh('');
   // Clear variant and accessories
   setValue('variant', '');
   const accessoryFields = document.getElementById('accessoryFields');
@@ -482,7 +484,8 @@ function renderAccessoriesWithSavedValues(pmDetails, savedRecord) {
   console.log('   Helmet from window:', window.savedHelmetValue);
   
   container.innerHTML = '';
-  
+  GuardOption.refresh('');
+
   const accessories = [
     { id: 'guard', name: 'Guard', priceKey: 'guardPrice' },
     { id: 'gripcover', name: 'Grip Cover', priceKey: 'gripPrice' },
@@ -517,9 +520,27 @@ function renderAccessoriesWithSavedValues(pmDetails, savedRecord) {
       formGroup.appendChild(label);
       formGroup.appendChild(select);
       container.appendChild(formGroup);
+
+      // Models with fixed guard amounts (e.g. Jupiter 110): ask which amount when Guard = Yes
+      if (acc.id === 'guard' && GuardOption.applies(getValue('model'))) {
+        const savedAmount = GuardOption.parse(savedRecord.salesRemark).amount;
+        const amtSel = document.createElement('select');
+        amtSel.id = 'guardAmount';
+        amtSel.className = 'editable-highlight';
+        amtSel.style.display = select.value === 'Yes' ? '' : 'none';
+        amtSel.innerHTML = GuardOption.optionsHtml(savedAmount);
+        formGroup.appendChild(amtSel);
+        select.addEventListener('change', function() {
+          amtSel.style.display = this.value === 'Yes' ? '' : 'none';
+          if (this.value !== 'Yes') amtSel.value = '';
+          GuardOption.refresh(amtSel.value);
+        });
+        amtSel.addEventListener('change', function() { GuardOption.refresh(this.value); });
+        GuardOption.refresh(select.value === 'Yes' ? amtSel.value : '');
+      }
     }
   });
-  
+
   // Helmet
   if (pmDetails.helmetPrice) {
     const price = parseFloat(pmDetails.helmetPrice) || 0;
@@ -637,6 +658,16 @@ async function handleUpdate(e) {
     }
   }
   
+  // Fixed guard amount (Jupiter 110): mandatory when Guard = Yes; goes into the remark + WhatsApp only
+  let guardAmount = '';
+  const guardAmtEl = document.getElementById('guardAmount');
+  const guardEl = document.getElementById('guard');
+  if (guardAmtEl && guardEl && guardEl.value === 'Yes') {
+    guardAmount = guardAmtEl.value;
+    if (!guardAmount) { alert('Please select the guard amount'); return; }
+  }
+  window.lastGuardAmount = guardAmount;
+
   // Collect form data
   const data = {
     receiptNo: receiptNo,
@@ -650,7 +681,7 @@ async function handleUpdate(e) {
     finalPrice: getValue('finalPrice'),
     financierName: financierName,
     deliveryDate: getValue('deliveryDate'),
-    salesRemark: getValue('salesRemark'),
+    salesRemark: GuardOption.compose(guardAmount, getValue('salesRemark')),
     receiptNo2: getValue('receiptNo2'),
     receipt2Amount: getValue('receipt2Amount'),
     receiptNo3: getValue('receiptNo3'),
@@ -827,7 +858,7 @@ function showWhatsAppModal(data) {
   accessoryList.forEach(function(acc) {
     if (pmCache[acc.priceKey]) {
       const value = data[acc.key] || 'No';
-      message += acc.name + ' - ' + value + '\n';
+      message += acc.name + ' - ' + value + ((acc.key === 'guard' && value === 'Yes' && window.lastGuardAmount) ? ' ₹' + window.lastGuardAmount : '') + '\n';
     }
   });
 

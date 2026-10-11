@@ -116,6 +116,7 @@ async function handleModelChange() {
   // Reset variant and accessories
   variantSelect.innerHTML = '<option value="">-- Loading variants... --</option>';
   document.getElementById('accessoryFields').innerHTML = '';
+  GuardOption.refresh('');
   priceMasterDetails = null;
   
   if (!model) {
@@ -158,8 +159,9 @@ async function handleVariantChange() {
   
   // Reset accessories
   document.getElementById('accessoryFields').innerHTML = '';
+  GuardOption.refresh('');
   priceMasterDetails = null;
-  
+
   if (!model || !variant) {
     return;
   }
@@ -214,9 +216,25 @@ function renderAccessories(details) {
         </label>
       `;
       container.appendChild(div);
+
+      // Models with fixed guard amounts (e.g. Jupiter 110): ask which amount when Guard is ticked
+      if (acc.id === 'guard' && GuardOption.applies(document.getElementById('model').value)) {
+        const amtSel = document.createElement('select');
+        amtSel.id = 'guardAmount';
+        amtSel.style.cssText = 'margin-left: 10px; padding: 6px; display: none;';
+        amtSel.innerHTML = GuardOption.optionsHtml('');
+        div.appendChild(amtSel);
+        const guardCb = div.querySelector('#guard');
+        guardCb.addEventListener('change', function() {
+          amtSel.style.display = this.checked ? 'inline-block' : 'none';
+          if (!this.checked) amtSel.value = '';
+          GuardOption.refresh(amtSel.value);
+        });
+        amtSel.addEventListener('change', function() { GuardOption.refresh(this.value); });
+      }
     }
   });
-  
+
   // Helmet with quantity
   if (details.helmetPrice) {
     const div = document.createElement('div');
@@ -391,7 +409,16 @@ async function handleSubmit(e) {
   }
   
   const accessories = getAccessoryValues();
-  
+
+  // Fixed guard amount (Jupiter 110): mandatory when Guard is ticked; goes into the remark + WhatsApp only
+  let guardAmount = '';
+  const guardAmtEl = document.getElementById('guardAmount');
+  if (guardAmtEl && accessories.guard === 'Yes') {
+    guardAmount = guardAmtEl.value;
+    if (!guardAmount) { showMessage('Please select the guard amount', 'error'); return; }
+  }
+  window.lastGuardAmount = guardAmount;
+
   console.log('=== ACCESSORY VALUES ===');
   console.log('Guard element exists:', document.getElementById('guard') !== null);
   console.log('Guard value:', accessories.guard);
@@ -440,7 +467,7 @@ async function handleSubmit(e) {
     buzzer: accessories.buzzer,
     backrest: accessories.backrest,
     extendedwarranty: accessories.extendedwarranty,
-    salesRemark: document.getElementById('salesRemark').value.trim(),
+    salesRemark: GuardOption.compose(guardAmount, document.getElementById('salesRemark').value),
     receiptNo1: receiptNo1Value,
     receipt1Amount: document.getElementById('receipt1Amount').value,
     receiptNo2: document.getElementById('receiptNo2').value.trim(),
@@ -510,7 +537,7 @@ function showWhatsAppModal(data) {
   
   if (priceMasterDetails) {
     if (priceMasterDetails.guardPrice) {
-      accessoriesText += `Guard - ${data.guard}\n`;
+      accessoriesText += `Guard - ${data.guard}${(data.guard === 'Yes' && window.lastGuardAmount) ? ' ₹' + window.lastGuardAmount : ''}\n`;
     }
     if (priceMasterDetails.gripPrice) {
       accessoriesText += `Grip Cover - ${data.gripcover}\n`;
@@ -628,6 +655,7 @@ function resetForm() {
   document.getElementById('salesForm').reset();
   document.getElementById('executiveName').value = currentUser.name || currentUser.username || '';
   document.getElementById('accessoryFields').innerHTML = '';
+  GuardOption.refresh('');
   priceMasterDetails = null;
   updateTotals();
   
