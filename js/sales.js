@@ -53,7 +53,10 @@ async function loadModels() {
   console.log('📋 Loading models from PriceMaster...');
   
   try {
-    const response = await API.getPriceMasterModels();
+    // Cached PriceMaster first (one call per day); falls back to the server if unavailable
+    await PMCache.ensure();
+    const cachedList = PMCache.models();
+    const response = (cachedList && cachedList.length) ? { success: true, models: cachedList } : await API.getPriceMasterModels();
     
     console.log('PriceMaster models response:', response);
     
@@ -121,7 +124,9 @@ async function handleModelChange() {
   }
   
   try {
-    const response = await API.getPriceMasterVariants(model);
+    await PMCache.ensure();
+    const cachedVariants = PMCache.variants(model);
+    const response = cachedVariants ? { success: true, variants: cachedVariants } : await API.getPriceMasterVariants(model);
     
     if (response.success) {
       variantSelect.innerHTML = '<option value="">-- Select --</option>';
@@ -160,7 +165,9 @@ async function handleVariantChange() {
   }
   
   try {
-    const response = await API.getPriceMasterDetails(model, variant);
+    await PMCache.ensure();
+    const cachedDetails = PMCache.details(model, variant);
+    const response = cachedDetails ? { success: true, details: cachedDetails } : await API.getPriceMasterDetails(model, variant);
     
     if (response.success) {
       priceMasterDetails = response.details;

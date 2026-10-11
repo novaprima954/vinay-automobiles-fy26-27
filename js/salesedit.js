@@ -130,7 +130,9 @@ async function loadModelsForEdit() {
   if (!modelSelect) return;
   
   try {
-    const response = await API.getPriceMasterModels();
+    await PMCache.ensure();
+    const cachedList = PMCache.models();
+    const response = (cachedList && cachedList.length) ? { success: true, models: cachedList } : await API.getPriceMasterModels();
     
     if (response.success && response.models) {
       cachedModels = response.models;
@@ -158,7 +160,9 @@ async function loadVariantsForModel(model) {
   }
   
   try {
-    const response = await API.getPriceMasterVariants(model);
+    await PMCache.ensure();
+    const fromCache = PMCache.variants(model);
+    const response = fromCache ? { success: true, variants: fromCache } : await API.getPriceMasterVariants(model);
     
     if (response.success && response.variants) {
       variantCache[model] = response.variants;
@@ -181,7 +185,9 @@ async function getPriceMasterDetails(model, variant) {
   }
   
   try {
-    const response = await API.getPriceMasterDetails(model, variant);
+    await PMCache.ensure();
+    const fromCache = PMCache.details(model, variant);
+    const response = fromCache ? { success: true, details: fromCache } : await API.getPriceMasterDetails(model, variant);
     
     if (response.success && response.details) {
       priceMasterCache[cacheKey] = response.details;
