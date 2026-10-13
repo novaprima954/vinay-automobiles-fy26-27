@@ -222,7 +222,7 @@ function renderAccessories(details) {
         const amtSel = document.createElement('select');
         amtSel.id = 'guardAmount';
         amtSel.style.cssText = 'margin-left: 10px; padding: 6px; display: none;';
-        amtSel.innerHTML = GuardOption.optionsHtml('');
+        amtSel.innerHTML = GuardOption.optionsHtml('', document.getElementById('model').value);
         div.appendChild(amtSel);
         const guardCb = div.querySelector('#guard');
         guardCb.addEventListener('change', function() {

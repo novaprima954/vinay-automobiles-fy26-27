@@ -2,17 +2,23 @@
 // For the models listed here, ticking Guard asks for one of the fixed amounts below. The amount
 // is NOT stored in the Guard column (that stays Yes/No): it is written as the first line of the
 // Sales Remark ("Guard ₹2700 | extra remarks") and shown next to Guard in the WhatsApp message.
-// To change prices or add models later, edit MODELS / AMOUNTS only.
+// To change prices or add models later, edit AMOUNTS_BY_MODEL only.
 const GuardOption = (function () {
-  const MODELS  = ['jupiter 110'];   // lower-case model names
-  const AMOUNTS = [2700, 2425];
+  const AMOUNTS_BY_MODEL = {   // lower-case model name -> allowed guard amounts
+    'jupiter 110': [2700, 2425],
+    'jupiter 125': [2585, 2150]
+  };
 
-  function applies(model) {
-    return MODELS.indexOf(String(model || '').trim().toLowerCase()) !== -1;
+  function amountsFor(model) {
+    return AMOUNTS_BY_MODEL[String(model || '').trim().toLowerCase()] || [];
   }
 
-  function optionsHtml(selected) {
-    return '<option value="">-- Guard amount --</option>' + AMOUNTS.map(function (a) {
+  function applies(model) {
+    return amountsFor(model).length > 0;
+  }
+
+  function optionsHtml(selected, model) {
+    return '<option value="">-- Guard amount --</option>' + amountsFor(model).map(function (a) {
       return '<option value="' + a + '"' + (String(selected) === String(a) ? ' selected' : '') + '>₹' + a + '</option>';
     }).join('');
   }

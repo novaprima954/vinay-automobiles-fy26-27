@@ -528,7 +528,7 @@ function renderAccessoriesWithSavedValues(pmDetails, savedRecord) {
         amtSel.id = 'guardAmount';
         amtSel.className = 'editable-highlight';
         amtSel.style.display = select.value === 'Yes' ? '' : 'none';
-        amtSel.innerHTML = GuardOption.optionsHtml(savedAmount);
+        amtSel.innerHTML = GuardOption.optionsHtml(savedAmount, getValue('model'));
         formGroup.appendChild(amtSel);
         select.addEventListener('change', function() {
           amtSel.style.display = this.value === 'Yes' ? '' : 'none';
