@@ -19,6 +19,15 @@ const PM_CACHE_KEY = 'pm_cache_v1';
 // Accessories that allow an optional manual "other" price, shown beside the PriceMaster price
 // on the quote (display only, never added to any total). key -> name used in the label.
 const MANUAL_ACC = { guardPrice: 'guard', helmetPrice: 'helmet' };
+// Preset "other" price pre-filled in the manual box, per model (lower-case) - still editable/clearable.
+const MANUAL_ACC_PRESETS = {
+  guardPrice: { 'jupiter 110': 2425, 'jupiter 125': 2150 }
+};
+function _manualPreset(key, model) {
+  const p = MANUAL_ACC_PRESETS[key];
+  return (p && p[String(model || '').trim().toLowerCase()]) || '';
+}
+
 const ACC_CONFIG = [
   { key: 'guardPrice',      label: 'All Round Guard' },
   { key: 'gripPrice',       label: 'Grip Cover' },
@@ -434,7 +443,7 @@ function renderAccessories(details) {
           <div onclick="event.stopPropagation()" style="margin-top:6px;font-size:12px;color:#555;">
             Other ${MANUAL_ACC[acc.key]} price (optional)
             <input type="number" id="accManual1-${acc.key}" min="0" placeholder="Vehicle 1 ₹" style="display:block;width:100%;box-sizing:border-box;margin-top:3px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
-            <input type="number" id="accManual2-${acc.key}" min="0" placeholder="Vehicle 2 ₹" class="acc-manual-v2" style="display:none;width:100%;box-sizing:border-box;margin-top:4px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
+            <input type="number" id="accManual2-${acc.key}" oninput="this.dataset.touched=1" min="0" placeholder="Vehicle 2 ₹" class="acc-manual-v2" style="display:none;width:100%;box-sizing:border-box;margin-top:4px;padding:5px 8px;font-size:12px;border:1px solid #ccc;border-radius:6px;">
           </div>` : ''}
         </div>
       `;
@@ -454,6 +463,10 @@ function renderAccessories(details) {
     </button>`;
   grid.appendChild(customSection);
 
+  Object.keys(MANUAL_ACC).forEach(function(key) {
+    const el1 = document.getElementById('accManual1-' + key);
+    if (el1) el1.value = _manualPreset(key, document.getElementById('modelSelect').value);
+  });
   _syncAccManual2();
   document.getElementById('summaryBar').style.display = 'block';
 }
@@ -521,9 +534,9 @@ function restoreQuotData(qd) {
   // 2b. Restore manual guard price
   const savedManual = Object.assign({}, qd.accManual1 || {});
   if (qd.guardManual1 && !savedManual.guardPrice) savedManual.guardPrice = qd.guardManual1; // older saved quotes
-  Object.keys(savedManual).forEach(function(key) {
+  Object.keys(MANUAL_ACC).forEach(function(key) {
     const el = document.getElementById('accManual1-' + key);
-    if (el && savedManual[key]) el.value = savedManual[key];
+    if (el) el.value = savedManual[key] || '';
   });
 
   // 3. Restore discount
@@ -566,7 +579,8 @@ function _syncAccManual2() {
     if (!el) return;
     const show = compareMode && priceDetails2 && Number(priceDetails2[key]) > 0;
     el.style.display = show ? 'block' : 'none';
-    if (!show) el.value = '';
+    if (!show) { el.value = ''; delete el.dataset.touched; }
+    else if (!el.value && !el.dataset.touched) el.value = _manualPreset(key, document.getElementById('modelSelect2').value);
   });
 }
 
