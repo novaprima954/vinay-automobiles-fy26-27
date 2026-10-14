@@ -113,6 +113,10 @@ function getAccessoriesList(record) {
   if (record.tankcover === 'Yes' || record.tankCover === 'Yes') accessories.push('Tank Cover');
   if (record.handlehook === 'Yes' || record.handleHook === 'Yes') accessories.push('Handle Hook');
   if (record.helmet && record.helmet !== 'No') accessories.push('Helmet (' + record.helmet + ')');
+  if (record.raincover === 'Yes') accessories.push('Rain Cover');
+  if (record.buzzer === 'Yes') accessories.push('Buzzer');
+  if (record.backrest === 'Yes') accessories.push('Back Rest');
+  if (record.extendedwarranty === 'Yes') accessories.push('Extended Warranty');
   
   return accessories.length > 0 ? accessories.join(', ') : 'None';
 }
@@ -126,25 +130,30 @@ function renderReceiptTicks(record) {
   const container = document.getElementById('formReceiptTicks');
   if (!container) return;
 
-  const candidates = [
-    record.receiptNo,
-    record.receiptNo1,
-    record.receiptNo2,
-    record.receiptNo3,
-    record.receiptNo4
-  ].map(function (v) { return String(v || '').trim(); }).filter(Boolean);
+  // [receipt number, amount] pairs. Receipt No (col A) shares its amount with Receipt No 1 when they match.
+  const rn0 = String(record.receiptNo || '').trim();
+  const rn1 = String(record.receiptNo1 || '').trim();
+  const pairs = [
+    [rn0, (rn0 && (!rn1 || rn0 === rn1)) ? record.receipt1Amount : ''],
+    [rn1, record.receipt1Amount],
+    [record.receiptNo2, record.receipt2Amount],
+    [record.receiptNo3, record.receipt3Amount],
+    [record.receiptNo4, record.receipt4Amount]
+  ].map(function (p) { return [String(p[0] || '').trim(), p[1]]; }).filter(function (p) { return p[0]; });
 
   // De-duplicate while preserving order (receiptNo and receiptNo1 can sometimes match)
   const seen = {};
-  const unique = candidates.filter(function (v) {
-    if (seen[v]) return false;
-    seen[v] = true;
+  const unique = pairs.filter(function (p) {
+    if (seen[p[0]]) return false;
+    seen[p[0]] = true;
     return true;
   });
 
   container.innerHTML = unique.length
-    ? unique.map(function (rn) {
-        return '<span class="tick-item"><span class="tick-box"></span>' + esc(rn) + '</span>';
+    ? unique.map(function (p) {
+        const amt = parseFloat(p[1]);
+        const amtText = (!isNaN(amt) && amt > 0) ? ' – ₹' + amt.toLocaleString('en-IN') : '';
+        return '<span class="tick-item"><span class="tick-box"></span>' + esc(p[0]) + esc(amtText) + '</span>';
       }).join('')
     : '<span style="color:#999;font-size:12px;">None on record</span>';
 }
@@ -192,6 +201,8 @@ async function openCustomerForm(receiptNo) {
       document.getElementById('formFinancer').textContent = currentRecord.financierName || 'Cash';
 
       renderReceiptTicks(currentRecord);
+      const discNum = parseFloat(currentRecord.discount);
+      document.getElementById('formDiscount').textContent = (!isNaN(discNum)) ? '₹' + discNum.toLocaleString('en-IN') : (currentRecord.discount || '-');
       // Reset Choice Number / DMS / INS / RTO to unticked for each newly opened record
       const choiceBox = document.getElementById('choiceNumberBox');
       if (choiceBox) choiceBox.classList.remove('checked');

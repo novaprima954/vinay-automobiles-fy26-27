@@ -177,6 +177,8 @@
     .tick-group {
       display: inline-flex;
       gap: 16px;
+      flex-wrap: wrap;
+      row-gap: 4px;
       vertical-align: middle;
     }
 
@@ -691,6 +693,10 @@
               <span class="tick-group" id="formReceiptTicks"><!-- populated with the customer's actual receipt numbers --></span>
             </div>
             <div style="margin-top: 8px;">
+              <span class="summary-label">Discount:</span>
+              <span class="summary-value" id="formDiscount">-</span>
+            </div>
+            <div style="margin-top: 8px;">
               <span class="tick-item" id="choiceNumberItem" onclick="toggleChoiceNumber()" style="cursor:pointer;">
                 <span class="tick-box tick-box-interactive" id="choiceNumberBox"></span>
                 <span class="summary-label" style="width:auto;">Choice Number</span>
@@ -1004,6 +1010,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js?v=4"></script>
   <script src="js/auth.js"></script>
-  <script src="js/customer-form.js?v=2"></script>
+  <script src="js/customer-form.js?v=3"></script>
 </body>
 </html>
