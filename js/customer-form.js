@@ -201,6 +201,13 @@ async function openCustomerForm(receiptNo) {
       document.getElementById('formFinancer').textContent = currentRecord.financierName || 'Cash';
 
       renderReceiptTicks(currentRecord);
+      // Finance Disbursement (col AG) and Final Price (col J)
+      const rupee = function (v) {
+        const n = parseFloat(v);
+        return (!isNaN(n) && n > 0) ? '₹' + n.toLocaleString('en-IN') : '-';
+      };
+      document.getElementById('formDisbursed').textContent = rupee(currentRecord.disbursedAmount);
+      document.getElementById('formFinalPrice').textContent = rupee(currentRecord.finalPrice);
       const discNum = parseFloat(currentRecord.discount);
       document.getElementById('formDiscount').textContent = (!isNaN(discNum)) ? '₹' + discNum.toLocaleString('en-IN') : (currentRecord.discount || '-');
       // Reset Choice Number / DMS / INS / RTO to unticked for each newly opened record
