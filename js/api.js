@@ -1289,8 +1289,12 @@ const API = {
     return await this.call('getDeliveryChallanRecord', { sessionId: SessionManager.getSessionId(), receiptNo });
   },
 
-  async issueDeliveryChallan(receiptNo) {
-    return await this.call('issueDeliveryChallan', { sessionId: SessionManager.getSessionId(), receiptNo });
+  async issueDeliveryChallan(receiptNo, via) {
+    return await this.call('issueDeliveryChallan', { sessionId: SessionManager.getSessionId(), receiptNo, via: via || 'Print' });
+  },
+
+  async saveDeliveryChallanToDrive(receiptNo, challanNo, pdfBase64) {
+    return await this.call('saveDeliveryChallanToDrive', { sessionId: SessionManager.getSessionId(), receiptNo, challanNo, pdfBase64 });
   },
 
   async getDeliveryChallanList(fromDate, toDate, search) {

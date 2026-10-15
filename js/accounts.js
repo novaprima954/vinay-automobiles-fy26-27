@@ -488,6 +488,8 @@ async function populateDetails(record) {
   if (viewOnlyBanner) {
     viewOnlyBanner.style.display = isViewOnly ? 'block' : 'none';
   }
+  const printDoWrap = document.getElementById('printDoWrap');
+  if (printDoWrap) printDoWrap.style.display = isViewOnly ? 'block' : 'none';
   
   disableFormFields(isViewOnly);
   calculateTotals();
@@ -949,6 +951,8 @@ async function confirmApprovalAndSave() {
       if (data.accountCheck === 'Yes') {
         const viewOnlyBanner = document.getElementById('viewOnlyBanner');
         if (viewOnlyBanner) viewOnlyBanner.style.display = 'block';
+        const printDoWrap = document.getElementById('printDoWrap');
+        if (printDoWrap) printDoWrap.style.display = 'block';
         disableFormFields(true);
       }
     } else {
@@ -962,6 +966,23 @@ async function confirmApprovalAndSave() {
     }
     console.error('Update error:', error);
     showMessage('Error updating record', 'error');
+  }
+}
+
+/**
+ * Print the Delivery Challan for the record that was just approved (Account Check = Yes)
+ */
+async function printDeliveryChallan() {
+  if (!currentReceiptNo) return;
+  const btn = document.getElementById('printDoBtn');
+  if (btn) { if (btn.disabled) return; btn.disabled = true; }
+  try {
+    const r = await DOPrint.printReceipt(currentReceiptNo);
+    if (!r.ok) showMessage(r.message || 'Could not print Delivery Challan', 'error');
+  } catch (e) {
+    showMessage('Error preparing Delivery Challan', 'error');
+  } finally {
+    if (btn) btn.disabled = false;
   }
 }
 

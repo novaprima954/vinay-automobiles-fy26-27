@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Delivery Challan - Vinay Automobiles</title>
   <link rel="stylesheet" href="css/common.css">
+  <link rel="stylesheet" href="css/do-print.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <style>
     body { background:#f4f5f9; }
 
@@ -76,93 +79,13 @@
       border:none; border-radius:10px; font-size:13.5px; font-weight:700; cursor:pointer; white-space:nowrap;
       box-shadow:0 2px 6px rgba(67,233,123,0.35);
     }
+    .dc-row button.drive { background:linear-gradient(135deg,#667eea,#764ba2); box-shadow:0 2px 6px rgba(102,126,234,0.35); }
     .dc-row button.reprint { background:linear-gradient(135deg,#90a4ae,#78909c); box-shadow:none; }
     .dc-row button:disabled { opacity:0.45; cursor:not-allowed; background:#ccc; box-shadow:none; }
 
     .empty-state { text-align:center; color:#999; padding:60px 20px; font-size:14px; }
     .empty-state .icon { font-size:40px; margin-bottom:10px; }
 
-    /* ── Printable Delivery Challan (hidden on screen, shown only via print) ── */
-    #doPrintArea { display:none; }
-
-    @media print {
-      body * { visibility:hidden; }
-      #doPrintArea, #doPrintArea * { visibility:visible; }
-      #doPrintArea { display:block; position:absolute; top:0; left:0; width:100%; }
-      @page { size: landscape; margin: 7mm; }
-    }
-
-    .do-page { display:flex; gap:0; width:100%; height:100%; }
-    .do-copy {
-      flex:1; padding:12px 20px; font-family:'Segoe UI', Arial, sans-serif; font-size:12px; color:#222;
-      box-sizing:border-box; display:flex; flex-direction:column;
-    }
-    .do-copy + .do-copy { border-left:2px dashed #ccc; }
-
-    .do-copy-label {
-      align-self:flex-end; font-size:9px; font-weight:800; color:#999; letter-spacing:1.2px;
-      text-transform:uppercase; margin-bottom:2px;
-    }
-
-    .do-header { display:flex; align-items:center; gap:12px; padding-bottom:9px; border-bottom:3px solid #b71c1c; }
-    .do-logo {
-      width:40px; height:40px; flex-shrink:0; position:relative;
-    }
-    .do-logo .tri {
-      width:0; height:0; border-left:20px solid transparent; border-right:20px solid transparent;
-      border-bottom:34px solid #b71c1c; margin:0 auto;
-    }
-    .do-logo .tri-inner {
-      position:absolute; top:9px; left:50%; transform:translateX(-50%);
-      width:0; height:0; border-left:11px solid transparent; border-right:11px solid transparent;
-      border-bottom:19px solid #fff;
-    }
-    .do-header-text { flex:1; text-align:center; }
-    .do-header .company { font-size:21px; font-weight:800; color:#b71c1c; letter-spacing:1px; line-height:1; }
-    .do-header .addr { font-size:10px; color:#555; margin-top:3px; }
-    .do-header .tvs-mark {
-      flex-shrink:0; font-size:15px; font-weight:800; color:#b71c1c; letter-spacing:0.5px;
-      font-style:italic; border:1.5px solid #b71c1c; border-radius:4px; padding:2px 8px;
-    }
-
-    .do-contact-row {
-      display:flex; justify-content:space-between; align-items:center; margin-top:6px;
-      font-size:10.5px; color:#333; font-weight:600; background:#fdf1f1; border-radius:6px; padding:5px 10px;
-    }
-
-    .do-box { border:1.5px solid #b71c1c; border-radius:10px; padding:11px 14px; margin-top:9px; flex:1; }
-    .do-top-row { display:flex; justify-content:space-between; border-bottom:1.5px solid #f0d0d0; padding-bottom:9px; margin-bottom:9px; gap:24px; }
-    .do-top-row .meta-block { text-align:right; }
-    .do-field-label { font-size:9px; color:#b71c1c; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; }
-    .do-field-value { font-size:14.5px; font-weight:700; border-bottom:1.5px solid #d8b8b8; display:inline-block; min-width:155px; padding-bottom:2px; margin-top:2px; }
-
-    .do-declaration { font-size:10.5px; margin:0 0 9px; line-height:1.5; color:#444; font-style:italic; }
-
-    .do-desc-title {
-      font-size:10.5px; font-weight:800; color:#fff; margin-bottom:7px; text-transform:uppercase; letter-spacing:0.6px;
-      background:#b71c1c; display:inline-block; padding:2px 10px; border-radius:4px;
-    }
-    .do-desc-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; margin-bottom:10px; }
-    .do-desc-row { display:flex; gap:9px; font-size:12px; align-items:baseline; }
-    .do-desc-row.full { grid-column:1 / -1; }
-    .do-desc-row .lbl { min-width:78px; color:#666; font-weight:600; }
-    .do-desc-row .val { flex:1; border-bottom:1px solid #ccc; font-weight:700; padding-bottom:1px; }
-
-    .do-received-title {
-      font-size:10.5px; font-weight:800; margin-top:4px; margin-bottom:8px; text-transform:uppercase;
-      letter-spacing:0.4px; color:#b71c1c; border-bottom:1.5px solid #f0d0d0; padding-bottom:4px;
-    }
-    .do-checks { display:grid; grid-template-columns:repeat(3, 1fr); gap:9px 14px; }
-    .do-check-item { display:flex; align-items:center; gap:7px; font-size:11px; color:#333; }
-    .do-check-box { width:14px; height:14px; border:1.5px solid #555; display:inline-block; border-radius:3px; flex-shrink:0; }
-
-    .do-hyp-row { margin-top:10px; }
-
-    .do-pending { margin-top:9px; font-size:11px; background:#fff3e0; border:1px solid #ffb74d; border-radius:8px; padding:7px 11px; }
-    .do-pending .title { font-weight:800; color:#e65100; }
-
-    .do-sign-row { display:flex; justify-content:space-between; margin-top:auto; padding-top:20px; font-size:11px; font-weight:700; color:#333; }
-    .do-sign-row .line { border-top:1.5px solid #555; padding-top:5px; min-width:160px; text-align:center; }
   </style>
 </head>
 <body>
@@ -195,11 +118,12 @@
           <div class="search-field">
             <label>Customer Name</label>
             <span class="icon">👤</span>
-            <input type="text" id="dcSearch" placeholder="Search across all deliveries…" oninput="loadList()">
+            <input type="text" id="dcSearch" placeholder="Type customer name, then click Search…">
           </div>
+          <button class="clear-btn" style="background:#667eea;color:white;border-color:#667eea;" onclick="loadList()">🔍 Search</button>
           <button class="clear-btn" onclick="clearFilters()">✕ Clear</button>
         </div>
-        <div class="filter-mode-hint">💡 Typing a customer name searches across <strong>all</strong> deliveries — the date range only applies when the name field is empty.</div>
+        <div class="filter-mode-hint">💡 Typing a customer name and clicking Search looks across <strong>all</strong> deliveries — the date range only applies when the name field is empty. Only bookings with Account Check = Yes are shown. <span id="dcScopeHint"></span></div>
       </div>
 
       <div class="result-summary" id="resultSummary"></div>
@@ -212,7 +136,8 @@
 
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/api.js?v=4"></script>
-  <script src="js/delivery-challan.js"></script>
+  <script src="js/api.js?v=5"></script>
+  <script src="js/do-print.js?v=1"></script>
+  <script src="js/delivery-challan.js?v=2"></script>
 </body>
 </html>

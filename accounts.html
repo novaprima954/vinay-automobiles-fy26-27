@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
   <title>Accounts Management - Vinay Automobiles</title>
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/do-print.css">
   <style>
     /* Additional Accounts Page Styles */
     .view-only-banner {
@@ -447,6 +448,9 @@
     <div class="view-only-banner" id="viewOnlyBanner">
       🔒 VIEW ONLY MODE: This record has Account Check = "Yes" and cannot be edited
     </div>
+    <div id="printDoWrap" style="display:none;margin:0 0 14px;">
+      <button type="button" id="printDoBtn" onclick="printDeliveryChallan()" style="padding:12px 22px;background:linear-gradient(135deg,#43e97b,#38f9d7);color:#064e3b;border:none;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;box-shadow:0 2px 6px rgba(67,233,123,0.35);">🧾 Print Delivery Challan</button>
+    </div>
     
     <!-- Status Message -->
     <div id="statusMessage" class="message hidden"></div>
@@ -853,9 +857,12 @@
     </div>
   </div>
 
+  <div id="doPrintArea"></div>
+
   <script src="js/config.js"></script>
-  <script src="js/api.js?v=4"></script>
+  <script src="js/api.js?v=5"></script>
   <script src="js/auth.js"></script>
-  <script src="js/accounts.js?v=4"></script>
+  <script src="js/do-print.js?v=1"></script>
+  <script src="js/accounts.js?v=5"></script>
 </body>
 </html>
