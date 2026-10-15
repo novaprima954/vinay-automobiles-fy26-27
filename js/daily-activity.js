@@ -233,7 +233,7 @@ function buildMorningMessage(proposedSale) {
 }
 
 function buildEveningMessage(proposedSale, data) {
-  const sd = _systemData || { crmWalkIns:0, crmWalkInsMonth:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
+  const sd = _systemData || { crmWalkIns:0, crmWalkInsIce:0, crmWalkInsEv:0, crmWalkInsMonth:0, crmWalkInsMonthIce:0, crmWalkInsMonthEv:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
 
   const variantLines = sd.bookingVariants.length
     ? sd.bookingVariants.map(function(v, i) { return (i+1) + '. ' + v.variant + ' - ' + v.qty; }).join('\n')
@@ -246,7 +246,7 @@ function buildEveningMessage(proposedSale, data) {
   return fmtDDMMYYYY(new Date()) + '\n'
     + 'Name : *' + currentUser.name + '*\n\n'
     + '*Today Proposed Booking* : ' + proposedSaleText + '\n\n'
-    + '*Enquiry as per System* : ' + pad2(sd.crmWalkIns) + '\n'
+    + '*Enquiry as per System* : ' + pad2(sd.crmWalkInsIce || 0) + '+' + pad2(sd.crmWalkInsEv || 0) + '\n'
     + '*Booking* : ' + pad2(data.bookingsManual) + '\n'
     + '*Booking as per System* : ' + pad2(sd.bookingsSystemCount) + '\n'
     + '*Booking Vehicle Name* : \n\n'
@@ -256,7 +256,7 @@ function buildEveningMessage(proposedSale, data) {
     + 'Total ICE Sale : ' + sd.iceMonthToDate + '\n'
     + 'Total EV Sale : ' + pad2(sd.evMonthToDate) + '\n\n'
     + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*'
-    + '\n*Total All Enquiry: ' + pad2(sd.crmWalkInsMonth || 0) + '*';
+    + '\n*Total All Enquiry: ' + pad2(sd.crmWalkInsMonthIce || 0) + '+' + pad2(sd.crmWalkInsMonthEv || 0) + '*';
 }
 
 function showWhatsAppModal(message) {
