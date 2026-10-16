@@ -72,7 +72,10 @@
 .do-check-item { display:flex; align-items:center; gap:7px; font-size:11px; color:#333; }
 .do-check-box { width:14px; height:14px; border:1.5px solid #555; display:inline-block; border-radius:3px; flex-shrink:0; }
 
-.do-hyp-row { margin-top:10px; }
+.do-hyp-row { margin-top:8px; }
+.do-service-row { margin-top:4px; }
+.do-acc-title { margin-top:8px; margin-bottom:6px; }
+.do-acc-checks { gap:6px 14px; }
 
 .do-pending { margin-top:9px; font-size:11px; background:#fff3e0; border:1px solid #ffb74d; border-radius:8px; padding:7px 11px; }
 .do-pending .title { font-weight:800; color:#e65100; }

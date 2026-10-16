@@ -20,8 +20,32 @@ const DOPrint = (function () {
     return String(d.getDate()).padStart(2, '0') + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + d.getFullYear();
   }
 
+  // Accessories this customer has taken: "Yes" ones, and helmet with its quantity (1 / 2)
+  function takenAccessories(rec) {
+    const list = [];
+    [['guard', 'Guard'], ['gripcover', 'Grip Cover'], ['seatcover', 'Seat Cover'], ['matin', 'Matin'],
+     ['tankcover', 'Tank Cover'], ['handlehook', 'Handle Hook']].forEach(function (a) {
+      if (rec[a[0]] === 'Yes') list.push(a[1]);
+    });
+    const helmet = String(rec.helmet || '').trim();
+    if (helmet && helmet !== 'No' && helmet !== '0') list.push(helmet === 'Yes' ? 'Helmet' : 'Helmet (' + helmet + ')');
+    [['raincover', 'Rain Cover'], ['buzzer', 'Buzzer'], ['backrest', 'Back Rest'], ['extendedwarranty', 'Extended Warranty']].forEach(function (a) {
+      if (rec[a[0]] === 'Yes') list.push(a[1]);
+    });
+    return list;
+  }
+
   function copyHtml(rec, challanNo, copyLabel) {
-    const modelLine = 'TVS ' + [rec.model, rec.variant].filter(Boolean).join(' ');
+    const modelLine = 'TVS ' + (rec.variant || '');
+    const accessories = takenAccessories(rec);
+    const accessoriesHtml = accessories.length
+      ? '<div class="do-received-title do-acc-title">Accessories taken</div>' +
+        '<div class="do-checks do-acc-checks">' +
+          accessories.map(function (item) {
+            return '<div class="do-check-item"><span class="do-check-box"></span>' + esc(item) + '</div>';
+          }).join('') +
+        '</div>'
+      : '';
     const checkItems = ['Owner Manual', 'Tool Kit', 'Battery & Warranty Card', 'Mirror', 'Saree Guard', 'Leg Guard'];
 
     const pendingHtml = rec.accessoryPending
@@ -42,6 +66,7 @@ const DOPrint = (function () {
         '<span>👤 Executive: ' + esc(rec.executiveName || '-') + (rec.executiveMobile ? ' — ' + esc(rec.executiveMobile) : '') + '</span>' +
         '<span>☎ 9130040050</span>' +
       '</div>' +
+      '<div class="do-contact-row do-service-row"><span>🔧 Service: 9130040051/52</span></div>' +
       '<div class="do-box">' +
         '<div class="do-top-row">' +
           '<div class="from-block">' +
@@ -58,7 +83,7 @@ const DOPrint = (function () {
         '<div class="do-declaration">I have taken delivery of the following described vehicle from Vinay Automobiles, Yavatmal, in good condition and to my entire satisfaction.</div>' +
         '<div class="do-desc-title">Description</div>' +
         '<div class="do-desc-grid">' +
-          '<div class="do-desc-row full"><span class="lbl">One TVS Model</span><span class="val">' + esc(modelLine) + '</span></div>' +
+          '<div class="do-desc-row full"><span class="lbl">TVS Model</span><span class="val">' + esc(modelLine) + '</span></div>' +
           '<div class="do-desc-row"><span class="lbl">Chassis No.</span><span class="val">' + esc(rec.frameNumber) + '</span></div>' +
           '<div class="do-desc-row"><span class="lbl">Engine No.</span><span class="val">' + esc(rec.engineNumber) + '</span></div>' +
           '<div class="do-desc-row"><span class="lbl">Colour</span><span class="val">' + esc(rec.colour) + '</span></div>' +
@@ -71,6 +96,7 @@ const DOPrint = (function () {
           }).join('') +
         '</div>' +
         '<div class="do-desc-row do-hyp-row"><span class="lbl">Hypothecation</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
+        accessoriesHtml +
         pendingHtml +
         '<div class="do-sign-row">' +
           '<div class="line">Customer\'s Signature</div>' +
@@ -87,8 +113,28 @@ const DOPrint = (function () {
     '</div>';
   }
 
+  // If a copy's content is taller than its box (many accessories / long pending list), shrink it
+  // slightly so nothing is cut off and the challan always stays on one page.
+  function fitCopies(container) {
+    container.querySelectorAll('.do-copy').forEach(function (copy) {
+      copy.style.zoom = '';
+      const over = copy.scrollHeight - copy.clientHeight;
+      if (over > 1 && copy.scrollHeight > 0) {
+        copy.style.zoom = String(Math.max(0.6, (copy.clientHeight / copy.scrollHeight) * 0.97));
+      }
+    });
+  }
+
   function buildPrintArea(rec, challanNo) {
-    document.getElementById('doPrintArea').innerHTML = pageHtml(rec, challanNo);
+    const area = document.getElementById('doPrintArea');
+    area.innerHTML = pageHtml(rec, challanNo);
+
+    // Measure at the real printable size (A4 landscape minus 7mm margins) while the area is
+    // still display:none on screen, then restore it.
+    const prev = area.style.cssText;
+    area.style.cssText = 'display:block;position:absolute;left:-10000px;top:0;width:1070px;height:741px;overflow:hidden;';
+    fitCopies(area);
+    area.style.cssText = prev;
   }
 
   /**
@@ -121,6 +167,7 @@ const DOPrint = (function () {
     stage.style.cssText = 'position:fixed;left:-10000px;top:0;width:1123px;height:794px;background:#fff;';
     stage.innerHTML = pageHtml(rec, challanNo);
     document.body.appendChild(stage);
+    fitCopies(stage);
     try {
       const canvas = await html2canvas(stage, { scale: 2, useCORS: true, logging: false, backgroundColor: '#ffffff' });
       const { jsPDF } = window.jspdf;
