@@ -174,8 +174,31 @@
       color: #555;
     }
 
+    /* Left column of the header must be allowed to shrink, otherwise long lists run under the
+       sticker box and get cut off instead of wrapping onto the next line */
+    .form-header-left {
+      flex: 1;
+      min-width: 0;
+      margin-right: 15px;
+    }
+
+    /* Label on the left, value beside it; long values (many receipts / accessories) wrap below */
+    .summary-row-wrap {
+      display: flex;
+      align-items: flex-start;
+    }
+    .summary-row-wrap .summary-label {
+      flex-shrink: 0;
+    }
+    .summary-row-wrap .summary-value,
+    .summary-row-wrap .tick-group {
+      flex: 1;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
     .tick-group {
-      display: inline-flex;
+      display: flex;
       gap: 16px;
       flex-wrap: wrap;
       row-gap: 4px;
@@ -675,7 +698,7 @@
     <!-- Page 1: Customer Details Form -->
     <div id="page1" class="printable-form">
       <div class="form-document-header">
-        <div>
+        <div class="form-header-left">
           <div class="dealer-brand">VINAY TVS</div>
           
           <!-- Summary Section -->
@@ -684,11 +707,11 @@
               <span class="summary-label">Executive Name:</span>
               <span class="summary-value" id="formExecutive">-</span>
             </div>
-            <div>
+            <div class="summary-row-wrap">
               <span class="summary-label">Accessories:</span>
               <span class="summary-value" id="formAccessories">-</span>
             </div>
-            <div style="margin-top: 8px;">
+            <div class="summary-row-wrap" style="margin-top: 8px;">
               <span class="summary-label">Receipt Number:</span>
               <span class="tick-group" id="formReceiptTicks"><!-- populated with the customer's actual receipt numbers --></span>
             </div>
@@ -1016,6 +1039,6 @@
   <script src="js/config.js"></script>
   <script src="js/api.js?v=4"></script>
   <script src="js/auth.js"></script>
-  <script src="js/customer-form.js?v=4"></script>
+  <script src="js/customer-form.js?v=5"></script>
 </body>
 </html>
