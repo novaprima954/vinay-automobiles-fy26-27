@@ -612,6 +612,14 @@ function renderReportList(data) {
 
 let currentDetailHpCompany = '';
 
+// 'yyyy-MM' -> 'Oct 2026'
+function _reportMonthLabel(key) {
+  const m = /^(\d{4})-(\d{2})$/.exec(String(key || ''));
+  if (!m) return key || 'Unknown';
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return names[parseInt(m[2], 10) - 1] + ' ' + m[1];
+}
+
 function showReportDetail(idx) {
   const item = reportData[idx];
   if (!item) return;
@@ -635,12 +643,10 @@ function showReportDetail(idx) {
   // Ref Customer breakdown
   const refEl = document.getElementById('rRefBreakdown');
   if (refEl) {
-    const breakdown = item.refBreakdown || {};
-    const keys = Object.keys(breakdown).sort();
-    if (keys.length === 0) {
-      refEl.innerHTML = '<span style="color:#999;font-size:13px;">No ref customer data</span>';
-    } else {
-      refEl.innerHTML = keys.map(function(k) {
+    // One list of customer-type rows (count + disbursed)
+    const refRows = function(breakdown) {
+      const keys = Object.keys(breakdown || {}).sort();
+      return keys.map(function(k) {
         const entry = breakdown[k];
         const count = (entry && typeof entry === 'object') ? entry.count : entry;
         const disbursed = (entry && typeof entry === 'object') ? entry.totalDisbursed : null;
@@ -652,6 +658,32 @@ function showReportDetail(idx) {
           '<span style="font-size:14px;font-weight:700;color:#667eea;background:#eef0fd;' +
           'padding:2px 10px;border-radius:20px;">' + count + '</span></div></div>';
       }).join('');
+    };
+
+    if (Object.keys(item.refBreakdown || {}).length === 0) {
+      refEl.innerHTML = '<span style="color:#999;font-size:13px;">No ref customer data</span>';
+    } else {
+      const byMonth = item.refByMonth || {};
+      const monthKeys = Object.keys(byMonth).sort().reverse(); // latest month first
+      const subHead = function(text, total, disb) {
+        return '<div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 4px;' +
+          'font-size:13px;font-weight:800;color:#4a4f9a;text-transform:uppercase;letter-spacing:0.4px;">' +
+          '<span>' + text + '</span><span style="font-size:12px;font-weight:700;color:#166534;text-transform:none;">' +
+          total + ' financing' + (total === 1 ? '' : 's') + ' · ' + formatCurrency(disb) + '</span></div>';
+      };
+
+      if (monthKeys.length > 1) {
+        // Several months in the result: overall list first, then a block per month
+        refEl.innerHTML = subHead('All selected months', item.count, item.totalDisbursed) + refRows(item.refBreakdown) +
+          monthKeys.map(function(mk) {
+            const rows = byMonth[mk];
+            let cnt = 0, disb = 0;
+            Object.keys(rows).forEach(function(r) { cnt += rows[r].count; disb += rows[r].totalDisbursed; });
+            return subHead(_reportMonthLabel(mk), cnt, disb) + refRows(rows);
+          }).join('');
+      } else {
+        refEl.innerHTML = refRows(item.refBreakdown);
+      }
     }
   }
 
