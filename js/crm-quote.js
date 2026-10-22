@@ -1063,6 +1063,8 @@ function buildQuotationHTML(d) {
     <strong>Terms and Conditions:</strong>
     <ol>
       <li>Prices, taxes, duties &amp; any other Govt. levies, R.T.O., Insurance, Road Tax etc. are subject to change without notice at the time of delivery.</li>
+      <li>Insurance includes 1-year Personal Accident (PA), 1-year Own Damage (OD) and 5-year Third Party (TP) cover, with 95% IDV and Zero Depreciation.</li>
+      <li>Vehicle, Insurance and RTO registration will be done as per the name and address on the customer&#39;s Aadhaar card.</li>
       <li>Booking subject to availability.</li>
       <li>All the above Terms &amp; Conditions of Sales are subject to change without notice.</li>
       <li>All matters are subject to Yavatmal jurisdiction only.</li>
@@ -1172,6 +1174,8 @@ function buildComparisonQuotationHTML(d) {
     <strong>Terms and Conditions:</strong>
     <ol>
       <li>Prices, taxes, duties &amp; any other Govt. levies are subject to change without notice at time of delivery.</li>
+      <li>Insurance includes 1-year Personal Accident (PA), 1-year Own Damage (OD) and 5-year Third Party (TP) cover, with 95% IDV and Zero Depreciation.</li>
+      <li>Vehicle, Insurance and RTO registration will be done as per the name and address on the customer&#39;s Aadhaar card.</li>
       <li>Booking subject to availability.</li>
       <li>All matters are subject to Yavatmal jurisdiction only.</li>
     </ol>
