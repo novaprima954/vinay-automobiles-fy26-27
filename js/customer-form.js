@@ -229,6 +229,23 @@ async function openCustomerForm(receiptNo) {
         console.log('✅ Page 3 visible (Financed: ' + currentRecord.financierName + ')');
       }
       
+      // PM E-DRIVE subsidy & RC disclaimer page - only for iQube / Orbiter (EV) bookings
+      const isEv = /iqube|orbiter/i.test(String(currentRecord.model || ''));
+      const page4 = document.getElementById('page4');
+      if (page4) {
+        page4.style.display = isEv ? 'block' : 'none';
+        if (isEv) {
+          const now = new Date();
+          const today = String(now.getDate()).padStart(2, '0') + '/' + String(now.getMonth() + 1).padStart(2, '0') + '/' + now.getFullYear();
+          const setText = function (id, text) { const el = document.getElementById(id); if (el) el.textContent = text; };
+          setText('edriveDateEn', today);
+          setText('edriveDateMr', today);
+          setText('edriveExecName', currentRecord.executiveName || '');
+          setText('edriveCustNameEn', currentRecord.customerName || '');
+          setText('edriveCustNameMr', currentRecord.customerName || '');
+        }
+      }
+
       // FIXED: Ask about PAN card
       askAboutPAN();
       
@@ -296,7 +313,7 @@ function printAllForms() {
 }
 
 /**
- * Renders page1/page2/page3 into a single jsPDF document. Shared by shareAsPDF()
+ * Renders page1/page2/page3/page4 into a single jsPDF document. Shared by shareAsPDF()
  * (downloads locally) and saveCustomerFormToDrive() (uploads to Drive).
  */
 async function _buildCustomerFormPdf() {
@@ -314,7 +331,7 @@ async function _buildCustomerFormPdf() {
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
 
-  const pageIds = ['page1', 'page2', 'page3'];
+  const pageIds = ['page1', 'page2', 'page3', 'page4'];
   let firstPage = true;
 
   for (let i = 0; i < pageIds.length; i++) {

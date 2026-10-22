@@ -257,6 +257,18 @@
       line-height: 1.6;
     }
 
+    /* PM E-DRIVE Subsidy & RC Disclaimer page (iQube / Orbiter only) */
+    .edrive-page { font-family: 'Segoe UI', 'Nirmala UI', 'Mangal', Arial, sans-serif; color: #000; }
+    .edrive-title { text-align: center; font-size: 19px; font-weight: 700; margin: 0 0 24px; }
+    .edrive-text { font-size: 14px; line-height: 1.65; text-align: justify; margin: 0 0 12px; }
+    .edrive-date { font-size: 14px; font-weight: 600; margin: 18px 0 6px; }
+    .edrive-sign-row { display: flex; justify-content: space-between; gap: 40px; margin-top: 34px; }
+    .edrive-sign { flex: 1; max-width: 300px; }
+    .edrive-sign-line { border-bottom: 1.5px solid #000; height: 28px; }
+    .edrive-sign-label { font-size: 14px; font-weight: 600; margin-top: 6px; }
+    .edrive-sign-name { font-size: 13px; color: #333; margin-top: 2px; min-height: 18px; }
+    .edrive-divider { border-top: 2px solid #000; margin: 30px 0 26px; }
+
     /* Form Grid */
     .form-grid {
       margin-bottom: 20px;
@@ -1034,11 +1046,64 @@
       </div>
     </div>
 
+    <!-- Page 4: PM E-DRIVE Subsidy & RC Disclaimer Form - A4 - only for iQube / Orbiter -->
+    <div id="page4" class="printable-form" style="display: none;">
+      <div class="edrive-page">
+        <div class="edrive-title">PM E-DRIVE Subsidy &amp; RC Disclaimer Form</div>
+
+        <p class="edrive-text">
+          I declare that I am availing PM E-DRIVE subsidy for the first time on my Aadhaar number. If found otherwise,
+          I am liable to pay the PM E-DRIVE subsidy amount (Rs. 5,000) which has been passed onto me back to the dealership.
+        </p>
+        <p class="edrive-text">
+          I understand that RC delivery is dependent upon my local RTO and dealership is not responsible for providing me
+          with my RC document. I understand that the document will be delivered at the address provided by me during the
+          registration process.
+        </p>
+
+        <div class="edrive-date">Date : <span id="edriveDateEn"></span></div>
+
+        <div class="edrive-sign-row">
+          <div class="edrive-sign">
+            <div class="edrive-sign-line"></div>
+            <div class="edrive-sign-label">Executive Signature</div>
+            <div class="edrive-sign-name" id="edriveExecName"></div>
+          </div>
+          <div class="edrive-sign">
+            <div class="edrive-sign-line"></div>
+            <div class="edrive-sign-label">Customer Signature</div>
+            <div class="edrive-sign-name" id="edriveCustNameEn"></div>
+          </div>
+        </div>
+
+        <div class="edrive-divider"></div>
+
+        <p class="edrive-text edrive-mr">
+          मी जाहीर करतो की, मी आतापर्यंत माझ्या आधार कार्डवर कुठल्याही प्रकारची PM E-DRIVE सबसिडी घेतलेली नाही.
+          जर असे आढळले, तर PM E-DRIVE ची रक्कम (रु. 5,000) मी शोरूमला परत जमा करेन.
+        </p>
+        <p class="edrive-text edrive-mr">
+          मी समजतो की आरसी डिलिव्हरी माझ्या स्थानिक आरटीओवर अवलंबून आहे आणि मला माझे आरसी दस्तऐवज प्रदान करण्यासाठी
+          डीलरशिप जबाबदार नाही. मला समजते की नोंदणी प्रक्रियेदरम्यान मी दिलेल्या पत्त्यावर दस्तऐवज वितरित केले जाईल.
+        </p>
+
+        <div class="edrive-date edrive-mr">दिनांक : <span id="edriveDateMr"></span></div>
+
+        <div class="edrive-sign-row">
+          <div class="edrive-sign">
+            <div class="edrive-sign-line"></div>
+            <div class="edrive-sign-label edrive-mr">ग्राहक सही</div>
+            <div class="edrive-sign-name" id="edriveCustNameMr"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <script src="js/config.js"></script>
   <script src="js/api.js?v=4"></script>
   <script src="js/auth.js"></script>
-  <script src="js/customer-form.js?v=5"></script>
+  <script src="js/customer-form.js?v=6"></script>
 </body>
 </html>
