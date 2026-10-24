@@ -920,6 +920,23 @@ const API = {
   },
 
   /**
+   * Bulk change status for several HSRP rows (max 20). srNos = array of Sr Nos.
+   */
+  async bulkUpdateHSRPStatus(srNos, newStatus, fitmentDate) {
+    const session = SessionManager.getSession();
+    if (!session) {
+      throw new Error('No session');
+    }
+
+    return this.call('bulkUpdateHSRPStatus', {
+      sessionId: session.sessionId,
+      srNos: JSON.stringify(srNos),
+      newStatus: newStatus,
+      fitmentDate: fitmentDate || ''
+    });
+  },
+
+  /**
    * Export HSRP to PDF
    */
   async exportHSRPToPdf(fromDate, toDate) {
@@ -952,14 +969,15 @@ const API = {
   /**
    * Download HSRP data
    */
-  async downloadHSRPData() {
+  async downloadHSRPData(srNos) {
     const session = SessionManager.getSession();
     if (!session) {
       throw new Error('No session');
     }
-    
+
     return this.call('downloadHSRPData', {
-      sessionId: session.sessionId
+      sessionId: session.sessionId,
+      srNos: srNos ? JSON.stringify(srNos) : ''
     });
   },
 

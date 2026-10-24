@@ -662,19 +662,28 @@ function displayStep2Results(results) {
 // VIEW & DOWNLOAD DATA
 // ==========================================
 
+let hsrpDisplayedRows = []; // rows currently shown in the table (used for CSV + bulk status)
+const BULK_MAX_ROWS = 20;
+const HSRP_STATUS_RANK = { '': 0, 'Ordered': 1, 'Received': 2, 'Fitted': 3 };
+
 function displayDataTable(data) {
   const tableBody = document.getElementById('dataTableBody');
   const tableContainer = document.getElementById('dataTableContainer');
-  
+  hsrpDisplayedRows = data || [];
+  const master = document.getElementById('bulkSelectAll');
+  if (master) master.checked = false;
+
   if (!data || data.length === 0) {
-    tableBody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">No data found</td></tr>';
+    tableBody.innerHTML = '<tr><td colspan="13" style="text-align: center; padding: 40px;">No data found</td></tr>';
     tableContainer.style.display = 'block';
+    updateBulkBar();
     return;
   }
-  
+
   let html = '';
   data.forEach(row => {
     html += '<tr>';
+    html += `<td><input type="checkbox" class="bulk-cb" data-sr-no="${row.srNo}" ${row.status === 'Fitted' ? 'disabled title="Already Fitted"' : ''} onchange="onRowSelectChange(this)"></td>`;
     html += `<td>${row.srNo}</td>`;
     html += `<td>${row.invoiceNo}</td>`;
     html += `<td>${row.invoiceDate}</td>`;
@@ -703,8 +712,128 @@ function displayDataTable(data) {
   
   tableBody.innerHTML = html;
   tableContainer.style.display = 'block';
-  
+  updateBulkBar();
+
   console.log('✅ Data displayed:', data.length, 'rows');
+}
+
+// ==========================================
+// BULK STATUS CHANGE
+// ==========================================
+
+function _selectedSrNos() {
+  return Array.from(document.querySelectorAll('.bulk-cb:checked')).map(cb => cb.getAttribute('data-sr-no'));
+}
+
+function updateBulkBar() {
+  const n = _selectedSrNos().length;
+  const countEl = document.getElementById('bulkCount');
+  if (countEl) countEl.textContent = n + ' selected';
+  const btn = document.getElementById('bulkApplyBtn');
+  if (btn) btn.disabled = n === 0;
+}
+
+function onRowSelectChange(cb) {
+  if (cb.checked && _selectedSrNos().length > BULK_MAX_ROWS) {
+    cb.checked = false;
+    alert('You can select a maximum of ' + BULK_MAX_ROWS + ' rows at once.');
+  }
+  updateBulkBar();
+}
+
+function toggleSelectAll(master) {
+  const boxes = Array.from(document.querySelectorAll('.bulk-cb:not(:disabled)'));
+  if (!master.checked) {
+    boxes.forEach(cb => { cb.checked = false; });
+  } else {
+    let count = 0;
+    boxes.forEach(cb => {
+      if (count < BULK_MAX_ROWS) { cb.checked = true; count++; } else { cb.checked = false; }
+    });
+    if (boxes.length > BULK_MAX_ROWS) {
+      alert('Selected the first ' + BULK_MAX_ROWS + ' rows (maximum per update). Apply, then select the next batch.');
+      master.checked = false;
+    }
+  }
+  updateBulkBar();
+}
+
+function clearSelection() {
+  document.querySelectorAll('.bulk-cb').forEach(cb => { cb.checked = false; });
+  const master = document.getElementById('bulkSelectAll');
+  if (master) master.checked = false;
+  updateBulkBar();
+}
+
+function onBulkStatusChange() {
+  const status = document.getElementById('bulkStatus').value;
+  const wrap = document.getElementById('bulkDateWrap');
+  wrap.style.display = status === 'Fitted' ? 'inline' : 'none';
+  if (status === 'Fitted' && !document.getElementById('bulkFitDate').value) {
+    document.getElementById('bulkFitDate').value = new Date().toISOString().split('T')[0];
+  }
+}
+
+async function applyBulkStatus() {
+  const srNos = _selectedSrNos();
+  const newStatus = document.getElementById('bulkStatus').value;
+  if (srNos.length === 0) { alert('Select at least one row'); return; }
+  if (!newStatus) { alert('Choose the status to change to'); return; }
+
+  let fitmentDate = '';
+  if (newStatus === 'Fitted') {
+    fitmentDate = document.getElementById('bulkFitDate').value;
+    if (!fitmentDate) { alert('Pick the fitment date'); return; }
+  }
+
+  // Status only moves forward - work out which selected rows would be skipped before asking
+  const byId = {};
+  hsrpDisplayedRows.forEach(r => { byId[String(r.srNo)] = r; });
+  const eligible = srNos.filter(id => {
+    const cur = (byId[id] && byId[id].status) || '';
+    return (HSRP_STATUS_RANK[cur] || 0) < HSRP_STATUS_RANK[newStatus];
+  });
+  const blocked = srNos.length - eligible.length;
+  if (eligible.length === 0) {
+    alert('None of the selected rows can be changed to ' + newStatus + ' (status can only move forward).');
+    return;
+  }
+  let msg = 'Change ' + eligible.length + ' record' + (eligible.length === 1 ? '' : 's') + ' to ' + newStatus +
+    (newStatus === 'Fitted' ? ' with fitment date ' + fitmentDate : '') + '?';
+  if (blocked > 0) msg += '\n\n' + blocked + ' selected row' + (blocked === 1 ? ' is' : 's are') + ' already at or beyond ' + newStatus + ' and will be skipped.';
+  if (newStatus === 'Fitted') msg += '\n\nFitted rows cannot be changed again from this screen.';
+  if (!confirm(msg)) return;
+
+  const btn = document.getElementById('bulkApplyBtn');
+  if (btn.disabled && btn.dataset.busy) return;
+  btn.disabled = true; btn.dataset.busy = '1';
+  const oldLabel = btn.textContent;
+  btn.textContent = '⏳ Updating...';
+
+  try {
+    const r = await API.bulkUpdateHSRPStatus(srNos, newStatus, fitmentDate);
+    if (!r.success) {
+      alert('Error: ' + (r.message || 'Update failed'));
+      return;
+    }
+    let summary = '✅ ' + r.updated + ' updated to ' + newStatus + '.';
+    if (r.skipped && r.skipped.length) {
+      summary += '\n\nSkipped ' + r.skipped.length + ':\n' +
+        r.skipped.slice(0, 10).map(s => 'Sr No ' + s.srNo + ' — ' + s.reason).join('\n') +
+        (r.skipped.length > 10 ? '\n…' : '');
+    }
+    alert(summary);
+
+    // Refresh the current view so statuses / fitment dates show
+    const searchBy = document.getElementById('searchBy').value;
+    if (searchBy) { await searchData(); } else { await viewAllData(); }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    delete btn.dataset.busy;
+    btn.textContent = oldLabel;
+    updateBulkBar();
+  }
 }
 
 /**
@@ -768,10 +897,18 @@ async function downloadData() {
     return;
   }
   
-  console.log('Downloading HSRP data...');
-  
+  // Export only the rows currently shown (search / filter result). With nothing on screen, offer all.
+  let srNos = null;
+  if (hsrpDisplayedRows && hsrpDisplayedRows.length > 0) {
+    srNos = hsrpDisplayedRows.map(r => String(r.srNo));
+  } else if (!confirm('No filtered data is on screen. Download ALL HSRP records?')) {
+    return;
+  }
+
+  console.log('Downloading HSRP data...', srNos ? srNos.length + ' rows' : 'all');
+
   try {
-    const response = await API.downloadHSRPData();
+    const response = await API.downloadHSRPData(srNos);
     
     if (response.success && response.csv) {
       const blob = new Blob([response.csv], { type: 'text/csv' });
