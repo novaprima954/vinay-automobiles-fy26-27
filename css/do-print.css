@@ -3,11 +3,17 @@
 #doPrintArea { display:none; }
 
 @media print {
-  /* display:none (not visibility:hidden) so the hidden page content can't add extra blank pages */
+  /* Page margin 0 = the browser has no margin strip to print its URL / date / page-number
+     header and footer in. The 7mm gap is added back as padding on the print area instead. */
+  @page { size: A4 landscape; margin: 0; }
+  /* The site's body has min-height:100vh; without resetting it, that height plus the challan
+     spilled onto a second (blank) page. Everything except the challan is removed from layout. */
+  html, body { margin:0 !important; padding:0 !important; height:auto !important; min-height:0 !important; overflow:hidden !important; background:#fff !important; }
   body > *:not(#doPrintArea) { display:none !important; }
-  html, body { margin:0 !important; padding:0 !important; background:#fff !important; }
-  #doPrintArea { display:block; width:100%; height:195mm; overflow:hidden; page-break-after:avoid; page-break-inside:avoid; }
-  @page { size: A4 landscape; margin: 7mm; }
+  #doPrintArea {
+    display:block; position:absolute; top:0; left:0; width:297mm; height:209mm;
+    padding:7mm; box-sizing:border-box; overflow:hidden; page-break-after:avoid; page-break-inside:avoid;
+  }
 }
 
 .do-page { display:flex; gap:0; width:100%; height:100%; overflow:hidden; }
