@@ -72,6 +72,7 @@
 .do-check-item { display:flex; align-items:center; gap:7px; font-size:11px; color:#333; }
 .do-check-box { width:14px; height:14px; border:1.5px solid #555; display:inline-block; border-radius:3px; flex-shrink:0; }
 
+.do-note { margin-top:8px; font-size:10.5px; font-style:italic; color:#444; line-height:1.4; }
 .do-hyp-row { margin-top:8px; }
 .do-service-row { margin-top:4px; }
 .do-acc-title { margin-top:8px; margin-bottom:6px; }

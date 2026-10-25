@@ -46,7 +46,7 @@ const DOPrint = (function () {
           }).join('') +
         '</div>'
       : '';
-    const checkItems = ['Owner Manual', 'Tool Kit', 'Battery & Warranty Card', 'Mirror', 'Saree Guard', 'Leg Guard'];
+    const checkItems = ['Tool Kit', 'Mirror', 'Leg Guard', 'Footrest', 'Centre Stand'];
 
     const pendingHtml = rec.accessoryPending
       ? '<div class="do-pending"><span class="title">Pending Accessories:</span> ' + esc(rec.accessoryPending) + '</div>'
@@ -95,6 +95,7 @@ const DOPrint = (function () {
             return '<div class="do-check-item"><span class="do-check-box"></span>' + item + '</div>';
           }).join('') +
         '</div>' +
+        '<div class="do-note">The Owner’s Manual and all other documents will be provided at the time of number plate fixation.</div>' +
         '<div class="do-desc-row do-hyp-row"><span class="lbl">Hypothecation</span><span class="val">' + esc(rec.financierName || 'Cash') + '</span></div>' +
         accessoriesHtml +
         pendingHtml +
