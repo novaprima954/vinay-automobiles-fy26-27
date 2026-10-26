@@ -95,7 +95,16 @@ async function loadTodayEntry() {
  */
 function checkMismatch() {
   const card = document.getElementById('mismatchCard');
-  if (!_proposedSaleLocked || !_systemData) { card.style.display = 'none'; return false; }
+  if (!_systemData) { card.style.display = 'none'; return false; }
+
+  // No Proposed Booking entered: once the morning window has closed, a reason is required
+  // (same box as a missed target)
+  if (!_proposedSaleLocked) {
+    if (_planWindowOpen) { card.style.display = 'none'; return false; }
+    document.getElementById('mismatchLabel').textContent = '⚠️ Today’s Proposed Booking was not entered — reason required';
+    card.style.display = 'block';
+    return true;
+  }
 
   const proposed = parseInt(document.getElementById('inp-proposed-sale').value) || 0;
   const booked = _systemData.bookingsSystemCount || 0;
@@ -179,7 +188,7 @@ async function saveActivity() {
   const mismatchReasonEl = document.getElementById('inp-mismatch-reason');
 
   if (checkMismatch() && !mismatchReasonEl.value.trim()) {
-    showMsg('Proposed vs Booking don\'t match — please enter a reason', 'error');
+    showMsg(_proposedSaleLocked ? 'Proposed vs Booking don\'t match — please enter a reason' : 'Proposed Booking was not entered — please enter a reason', 'error');
     mismatchReasonEl.focus();
     return;
   }
