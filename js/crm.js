@@ -114,7 +114,7 @@ function switchTab(tab) {
   if (tab === 'myBookings' && (currentUser.role === 'financier' || currentUser.role === 'admin')) loadFinancierBookings();
   // All Leads is load-on-demand (see the "Load List" button in the tab) — no auto-load here.
   if (tab === 'admin') {
-    if (currentUser.role === 'admin') loadAdmin();
+    if (currentUser.role === 'admin') { loadAdmin(); initConversionReportDates(); }
     else if (currentUser.role === 'financier') {
       // Show financier's own analytics in the admin tab
       const container = document.getElementById('finAnalyticsContent');
@@ -2258,20 +2258,85 @@ function renderLeadDetail(lead) {
   `;
 }
 
-async function convertLead(leadId, name) {
-  if (!confirm(`Convert ${name} to sale? This will mark the lead as Converted.`)) return;
+// Convert to Sale opens the Sales form pre-filled from the lead; the lead is marked Converted
+// only when the sale is actually saved there (and linked to it by Lead ID / Receipt No).
+function convertLead(leadId, name) {
+  window.location.href = 'sales.html?leadId=' + encodeURIComponent(leadId);
+}
+
+// ── CONVERSION REPORT (admin) ──────────────
+
+function initConversionReportDates() {
+  const f = document.getElementById('convFromDate');
+  const t = document.getElementById('convToDate');
+  if (!f || !t || f.value) return;
+  const now = new Date();
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  f.value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+  t.value = iso(now);
+}
+
+async function loadConversionReport() {
+  const box = document.getElementById('convReportContent');
+  const btn = document.getElementById('convReportBtn');
+  if (!box) return;
+  box.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading…</div></div>';
+  if (btn) btn.disabled = true;
   try {
-    const r = await API.convertLeadToSale(leadId);
-    if (r.success) {
-      closeSheet('detailSheet');
-      showMessage('Lead converted to sale!', 'success');
-      _bgRefreshDashboard();
-      loadMyLeads();
-    } else {
-      showMessage(r.message || 'Error', 'error');
+    const r = await API.getConversionReport(document.getElementById('convFromDate').value, document.getElementById('convToDate').value);
+    if (btn) btn.disabled = false;
+    if (!r.success) { box.innerHTML = errorHtml(r.message); return; }
+
+    const t = r.totals;
+    const card = (label, icon, value, color) =>
+      '<div style="background:#f8f9fa;border-radius:10px;padding:12px;text-align:center;">' +
+      '<div style="font-size:18px;">' + icon + '</div>' +
+      '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + value + '</div>' +
+      '<div style="font-size:11px;color:#888;">' + label + '</div></div>';
+
+    let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:8px 0 12px;">' +
+      card('Leads', '📋', t.leads, '#667eea') +
+      card('Quoted', '📄', t.quoted, '#FF9800') +
+      card('Converted', '✅', t.converted, '#388E3C') +
+      card('Lost', '❌', t.lost, '#ef5350') +
+      card('Still Active', '🔄', t.active, '#9C27B0') +
+      card('Conversion', '🎯', t.convPct + '%', '#667eea') +
+      card('Quote → Sale', '🔁', t.quoteToConvPct + '%', '#00897B') +
+      card('Avg Days to Book', '⏱️', t.avgDays === null ? '—' : t.avgDays, '#555') +
+      '</div>';
+
+    html += '<div style="font-size:12px;color:#666;margin-bottom:12px;line-height:1.7;">' +
+      'Converted through a booking: <strong>' + t.viaBooking + '</strong>' +
+      (t.withoutBooking > 0 ? ' · Marked Converted with no linked booking (older leads / loan sync): <strong>' + t.withoutBooking + '</strong>' : '') +
+      '<br>Bookings in this period: <strong>' + r.bookings.inRange + '</strong> — from CRM leads: <strong>' + r.bookings.fromLead +
+      '</strong>, direct (no lead): <strong>' + r.bookings.direct + '</strong></div>';
+
+    const table = (title, rows) => {
+      if (!rows || rows.length === 0) return '';
+      return '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;">' + title + '</div>' +
+        '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;">' +
+        '<thead><tr style="background:#f0f2ff;color:#444;text-align:right;">' +
+        '<th style="text-align:left;padding:7px 8px;">Name</th><th style="padding:7px 8px;">Leads</th><th style="padding:7px 8px;">Quoted</th>' +
+        '<th style="padding:7px 8px;">Converted</th><th style="padding:7px 8px;">Lost</th><th style="padding:7px 8px;">Conv %</th><th style="padding:7px 8px;">Avg days</th></tr></thead><tbody>' +
+        rows.map(x => '<tr style="border-bottom:1px solid #eee;text-align:right;">' +
+          '<td style="text-align:left;padding:7px 8px;font-weight:600;">' + esc(x.name) + '</td><td style="padding:7px 8px;">' + x.leads + '</td>' +
+          '<td style="padding:7px 8px;">' + x.quoted + '</td><td style="padding:7px 8px;color:#388E3C;font-weight:700;">' + x.converted + '</td>' +
+          '<td style="padding:7px 8px;">' + x.lost + '</td><td style="padding:7px 8px;font-weight:700;">' + x.convPct + '%</td>' +
+          '<td style="padding:7px 8px;">' + (x.avgDays === null ? '—' : x.avgDays) + '</td></tr>').join('') +
+        '</tbody></table></div>';
+    };
+    html += table('By Executive', r.byExecutive) + table('By Source', r.bySource) + table('By Model', r.byModel);
+
+    if (r.lostReasons && r.lostReasons.length) {
+      html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;">Lost Reasons</div>' +
+        r.lostReasons.map(x => '<div style="display:flex;justify-content:space-between;padding:6px 10px;margin:3px 0;background:#fff5f5;border-radius:6px;font-size:12.5px;">' +
+          '<span>' + esc(x.reason) + '</span><strong>' + x.count + '</strong></div>').join('');
     }
-  } catch(e) {
-    showMessage('Error converting lead', 'error');
+
+    box.innerHTML = html;
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    box.innerHTML = errorHtml('Error loading conversion report');
   }
 }
 

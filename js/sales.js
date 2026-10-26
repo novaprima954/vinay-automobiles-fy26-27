@@ -16,6 +16,14 @@ document.addEventListener('DOMContentLoaded', async function() {
   }
   
   currentUser = session.user;
+
+  // Sales entries are created from a CRM lead (Convert to Sale). Only admin may open this form directly.
+  const urlLeadId = new URLSearchParams(window.location.search).get('leadId') || '';
+  if (!urlLeadId && currentUser.role !== 'admin') {
+    alert('Sales entries are created from a CRM lead. Open the lead in CRM and click "Convert to Sale".');
+    window.location.href = 'crm.html';
+    return;
+  }
   const execDisplayName = currentUser.name || currentUser.username || '';
   document.getElementById('currentUser').textContent = execDisplayName;
   document.getElementById('executiveName').value = execDisplayName;
@@ -27,6 +35,9 @@ document.addEventListener('DOMContentLoaded', async function() {
   // Load models from PriceMaster
   await loadModels();
   
+  // Coming from a CRM lead: pre-fill name, mobile, model and variant
+  if (urlLeadId) await loadLeadForSale(urlLeadId);
+
   // Setup event listeners
   document.getElementById('model').addEventListener('change', handleModelChange);
   document.getElementById('variant').addEventListener('change', handleVariantChange);
@@ -45,6 +56,74 @@ document.addEventListener('DOMContentLoaded', async function() {
     document.getElementById('receiptNo1').value = this.value;
   });
 });
+
+/**
+ * CRM lead -> Sales form: fills customer name, mobile, model and variant (nothing else).
+ */
+async function loadLeadForSale(leadId) {
+  try {
+    const r = await API.getLeadForSale(leadId);
+    if (!r.success) {
+      alert(r.message || 'Could not load the CRM lead');
+      window.location.href = 'crm.html';
+      return;
+    }
+    const l = r.lead;
+    window.currentLeadId = l.leadId;
+    document.getElementById('customerName').value = l.customerName || '';
+    document.getElementById('mobileNo').value = l.mobileNo || '';
+    if (l.assignedTo) document.getElementById('executiveName').value = l.assignedTo;
+
+    const banner = document.getElementById('leadBanner');
+    if (banner) {
+      banner.textContent = '🔁 Converting CRM lead: ' + (l.customerName || '') + (l.mobileNo ? ' · ' + l.mobileNo : '') +
+        ' — the lead is marked Converted when you save this sale.';
+      banner.style.display = 'block';
+    }
+    await prefillModelVariant(l);
+  } catch (e) {
+    console.error('Lead load error:', e);
+    showMessage('Could not load the CRM lead details', 'error');
+  }
+}
+
+// Model/variant from the lead's latest quotation, else best-effort parse of the lead's free-text
+// model. Anything that does not match PriceMaster exactly is left blank for the executive to pick.
+async function prefillModelVariant(l) {
+  await PMCache.ensure();
+  const models = PMCache.models() || [];
+  const lc = s => String(s || '').trim().toLowerCase();
+  let model = '', variant = '';
+
+  if (lc(l.quoteModel)) {
+    model = models.find(m => lc(m) === lc(l.quoteModel)) || '';
+    if (model && lc(l.quoteVariant)) {
+      variant = (PMCache.variants(model) || []).find(v => lc(v) === lc(l.quoteVariant)) || '';
+    }
+  }
+  if (!model && lc(l.leadModel)) {
+    const text = lc(l.leadModel);
+    const candidates = models.filter(m => text.indexOf(lc(m)) === 0).sort((a, b) => b.length - a.length);
+    if (candidates[0]) {
+      model = candidates[0];
+      const rest = text.slice(lc(model).length).trim();
+      if (rest) {
+        const vs = PMCache.variants(model) || [];
+        variant = vs.find(v => lc(v) === rest) || vs.find(v => lc(v).indexOf(rest) !== -1) || '';
+      }
+    }
+  }
+  if (!model) return;
+
+  const modelSel = document.getElementById('model');
+  modelSel.value = model;
+  await handleModelChange.call(modelSel);
+  if (variant) {
+    const variantSel = document.getElementById('variant');
+    variantSel.value = variant;
+    await handleVariantChange.call(variantSel);
+  }
+}
 
 /**
  * Load models from PriceMaster
@@ -468,6 +547,7 @@ async function handleSubmit(e) {
     backrest: accessories.backrest,
     extendedwarranty: accessories.extendedwarranty,
     salesRemark: GuardOption.compose(guardAmount, document.getElementById('salesRemark').value),
+    leadId: window.currentLeadId || '',
     receiptNo1: receiptNo1Value,
     receipt1Amount: document.getElementById('receipt1Amount').value,
     receiptNo2: document.getElementById('receiptNo2').value.trim(),

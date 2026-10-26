@@ -629,6 +629,16 @@ const API = {
   /**
    * Convert lead to sale
    */
+  async getLeadForSale(leadId) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getLeadForSale', { sessionId, leadId });
+  },
+
+  async getConversionReport(fromDate, toDate) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('getConversionReport', { sessionId, fromDate: fromDate || '', toDate: toDate || '' });
+  },
+
   async convertLeadToSale(leadId) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('convertLeadToSale', { sessionId, leadId });
