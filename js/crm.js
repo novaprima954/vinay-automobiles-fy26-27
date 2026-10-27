@@ -1505,10 +1505,16 @@ async function sendBulkWaMessages() {
 
 // ── ALL LEADS TAB ──────────────────────────
 
+let allLeadsLoaded  = false; // list fetched from the server at least once
+let allLeadsFetching = false; // a fetch is in progress
+
+// Fetches the leads. Filters / search the user has already set are kept (so searching before the
+// list is loaded, or refreshing later, never wipes what they typed or picked).
 async function loadAllLeads() {
   const container = document.getElementById('allLeadsContent');
   const loading   = document.getElementById('allLeadsLoading');
-  if (!container) return;
+  if (!container || allLeadsFetching) return;
+  allLeadsFetching = true;
   loading.style.display = '';
   container.innerHTML   = '';
 
@@ -1519,14 +1525,7 @@ async function loadAllLeads() {
     if (!response.success) { container.innerHTML = errorHtml(response.message); return; }
 
     allLeadsAll = response.leads || [];
-    currentAllLeadsStatusFilter = 'all';
-    currentAllLeadsSourceFilter = 'all';
-    currentAllLeadsExecFilter   = 'all';
-
-    // Reset filter chips UI
-    document.querySelectorAll('#allLeadsStatusFilter .filter-chip').forEach(c => c.classList.remove('active'));
-    const firstSt = document.querySelector('#allLeadsStatusFilter .filter-chip');
-    if (firstSt) firstSt.classList.add('active');
+    allLeadsLoaded = true;
 
     // Build executive list for exec filter (admin only)
     if (isAdmin) {
@@ -1540,6 +1539,9 @@ async function loadAllLeads() {
         if (execSel) {
           execSel.innerHTML = '<option value="all">All Executives</option>' +
             allExecutives.map(e => `<option value="${esc(e)}">${esc(e)}</option>`).join('');
+          // keep the executive the user already picked (the list was just rebuilt)
+          if (allExecutives.indexOf(currentAllLeadsExecFilter) !== -1) execSel.value = currentAllLeadsExecFilter;
+          else currentAllLeadsExecFilter = 'all';
         }
       }
     }
@@ -1548,6 +1550,8 @@ async function loadAllLeads() {
   } catch(e) {
     loading.style.display = 'none';
     container.innerHTML = errorHtml('Error loading leads');
+  } finally {
+    allLeadsFetching = false;
   }
 }
 
@@ -1578,6 +1582,12 @@ function filterAllLeadsByName() {
 }
 
 function applyAllLeadsFilters() {
+  // Filters before the list has been fetched: fetch it now (it re-applies the filters when done)
+  // instead of showing "No leads" and hiding the Load List button.
+  if (!allLeadsLoaded) {
+    if (!allLeadsFetching) loadAllLeads();
+    return;
+  }
   let leads = allLeadsAll;
 
   if (currentAllLeadsStatusFilter !== 'all') {
@@ -1640,6 +1650,7 @@ function renderAllLeads() {
 
   let html = `<div style="display:flex;gap:10px;padding:10px 16px 0;flex-wrap:wrap;">
     <span style="font-size:12px;color:#888;">Showing <strong>${shown}</strong> of <strong>${total}</strong> leads</span>
+    <span onclick="loadAllLeads()" style="font-size:12px;color:#667eea;font-weight:700;cursor:pointer;">🔄 Refresh</span>
     ${converted > 0 ? `<span style="font-size:12px;color:#66BB6A;font-weight:700;">✅ ${converted} converted</span>` : ''}
     ${overdue > 0   ? `<span style="font-size:12px;color:#ef5350;font-weight:700;">⚠️ ${overdue} overdue</span>` : ''}
   </div>`;
