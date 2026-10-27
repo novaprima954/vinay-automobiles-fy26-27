@@ -46,6 +46,8 @@ document.addEventListener('DOMContentLoaded', async function() {
   if (currentUser.role === 'admin') {
     document.getElementById('navAdmin').style.display = '';
     document.getElementById('adminAnalyticsSection').style.display = '';
+    // Admin: the All Leads list loads by itself when the tab is opened - no "Load List" button
+    document.getElementById('allLeadsContent').innerHTML = '';
     document.getElementById('navMyBookings').style.display = '';
     const bkLbl = document.querySelector('#navMyBookings .nav-label');
     if (bkLbl) bkLbl.textContent = 'All Bookings';
@@ -107,6 +109,7 @@ function switchTab(tab) {
     else if (dashboardData) renderFollowups(currentFollowupFilter);
   }
   if (tab === 'pool'     && currentUser.role !== 'financier') loadPool();
+  if (tab === 'allLeads' && currentUser.role === 'admin' && !allLeadsLoaded) loadAllLeads();
   if (tab === 'myLeads') {
     if (currentUser.role === 'financier') loadFinancierLeads();
     else loadMyLeads();
@@ -1782,15 +1785,6 @@ async function loadAdmin() {
         </div>`;
       }
 
-      if (a.lostReasons && a.lostReasons.length > 0) {
-        html += `<div class="analytics-card">
-          <div class="analytics-card-title">❌ Lost Reasons</div>
-          ${a.lostReasons.map(r => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:14px;">
-            <span>${esc(r.reason)}</span>
-            <span style="font-weight:700;color:#ef5350;">${r.count}</span>
-          </div>`).join('')}
-        </div>`;
-      }
     }
 
     container.innerHTML = html;
@@ -1973,15 +1967,6 @@ async function loadAnalytics() {
       </div>`;
     }
 
-    if (a.lostReasons && a.lostReasons.length > 0) {
-      html += `<div class="analytics-card">
-        <div class="analytics-card-title">❌ Lost Reasons</div>
-        ${a.lostReasons.map(r => `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #f5f5f5;font-size:14px;">
-          <span>${esc(r.reason)}</span>
-          <span style="font-weight:700;color:#ef5350;">${r.count}</span>
-        </div>`).join('')}
-      </div>`;
-    }
 
     container.innerHTML = html || '<div style="padding:20px;color:#aaa;text-align:center;">No analytics data yet</div>';
   } catch(e) {
@@ -2336,7 +2321,7 @@ async function loadConversionReport() {
           '<td style="padding:7px 8px;">' + (x.avgDays === null ? '—' : x.avgDays) + '</td></tr>').join('') +
         '</tbody></table></div>';
     };
-    html += table('By Executive', r.byExecutive) + table('By Source', r.bySource) + table('By Model', r.byModel);
+    html += table('By Executive', r.byExecutive) + table('By Source', r.bySource);
 
     if (r.lostReasons && r.lostReasons.length) {
       html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;">Lost Reasons</div>' +
