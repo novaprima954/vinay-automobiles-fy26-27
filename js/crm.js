@@ -2356,7 +2356,8 @@ async function loadConversionReport() {
           const modelDiff  = lc(L.quoteModel || '') && lc(S.model) && lc(L.quoteModel) !== lc(S.model);
           const colourDiff = lc(L.colour) && lc(S.colour) && lc(L.colour) !== lc(S.colour);
           html += '<tr style="background:#f4fbf5;">' +
-            '<td style="' + td + 'font-weight:800;color:#1b5e20;white-space:nowrap;">🧾 Sale</td>' +
+            '<td style="' + td + 'font-weight:800;color:#1b5e20;white-space:nowrap;">🧾 Sale' +
+              (S.matchedBy === 'mobile' ? '<div style="font-size:10px;font-weight:600;color:#999;" title="Not linked by receipt: matched to the earliest booking with this mobile number">matched by mobile</div>' : '') + '</td>' +
             cell(S.name, nameDiff) + cell(S.mobile, mobileDiff) + cell(saleModel, modelDiff) + cell(S.colour, colourDiff) +
             cell(S.bookingDate) + cell(S.executive) + cell(S.receiptNo) +
             '<td style="' + td + '">' + inr(S.discount) + '</td><td style="' + td + 'font-weight:700;">' + inr(S.finalPrice) + '</td>' +
@@ -2364,8 +2365,7 @@ async function loadConversionReport() {
             '<td style="' + td + 'font-weight:700;color:#00695C;">' + (c.days === null ? '—' : c.days) + '</td></tr>';
         } else {
           html += '<tr style="background:#f7f7f7;"><td style="' + td + 'font-weight:800;color:#999;white-space:nowrap;">🧾 Sale</td>' +
-            '<td colspan="10" style="' + td + 'color:#999;">No linked booking — marked Converted without going through the Sales form' +
-            (c.convertedDate ? ' (on ' + esc(c.convertedDate) + ')' : '') + '</td>' +
+            '<td colspan="10" style="' + td + 'color:#999;">No booking found — not linked to a booking, and no booking with this mobile number</td>' +
             '<td style="' + td + 'font-weight:700;color:#00695C;">' + (c.days === null ? '—' : c.days) + '</td></tr>';
         }
         html += '</tbody>';
