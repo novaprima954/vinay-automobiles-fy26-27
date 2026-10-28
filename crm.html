@@ -593,6 +593,14 @@
           <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px;">To</label>
           <input type="date" id="convToDate" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;">
         </div>
+        <div style="min-width:110px;">
+          <label style="font-size:11px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:4px;">Vehicle</label>
+          <select id="convVehicleType" style="width:100%;padding:8px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;box-sizing:border-box;background:white;">
+            <option value="all">All</option>
+            <option value="ice">ICE</option>
+            <option value="ev">EV (iQube / Orbiter)</option>
+          </select>
+        </div>
         <button id="convReportBtn" onclick="loadConversionReport()"
           style="padding:9px 18px;background:linear-gradient(135deg,#667eea,#764ba2);color:white;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;">
           Load
@@ -1002,7 +1010,7 @@
 
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
-<script src="js/api.js?v=6"></script>
-<script src="js/crm.js?v=23"></script>
+<script src="js/api.js?v=7"></script>
+<script src="js/crm.js?v=24"></script>
 </body>
 </html>

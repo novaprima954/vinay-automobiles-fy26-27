@@ -2279,7 +2279,8 @@ async function loadConversionReport() {
   box.innerHTML = '<div class="loading"><div class="spinner"></div><div>Loading…</div></div>';
   if (btn) btn.disabled = true;
   try {
-    const r = await API.getConversionReport(document.getElementById('convFromDate').value, document.getElementById('convToDate').value);
+    const r = await API.getConversionReport(document.getElementById('convFromDate').value, document.getElementById('convToDate').value,
+      (document.getElementById('convVehicleType') || {}).value || 'all');
     if (btn) btn.disabled = false;
     if (!r.success) { box.innerHTML = errorHtml(r.message); return; }
 
@@ -2322,6 +2323,43 @@ async function loadConversionReport() {
         '</tbody></table></div>';
     };
     html += table('By Executive', r.byExecutive) + table('By Source', r.bySource);
+
+    // Case-wise: each converted lead in two rows - lead details, then the sale it became
+    if (r.cases && r.cases.length) {
+      const inr = n => (n === '' || n === null || n === undefined || isNaN(Number(n))) ? '—' : '₹' + Number(n).toLocaleString('en-IN');
+      const lc = s => String(s || '').trim().toLowerCase();
+      html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:18px 0 6px;">Case-wise Conversions (' + r.cases.length + ')</div>';
+      html += r.cases.map(c => {
+        const L = c.lead, S = c.sale;
+        const leadModel = [L.quoteModel || L.model, L.quoteVariant].filter(Boolean).join(' ') || '—';
+        const row1 = '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;">' +
+          '<span style="font-weight:800;color:#3730a3;">🧑 Lead</span>' +
+          '<span><strong>' + esc(L.name) + '</strong></span><span>📱 ' + esc(L.mobile) + '</span>' +
+          '<span>🏍️ ' + esc(leadModel) + '</span><span>🎨 ' + esc(L.colour || '—') + '</span>' +
+          '<span style="color:#777;">📲 ' + esc(L.source || '—') + '</span><span style="color:#777;">👤 ' + esc(L.executive || '—') + '</span>' +
+          '<span style="color:#777;">📅 ' + esc(L.createdDate || '—') + '</span></div>';
+
+        let row2;
+        if (S) {
+          const saleModel = [S.model, S.variant].filter(Boolean).join(' ') || '—';
+          const modelChanged  = lc(L.quoteModel || '') && lc(S.model) && lc(L.quoteModel) !== lc(S.model);
+          const colourChanged = lc(L.colour) && lc(S.colour) && lc(L.colour) !== lc(S.colour);
+          const warn = '<span style="color:#e65100;font-weight:700;" title="Different from the lead / quotation"> ⚠</span>';
+          row2 = '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;margin-top:6px;padding-top:6px;border-top:1px dashed #ddd;">' +
+            '<span style="font-weight:800;color:#1b5e20;">🧾 Sale</span>' +
+            '<span><strong>' + esc(S.receiptNo) + '</strong></span><span>📅 ' + esc(S.bookingDate || '—') + '</span>' +
+            '<span>🏍️ ' + esc(saleModel) + (modelChanged ? warn : '') + '</span>' +
+            '<span>🎨 ' + esc(S.colour || '—') + (colourChanged ? warn : '') + '</span>' +
+            '<span>💸 Disc ' + inr(S.discount) + '</span><span>💰 ' + inr(S.finalPrice) + '</span>' +
+            '<span>🏦 ' + esc(S.financier || '—') + '</span><span style="color:#777;">👤 ' + esc(S.executive || '—') + '</span>' +
+            '<span style="font-weight:700;color:#00695C;">⏱️ ' + (c.days === null ? '—' : c.days + ' day' + (c.days === 1 ? '' : 's')) + '</span></div>';
+        } else {
+          row2 = '<div style="font-size:12px;color:#999;margin-top:6px;padding-top:6px;border-top:1px dashed #ddd;">🧾 No linked booking — marked Converted without going through the Sales form' +
+            (c.convertedDate ? ' on ' + esc(c.convertedDate) : '') + (c.days !== null ? ' · ⏱️ ' + c.days + ' days' : '') + '</div>';
+        }
+        return '<div style="background:#fafbff;border:1px solid #e8eaf6;border-radius:10px;padding:10px 12px;margin:6px 0;">' + row1 + row2 + '</div>';
+      }).join('');
+    }
 
     if (r.lostReasons && r.lostReasons.length) {
       html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;">Lost Reasons</div>' +
