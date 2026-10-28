@@ -2324,41 +2324,53 @@ async function loadConversionReport() {
     };
     html += table('By Executive', r.byExecutive) + table('By Source', r.bySource);
 
-    // Case-wise: each converted lead in two rows - lead details, then the sale it became
+    // Case-wise: each converted lead as two rows (Lead, then Sale) in the SAME columns, so name sits
+    // under name, mobile under mobile, model under model... and differences are easy to spot.
     if (r.cases && r.cases.length) {
       const inr = n => (n === '' || n === null || n === undefined || isNaN(Number(n))) ? '—' : '₹' + Number(n).toLocaleString('en-IN');
       const lc = s => String(s || '').trim().toLowerCase();
-      html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:18px 0 6px;">Case-wise Conversions (' + r.cases.length + ')</div>';
-      html += r.cases.map(c => {
-        const L = c.lead, S = c.sale;
-        const leadModel = [L.quoteModel || L.model, L.quoteVariant].filter(Boolean).join(' ') || '—';
-        const row1 = '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;">' +
-          '<span style="font-weight:800;color:#3730a3;">🧑 Lead</span>' +
-          '<span><strong>' + esc(L.name) + '</strong></span><span>📱 ' + esc(L.mobile) + '</span>' +
-          '<span>🏍️ ' + esc(leadModel) + '</span><span>🎨 ' + esc(L.colour || '—') + '</span>' +
-          '<span style="color:#777;">📲 ' + esc(L.source || '—') + '</span><span style="color:#777;">👤 ' + esc(L.executive || '—') + '</span>' +
-          '<span style="color:#777;">📅 ' + esc(L.createdDate || '—') + '</span></div>';
+      const th = 'padding:7px 8px;text-align:left;white-space:nowrap;';
+      const td = 'padding:6px 8px;vertical-align:top;';
+      const diffStyle = 'background:#fff3e0;color:#e65100;font-weight:700;';
+      const cell = (v, diff) => '<td style="' + td + (diff ? diffStyle : '') + '">' + (v ? esc(v) : '—') + '</td>';
+      html += '<div style="font-size:12px;font-weight:800;color:#555;text-transform:uppercase;letter-spacing:0.4px;margin:18px 0 6px;">Case-wise Conversions (' + r.cases.length + ')</div>' +
+        '<div style="font-size:11px;color:#999;margin-bottom:6px;">Orange = differs between the lead / quotation and the booking</div>' +
+        '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:980px;">' +
+        '<thead><tr style="background:#f0f2ff;color:#444;">' +
+        ['', 'Name', 'Mobile', 'Model', 'Colour', 'Date', 'Executive', 'Source / Receipt', 'Discount', 'Final Price', 'Financier', 'Days to Book']
+          .map(h => '<th style="' + th + '">' + h + '</th>').join('') + '</tr></thead>';
 
-        let row2;
+      r.cases.forEach(c => {
+        const L = c.lead, S = c.sale;
+        const leadModel = [L.quoteModel || L.model, L.quoteVariant].filter(Boolean).join(' ');
+        html += '<tbody style="border-bottom:2px solid #d9dcf5;">' +
+          '<tr style="background:#fafbff;">' +
+            '<td style="' + td + 'font-weight:800;color:#3730a3;white-space:nowrap;">🧑 Lead</td>' +
+            cell(L.name) + cell(L.mobile) + cell(leadModel) + cell(L.colour) + cell(L.createdDate) + cell(L.executive) + cell(L.source) +
+            '<td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td><td style="' + td + '"></td></tr>';
+
         if (S) {
-          const saleModel = [S.model, S.variant].filter(Boolean).join(' ') || '—';
-          const modelChanged  = lc(L.quoteModel || '') && lc(S.model) && lc(L.quoteModel) !== lc(S.model);
-          const colourChanged = lc(L.colour) && lc(S.colour) && lc(L.colour) !== lc(S.colour);
-          const warn = '<span style="color:#e65100;font-weight:700;" title="Different from the lead / quotation"> ⚠</span>';
-          row2 = '<div style="display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12.5px;margin-top:6px;padding-top:6px;border-top:1px dashed #ddd;">' +
-            '<span style="font-weight:800;color:#1b5e20;">🧾 Sale</span>' +
-            '<span><strong>' + esc(S.receiptNo) + '</strong></span><span>📅 ' + esc(S.bookingDate || '—') + '</span>' +
-            '<span>🏍️ ' + esc(saleModel) + (modelChanged ? warn : '') + '</span>' +
-            '<span>🎨 ' + esc(S.colour || '—') + (colourChanged ? warn : '') + '</span>' +
-            '<span>💸 Disc ' + inr(S.discount) + '</span><span>💰 ' + inr(S.finalPrice) + '</span>' +
-            '<span>🏦 ' + esc(S.financier || '—') + '</span><span style="color:#777;">👤 ' + esc(S.executive || '—') + '</span>' +
-            '<span style="font-weight:700;color:#00695C;">⏱️ ' + (c.days === null ? '—' : c.days + ' day' + (c.days === 1 ? '' : 's')) + '</span></div>';
+          const saleModel = [S.model, S.variant].filter(Boolean).join(' ');
+          const nameDiff   = lc(L.name) && lc(S.name) && lc(L.name) !== lc(S.name);
+          const mobileDiff = lc(L.mobile) && lc(S.mobile) && lc(L.mobile) !== lc(S.mobile);
+          const modelDiff  = lc(L.quoteModel || '') && lc(S.model) && lc(L.quoteModel) !== lc(S.model);
+          const colourDiff = lc(L.colour) && lc(S.colour) && lc(L.colour) !== lc(S.colour);
+          html += '<tr style="background:#f4fbf5;">' +
+            '<td style="' + td + 'font-weight:800;color:#1b5e20;white-space:nowrap;">🧾 Sale</td>' +
+            cell(S.name, nameDiff) + cell(S.mobile, mobileDiff) + cell(saleModel, modelDiff) + cell(S.colour, colourDiff) +
+            cell(S.bookingDate) + cell(S.executive) + cell(S.receiptNo) +
+            '<td style="' + td + '">' + inr(S.discount) + '</td><td style="' + td + 'font-weight:700;">' + inr(S.finalPrice) + '</td>' +
+            cell(S.financier) +
+            '<td style="' + td + 'font-weight:700;color:#00695C;">' + (c.days === null ? '—' : c.days) + '</td></tr>';
         } else {
-          row2 = '<div style="font-size:12px;color:#999;margin-top:6px;padding-top:6px;border-top:1px dashed #ddd;">🧾 No linked booking — marked Converted without going through the Sales form' +
-            (c.convertedDate ? ' on ' + esc(c.convertedDate) : '') + (c.days !== null ? ' · ⏱️ ' + c.days + ' days' : '') + '</div>';
+          html += '<tr style="background:#f7f7f7;"><td style="' + td + 'font-weight:800;color:#999;white-space:nowrap;">🧾 Sale</td>' +
+            '<td colspan="10" style="' + td + 'color:#999;">No linked booking — marked Converted without going through the Sales form' +
+            (c.convertedDate ? ' (on ' + esc(c.convertedDate) + ')' : '') + '</td>' +
+            '<td style="' + td + 'font-weight:700;color:#00695C;">' + (c.days === null ? '—' : c.days) + '</td></tr>';
         }
-        return '<div style="background:#fafbff;border:1px solid #e8eaf6;border-radius:10px;padding:10px 12px;margin:6px 0;">' + row1 + row2 + '</div>';
-      }).join('');
+        html += '</tbody>';
+      });
+      html += '</table></div>';
     }
 
     if (r.lostReasons && r.lostReasons.length) {
