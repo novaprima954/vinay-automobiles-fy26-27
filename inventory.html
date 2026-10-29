@@ -745,7 +745,14 @@
         <div class="filter-row">
           <div class="form-group">
             <label>Month</label>
-            <select id="adaccMonth" onchange="loadADAccessories()"></select>
+            <div id="adaccMonthMulti" style="position:relative;">
+              <button type="button" onclick="toggleAdMonthPanel()" id="adaccMonthBtn"
+                style="padding:8px 12px;border:2px solid #ddd;border-radius:8px;font-size:14px;background:white;cursor:pointer;display:flex;align-items:center;gap:8px;color:#333;min-width:170px;justify-content:space-between;">
+                <span id="adaccMonthLabel">Select months</span>
+                <span style="font-size:10px;color:#999;">&#9660;</span>
+              </button>
+              <div id="adaccMonthPanel" style="display:none;position:absolute;top:calc(100% + 4px);left:0;background:white;border:1px solid #ddd;border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,0.15);z-index:50;max-height:300px;overflow-y:auto;min-width:210px;padding:6px 0;"></div>
+            </div>
           </div>
           <div class="form-group">
             <label>&nbsp;</label>
@@ -841,6 +848,6 @@
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js?v=7"></script>
-  <script src="js/inventory.js?v=4"></script>
+  <script src="js/inventory.js?v=5"></script>
 </body>
 </html>

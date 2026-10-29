@@ -1664,29 +1664,74 @@ function showRptStatus(msg, bg, color) {
 // AD ACCESSORIES CALCULATOR
 // ==========================================
 
-// Month dropdown: current month first, then back 18 months, plus "All time"
+// Month multi-select: current month first, then back 18 months. Nothing ticked = all time.
+let adSelectedMonths = [];
+
 function initAdMonthDropdown() {
-  const sel = document.getElementById('adaccMonth');
-  if (!sel || sel.options.length > 0) return;
+  const panel = document.getElementById('adaccMonthPanel');
+  if (!panel || panel.children.length > 0) return;
   const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const now = new Date();
-  let html = '';
+  let html = '<label style="display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:14px;cursor:pointer;font-weight:700;border-bottom:1px solid #eee;">' +
+    '<input type="checkbox" id="adaccMonthAll" onchange="onAdMonthAllChange()"> All time</label>';
   for (let i = 0; i < 19; i++) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
-    html += '<option value="' + val + '">' + names[d.getMonth()] + ' ' + d.getFullYear() + '</option>';
+    html += '<label style="display:flex;align-items:center;gap:8px;padding:6px 14px;font-size:14px;cursor:pointer;">' +
+      '<input type="checkbox" class="adacc-month-cb" value="' + val + '"' + (i === 0 ? ' checked' : '') + ' onchange="onAdMonthChange()"> ' +
+      names[d.getMonth()] + ' ' + d.getFullYear() + '</label>';
   }
-  html += '<option value="">All time</option>';
-  sel.innerHTML = html;
-  sel.value = sel.options[0].value; // current month
+  html += '<div style="padding:8px 14px;border-top:1px solid #eee;text-align:right;">' +
+    '<button type="button" class="btn-primary" onclick="applyAdMonths()" style="padding:6px 18px;font-size:13px;">Apply</button></div>';
+  panel.innerHTML = html;
+  adSelectedMonths = [now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0')];
+  updateAdMonthLabel();
+
+  // click outside closes the panel
+  document.addEventListener('click', function(e) {
+    const box = document.getElementById('adaccMonthMulti');
+    if (box && !box.contains(e.target)) panel.style.display = 'none';
+  });
+}
+
+function toggleAdMonthPanel() {
+  const panel = document.getElementById('adaccMonthPanel');
+  panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+
+function onAdMonthAllChange() {
+  if (document.getElementById('adaccMonthAll').checked) {
+    document.querySelectorAll('.adacc-month-cb').forEach(cb => { cb.checked = false; });
+  }
+}
+
+function onAdMonthChange() {
+  const any = document.querySelectorAll('.adacc-month-cb:checked').length > 0;
+  document.getElementById('adaccMonthAll').checked = !any;
+}
+
+function applyAdMonths() {
+  adSelectedMonths = Array.from(document.querySelectorAll('.adacc-month-cb:checked')).map(cb => cb.value);
+  document.getElementById('adaccMonthAll').checked = adSelectedMonths.length === 0;
+  document.getElementById('adaccMonthPanel').style.display = 'none';
+  updateAdMonthLabel();
+  loadADAccessories();
+}
+
+function updateAdMonthLabel() {
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const el = document.getElementById('adaccMonthLabel');
+  if (adSelectedMonths.length === 0) el.textContent = 'All time';
+  else if (adSelectedMonths.length === 1) {
+    const p = adSelectedMonths[0].split('-');
+    el.textContent = names[parseInt(p[1], 10) - 1] + ' ' + p[0];
+  } else el.textContent = adSelectedMonths.length + ' months selected';
 }
 
 async function loadADAccessories() {
-  const monthEl = document.getElementById('adaccMonth');
   const content = document.getElementById('adaccContent');
-
-  const monthVal = monthEl.value; // e.g. "2026-05", '' = all time
-  const dateFilter = monthVal ? 'month:' + monthVal : 'all';
+  const months = adSelectedMonths.slice().sort();
+  const dateFilter = months.length ? 'months:' + months.join(',') : 'all';
 
   content.innerHTML = '<div class="loading" style="padding:30px; text-align:center;"><div class="spinner"></div><div style="margin-top:8px; color:#666;">Loading...</div></div>';
 
@@ -1700,7 +1745,7 @@ async function loadADAccessories() {
       content.innerHTML = '<div style="padding:20px; color:#dc3545;">The server has not been updated yet — please redeploy the Apps Script, then refresh.</div>';
       return;
     }
-    renderADAccessories(res.ads, monthVal);
+    renderADAccessories(res.ads, months);
   } catch(e) {
     content.innerHTML = '<div style="padding:20px; color:#dc3545;">Error: ' + e.message + '</div>';
   }
