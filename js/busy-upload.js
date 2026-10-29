@@ -228,7 +228,7 @@ function buildVSeriesExcel(records) {
       r.engineNo       || '',                      // F: Engine Number
       r.customerName   || '',                      // G: Customer Name
       r.hpCompany      || '',                      // H: HP Company
-      'SBI General Insurance',                     // I: Insurance
+      'TATA AIG Insurance',                        // I: Insurance
       'No',                                        // J: Scheme
       r.accessories    || 'N',                     // K: Accessories Y/N
       r.invoiceAmount  || '',                      // L: Invoice Amount
@@ -757,6 +757,13 @@ async function generateVahanExport() {
   }
 }
 
+// iQube / Orbiter vouchers split the customer's amount into RTO TAX A/C + Registration Charges
+const VAHAN_EV_RTO_TAX = 270;
+const VAHAN_EV_REG_CHARGES = 400;
+function _isEvModelName(model) {
+  return /iqube|orbiter/i.test(String(model || ''));
+}
+
 function buildVahanExcel(records, startVoucher) {
   var wb = XLSX.utils.book_new();
 
@@ -782,6 +789,8 @@ function buildVahanExcel(records, startVoucher) {
     var voucherStr = 'RTO/' + voucherNo;
     var rto        = r.rtoAmount    || 0;  // auto-matched from PriceMaster; 0 = no match
     var invAmt     = r.invoiceAmount || 0; // HSRP col T, rounded
+    var isEv       = _isEvModelName(r.modelName);
+    if (isEv) rto = VAHAN_EV_RTO_TAX + VAHAN_EV_REG_CHARGES; // customer debit = 270 + 400
 
     // Row 1 — customer debit line
     outputRows.push([
@@ -810,7 +819,7 @@ function buildVahanExcel(records, startVoucher) {
       '',            // D
       'RTO TAX A/C', // E — Account Name (contra)
       '',            // F
-      { f: 'F' + row1ExcelRef }, // G — =F<row1> auto-fills from col F
+      isEv ? VAHAN_EV_RTO_TAX : { f: 'F' + row1ExcelRef }, // G — EV: fixed 270; others: =F<row1>
       '',            // H
       '',            // I
       '',            // J
@@ -818,6 +827,25 @@ function buildVahanExcel(records, startVoucher) {
       ''             // L
     ]);
     excelRow++;
+
+    // EV only — extra credit line below RTO TAX A/C
+    if (isEv) {
+      outputRows.push([
+        '',                     // A
+        '',                     // B
+        '',                     // C
+        '',                     // D
+        'Registration Charges', // E — Account Name
+        '',                     // F
+        VAHAN_EV_REG_CHARGES,   // G — Amount CR
+        '',                     // H
+        '',                     // I
+        '',                     // J
+        '',                     // K
+        ''                      // L
+      ]);
+      excelRow++;
+    }
 
     voucherNo++;
   });
