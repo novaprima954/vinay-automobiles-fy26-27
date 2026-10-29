@@ -43,6 +43,11 @@ document.addEventListener('DOMContentLoaded', async function () {
   invSessionId = session.sessionId;
   document.getElementById('currentUser').textContent = invUser.name + ' (' + invUser.role + ')';
 
+  // Reconciliation report: admin, accounts, accessories
+  if (['admin', 'accounts', 'accessories'].indexOf(invUser.role) !== -1) {
+    document.getElementById('reconTab').style.display = '';
+  }
+
   // Show masters tab for admin and accessories
   if (invUser.role === 'admin' || invUser.role === 'accessories') {
     document.getElementById('mastersTab').style.display = '';
@@ -189,7 +194,8 @@ function showTab(name) {
   if (name === 'masters') renderMasters();
   if (name === 'dashboard') renderDashboard();
   if (name === 'reports') {} // user clicks Generate manually
-  document.querySelector('.container').classList.toggle('inv-wide', name === 'reports');
+  if (name === 'recon') initReconDates();
+  document.querySelector('.container').classList.toggle('inv-wide', name === 'reports' || name === 'recon');
   if (name === 'adacc') { document.getElementById('adaccTab').classList.add('active'); loadADAccessories(); }
 }
 
@@ -1223,6 +1229,116 @@ const groupExpanded = { opening: false, sold: false, stockIn: false, closing: fa
 function toggleRptGroup(key) {
   groupExpanded[key] = !groupExpanded[key];
   renderReportTable();
+}
+
+// ==========================================
+// RECONCILIATION (read-only)
+// ==========================================
+
+let reconData = null;
+
+function initReconDates() {
+  const f = document.getElementById('rc_fromDate'), t = document.getElementById('rc_toDate');
+  if (f.value) return;
+  const now = new Date();
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  f.value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+  t.value = iso(now);
+}
+
+function _rcEsc(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function loadReconciliation() {
+  const btn = document.getElementById('rc_btn'), st = document.getElementById('rc_status');
+  btn.disabled = true; btn.textContent = '⏳ Checking…';
+  st.style.display = 'block'; st.style.background = '#eef2ff'; st.style.color = '#3730a3'; st.textContent = 'Reading bookings and stock transactions…';
+  try {
+    const res = await API.inventoryCall('getInvReconciliation', {
+      sessionId: invSessionId,
+      fromDate: document.getElementById('rc_fromDate').value,
+      toDate: document.getElementById('rc_toDate').value
+    });
+    if (!res.success) {
+      st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = res.message || 'Could not load the report';
+      return;
+    }
+    reconData = res;
+    st.style.display = 'none';
+    renderReconciliation();
+  } catch (e) {
+    st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate';
+  }
+}
+
+function renderReconciliation() {
+  const box = document.getElementById('rc_content');
+  if (!reconData) { box.innerHTML = ''; return; }
+  const d = reconData, s = d.summary;
+  const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px 14px;text-align:center;min-width:110px;">' +
+    '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
+
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' +
+    card('Bookings checked', s.bookings, '#667eea') + card('Accessories checked', s.checked, '#667eea') +
+    card('✅ OK', s.ok, '#2e7d32') + card('❌ Not deducted', s.missing, '#c62828') + card('⚠️ Short', s.short, '#e65100') +
+    card('⚠️ Deducted extra', s.extra, '#e65100') + card('Issued but not expected', s.issuedAnyway, '#6a1b9a') + '</div>';
+
+  const badge = {
+    ok:             ['✅ OK', '#e8f5e9', '#2e7d32'],
+    missing:        ['❌ Not deducted', '#ffebee', '#c62828'],
+    short:          ['⚠️ Short', '#fff3e0', '#e65100'],
+    extra:          ['⚠️ Deducted extra', '#fff3e0', '#e65100'],
+    issued_pending: ['Issued although Pending', '#f3e5f5', '#6a1b9a'],
+    issued_refused: ['Issued although Refused', '#f3e5f5', '#6a1b9a'],
+    not_ordered:    ['Issued, not ordered', '#f3e5f5', '#6a1b9a']
+  };
+  const txnText = rows => (rows || []).map(t => _rcEsc(t.date) + ' · ' + _rcEsc(t.type) + ' ' + t.qty + ' × ' + _rcEsc(t.skuName || t.skuId) +
+    (t.enteredBy ? ' · ' + _rcEsc(t.enteredBy) : '') + (t.remarks ? ' · ' + _rcEsc(t.remarks) : '')).join('<br>') || '—';
+
+  let items = d.items || [];
+  if (document.getElementById('rc_filter').value === 'problems') items = items.filter(it => it.status !== 'ok');
+
+  html += '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:6px 0;">Booking accessories (' + items.length + ')</div>';
+  if (items.length === 0) {
+    html += '<div style="color:#2e7d32;padding:12px;background:#f1f8f1;border-radius:8px;">No problems found for this period 🎉</div>';
+  } else {
+    html += '<div style="overflow-x:auto;"><table class="report-table" style="min-width:980px;"><thead><tr>' +
+      ['Receipt', 'Customer', 'Model', 'Delivery', 'Accessory', 'Expected', 'Issued', 'Status', 'Stock transactions']
+        .map(h => '<th style="text-align:left;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+      items.map(it => {
+        const b = badge[it.status] || [it.status, '#eee', '#333'];
+        return '<tr style="vertical-align:top;">' +
+          '<td>' + _rcEsc(it.receiptNo) + '</td><td>' + _rcEsc(it.customer) + '</td>' +
+          '<td>' + _rcEsc([it.model, it.variant].filter(Boolean).join(' ')) + '</td><td>' + _rcEsc(it.deliveryDate) + '</td>' +
+          '<td style="font-weight:700;">' + _rcEsc(it.accessory) + (it.note ? ' <span style="color:#999;font-weight:400;">(' + _rcEsc(it.note) + ')</span>' : '') + '</td>' +
+          '<td>' + it.expected + '</td><td style="font-weight:700;">' + it.issued + '</td>' +
+          '<td><span style="background:' + b[1] + ';color:' + b[2] + ';padding:3px 9px;border-radius:12px;font-weight:700;font-size:12px;white-space:nowrap;">' + b[0] + '</span></td>' +
+          '<td style="font-size:12px;color:#555;">' + txnText(it.txns) + '</td></tr>';
+      }).join('') + '</tbody></table></div>';
+  }
+
+  const section = (title, hint, rows, rowHtml) => {
+    if (!rows || rows.length === 0) return '';
+    return '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:22px 0 2px;">' + title + ' (' + rows.length + ')</div>' +
+      '<div style="font-size:12px;color:#999;margin-bottom:6px;">' + hint + '</div>' + rows.map(rowHtml).join('');
+  };
+  const box1 = inner => '<div style="background:#fafbff;border:1px solid #e8eaf6;border-radius:8px;padding:8px 12px;margin:5px 0;font-size:12.5px;">' + inner + '</div>';
+
+  html += section('Repeated ISSUE rows for one booking + SKU',
+    'The same SKU was issued to the same booking more than once.', d.duplicateIssues,
+    x => box1('<strong>Receipt ' + _rcEsc(x.receiptNo) + '</strong> · ' + _rcEsc(x.skuId) + '<br>' + txnText(x.rows)));
+  html += section('Repeated OTC sale rows',
+    'Same OTC receipt + SKU + customer entered more than once — possibly a double click. Verify before acting.', d.duplicateOtc,
+    x => box1('<strong>' + _rcEsc(x.customer) + '</strong> · OTC receipt ' + _rcEsc(x.otcReceipt || '—') + ' · ' + _rcEsc(x.skuName) + '<br>' + txnText(x.rows)));
+  html += section('OTC sale to a customer whose booking also had the accessory',
+    'Matched by customer name — possible double deduction (once on the booking, once as OTC). Verify.', d.otcVsBooking,
+    x => box1('<strong>' + _rcEsc(x.customer) + '</strong> · ' + _rcEsc(x.accessory) + ' · OTC receipt ' + _rcEsc(x.otcReceipt || '—') +
+      ' · booking receipt ' + _rcEsc(x.bookingReceipt) + '<br>' + txnText([x.row])));
+
+  box.innerHTML = html;
 }
 
 async function loadReport() {
