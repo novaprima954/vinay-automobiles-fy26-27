@@ -196,7 +196,7 @@ function showTab(name) {
   if (name === 'reports') {} // user clicks Generate manually
   if (name === 'recon') initReconDates();
   document.querySelector('.container').classList.toggle('inv-wide', name === 'reports' || name === 'recon');
-  if (name === 'adacc') { document.getElementById('adaccTab').classList.add('active'); loadADAccessories(); }
+  if (name === 'adacc') { document.getElementById('adaccTab').classList.add('active'); initAdMonthDropdown(); loadADAccessories(); }
 }
 
 // ==========================================
@@ -1664,11 +1664,28 @@ function showRptStatus(msg, bg, color) {
 // AD ACCESSORIES CALCULATOR
 // ==========================================
 
+// Month dropdown: current month first, then back 18 months, plus "All time"
+function initAdMonthDropdown() {
+  const sel = document.getElementById('adaccMonth');
+  if (!sel || sel.options.length > 0) return;
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const now = new Date();
+  let html = '';
+  for (let i = 0; i < 19; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const val = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    html += '<option value="' + val + '">' + names[d.getMonth()] + ' ' + d.getFullYear() + '</option>';
+  }
+  html += '<option value="">All time</option>';
+  sel.innerHTML = html;
+  sel.value = sel.options[0].value; // current month
+}
+
 async function loadADAccessories() {
   const monthEl = document.getElementById('adaccMonth');
   const content = document.getElementById('adaccContent');
 
-  const monthVal = monthEl.value; // e.g. "2026-05"
+  const monthVal = monthEl.value; // e.g. "2026-05", '' = all time
   const dateFilter = monthVal ? 'month:' + monthVal : 'all';
 
   content.innerHTML = '<div class="loading" style="padding:30px; text-align:center;"><div class="spinner"></div><div style="margin-top:8px; color:#666;">Loading...</div></div>';
@@ -1679,42 +1696,71 @@ async function loadADAccessories() {
       content.innerHTML = '<div style="padding:20px; color:#dc3545;">' + (res.message || 'Error loading data') + '</div>';
       return;
     }
-    renderADAccessories(res.stats, monthVal);
+    if (!res.ads) {
+      content.innerHTML = '<div style="padding:20px; color:#dc3545;">The server has not been updated yet — please redeploy the Apps Script, then refresh.</div>';
+      return;
+    }
+    renderADAccessories(res.ads, monthVal);
   } catch(e) {
     content.innerHTML = '<div style="padding:20px; color:#dc3545;">Error: ' + e.message + '</div>';
   }
 }
 
-function renderADAccessories(stats, monthVal) {
+function renderADAccessories(ads, monthVal) {
   const content = document.getElementById('adaccContent');
-  if (!stats || stats.length === 0) {
-    content.innerHTML = '<div style="padding:40px; text-align:center; color:#999; font-size:14px;">No AD sale data found for this period.</div>';
+  if (!ads || ads.length === 0) {
+    content.innerHTML = '<div style="padding:40px; text-align:center; color:#999; font-size:14px;">No vehicle or AD sale data found for this period.</div>';
     return;
   }
 
+  // "12 (60%)" - quantity and its share of the vehicles sold of that model
+  const cell = function(qty, vehicles) {
+    if (!qty) return '<span style="color:#bbb;">—</span>';
+    if (!vehicles) return '<strong>' + qty + '</strong>';
+    const pct = Math.round(qty * 1000 / vehicles) / 10;
+    return '<strong style="color:#667eea;">' + qty + '</strong> <span style="color:#2e7d32;font-weight:700;">(' + pct + '%)</span>';
+  };
+  const th = 'padding:8px 14px; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;';
+
   let html = '';
-  stats.forEach(function(ad) {
+  ads.forEach(function(ad) {
     html += `
       <div style="background:#fff; border-radius:12px; box-shadow:0 2px 8px rgba(0,0,0,0.08); margin-bottom:16px; overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:14px 18px;">
+        <div style="background:linear-gradient(135deg,#667eea,#764ba2); color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
           <span style="font-weight:700; font-size:15px;">🏪 ${escHtml(ad.adName)}</span>
+          <span style="font-size:13px; opacity:0.95;">${ad.hasMapping ? '🏍️ ' + ad.totalVehicles + ' vehicles' : 'No HSRP name mapped — vehicles not counted'}</span>
         </div>
         <div style="overflow-x:auto;">
           <table style="width:100%; border-collapse:collapse; font-size:13px;">
             <thead><tr style="background:#f8f9ff;">
-              <th style="padding:8px 14px; text-align:left; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Product</th>
-              <th style="padding:8px 14px; text-align:center; font-weight:600; color:#555; border-bottom:2px solid #e0e0ff;">Qty Received</th>
+              <th style="${th} text-align:left;">Model</th>
+              <th style="${th} text-align:center;">Vehicles Sold</th>
+              <th style="${th} text-align:center;">Guard</th>
+              <th style="${th} text-align:center;">Matin</th>
+              <th style="${th} text-align:center;">Helmet</th>
             </tr></thead>
             <tbody>
-              ${ad.products.map(function(p) {
-                return '<tr style="border-bottom:1px solid #f5f5f5;">'
-                  + '<td style="padding:8px 14px; color:#333;">' + escHtml(p.skuName) + '</td>'
-                  + '<td style="padding:8px 14px; text-align:center; font-weight:700; color:#667eea;">' + p.qty + '</td>'
-                  + '</tr>';
-              }).join('')}
+              ${ad.models.length === 0 ? '<tr><td colspan="5" style="padding:10px 14px; color:#999;">No vehicles or model accessories this period</td></tr>' :
+                ad.models.map(function(m) {
+                  return '<tr style="border-bottom:1px solid #f5f5f5;">'
+                    + '<td style="padding:8px 14px; color:#333; font-weight:600;">' + escHtml(m.model) + '</td>'
+                    + '<td style="padding:8px 14px; text-align:center; font-weight:700;">' + (m.vehicles || '<span style="color:#bbb;">—</span>') + '</td>'
+                    + '<td style="padding:8px 14px; text-align:center;">' + cell(m.guard, m.vehicles) + '</td>'
+                    + '<td style="padding:8px 14px; text-align:center;">' + cell(m.matin, m.vehicles) + '</td>'
+                    + '<td style="padding:8px 14px; text-align:center;">' + cell(m.helmet, m.vehicles) + '</td>'
+                    + '</tr>';
+                }).join('')}
             </tbody>
           </table>
         </div>
+        ${ad.other && ad.other.length ? `
+        <div style="padding:10px 18px 14px; border-top:1px solid #eee;">
+          <div style="font-size:12px; font-weight:800; color:#555; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:6px;">Other / common accessories</div>
+          ${ad.other.map(function(o) {
+            return '<div style="display:flex; justify-content:space-between; padding:4px 0; font-size:13px; border-bottom:1px dashed #f0f0f0;">'
+              + '<span style="color:#333;">' + escHtml(o.skuName) + '</span><strong style="color:#667eea;">' + o.qty + '</strong></div>';
+          }).join('')}
+        </div>` : ''}
       </div>`;
   });
 

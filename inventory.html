@@ -741,10 +741,11 @@
       <!-- ===== AD ACCESSORIES CALCULATOR ===== -->
       <div id="panel-adacc" class="inv-panel">
         <h3>📋 AD Accessories Received</h3>
+        <p style="font-size:12px;color:#777;margin:0 0 10px;">Vehicles sold to each AD come from the HSRP sheet (invoice month); accessories come from AD Sales. Percent = accessories sold ÷ vehicles of that model.</p>
         <div class="filter-row">
           <div class="form-group">
             <label>Month</label>
-            <input type="month" id="adaccMonth" onchange="loadADAccessories()">
+            <select id="adaccMonth" onchange="loadADAccessories()"></select>
           </div>
           <div class="form-group">
             <label>&nbsp;</label>
@@ -840,6 +841,6 @@
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js?v=7"></script>
-  <script src="js/inventory.js?v=3"></script>
+  <script src="js/inventory.js?v=4"></script>
 </body>
 </html>
