@@ -2348,7 +2348,7 @@ async function runDmsComparison() {
     if (rows.length === 0) { box.innerHTML = errorHtml('No enquiries found in the file'); return; }
     const r = await API.compareDmsEnquiries(rows, document.getElementById('dmsFromDate').value, document.getElementById('dmsToDate').value);
     if (!r.success) { box.innerHTML = errorHtml(r.message); return; }
-    dmsResult = r; dmsFilter = 'all';
+    dmsResult = r; dmsFilter = 'all'; dmsExecFilter = 'all'; dmsVehicleFilter = 'all'; dmsStatusFilter = 'all';
     document.getElementById('dmsExportBtn').style.display = '';
     renderDmsComparison();
   } catch (e) {
@@ -2360,7 +2360,44 @@ async function runDmsComparison() {
 
 function setDmsFilter(f) { dmsFilter = f; renderDmsComparison(); }
 
+let dmsExecFilter = 'all', dmsVehicleFilter = 'all', dmsStatusFilter = 'all';
+
+function setDmsExtraFilter(kind, value) {
+  if (kind === 'exec') dmsExecFilter = value;
+  if (kind === 'vehicle') dmsVehicleFilter = value;
+  if (kind === 'status') dmsStatusFilter = value;
+  renderDmsComparison();
+}
+
+function _dmsRowExec(r) {
+  const n = String((r.dms && r.dms.salesman) || (r.crm && r.crm.assignedTo) || '').toLowerCase().replace(/[^a-z ]/g, ' ').trim().split(/\s+/)[0];
+  return n || 'unknown';
+}
+
+function _dmsRowIsEv(r) {
+  const m = String((r.dms && r.dms.baseModel) || (r.crm && r.crm.baseModel) || '').toLowerCase();
+  return m === 'iqube' || m === 'orbiter';
+}
+
+// DMS status (Open / Booked / Closed); CRM-only rows use the CRM status mapped the same way
+function _dmsRowStatus(r) {
+  if (r.dms && r.dms.status) return r.dms.status;
+  const s = r.crm ? r.crm.status : '';
+  return s === 'Converted' ? 'Booked' : (s === 'Lost' ? 'Closed' : 'Open');
+}
+
+// Executive / vehicle type / status filters (these also drive the summary numbers)
+function _dmsPassesBaseFilters(r) {
+  if (dmsExecFilter !== 'all' && _dmsRowExec(r) !== dmsExecFilter) return false;
+  if (dmsVehicleFilter === 'ev' && !_dmsRowIsEv(r)) return false;
+  if (dmsVehicleFilter === 'ice' && _dmsRowIsEv(r)) return false;
+  if (dmsStatusFilter !== 'all' && _dmsRowStatus(r) !== dmsStatusFilter) return false;
+  return true;
+}
+
+// ...plus the result-type chip
 function _dmsRowVisible(r) {
+  if (!_dmsPassesBaseFilters(r)) return false;
   if (dmsFilter === 'matched_ok') return r.type === 'matched' && r.problems === 0;
   if (dmsFilter === 'mismatch') return r.type === 'matched' && r.problems > 0;
   if (dmsFilter === 'missing_crm') return r.type === 'missing_crm';
@@ -2372,18 +2409,49 @@ function _dmsRowVisible(r) {
 function renderDmsComparison() {
   const box = document.getElementById('dmsCompareContent');
   if (!dmsResult) { box.innerHTML = ''; return; }
-  const t = dmsResult.totals;
+
+  // Summary numbers follow the executive / vehicle / status filters
+  const base = dmsResult.rows.filter(_dmsPassesBaseFilters);
+  const t = { total: base.length, matched: 0, missingCrm: 0, missingDms: 0, withProblems: 0 };
+  const byExec = {};
+  base.forEach(r => {
+    const k = _dmsRowExec(r);
+    const e = byExec[k] || (byExec[k] = { executive: k.charAt(0).toUpperCase() + k.slice(1), total: 0, matched: 0, missingCrm: 0, missingDms: 0, nameDiff: 0, modelDiff: 0, statusDiff: 0, commentFlags: 0 });
+    e.total++;
+    if (r.type === 'matched') { e.matched++; t.matched++; }
+    if (r.type === 'missing_crm') { e.missingCrm++; t.missingCrm++; }
+    if (r.type === 'missing_dms') { e.missingDms++; t.missingDms++; }
+    if (r.nameLevel === 'different') e.nameDiff++;
+    if (r.modelSame === false) e.modelDiff++;
+    if (r.statusSame === false) e.statusDiff++;
+    r.flags.forEach(f => { if (f.indexOf('DMS Open but') === 0 || f.indexOf('No follow-up') === 0) e.commentFlags++; });
+    if (r.problems > 0) t.withProblems++;
+  });
+  const execList = Object.keys(byExec).map(k => byExec[k]).sort((a, b) => b.total - a.total);
+
+  // Executive dropdown lists everyone in the result, not just those left after filtering
+  const allExecs = {};
+  dmsResult.rows.forEach(r => { allExecs[_dmsRowExec(r)] = true; });
+  const sel = (id, cur, opts) => '<select onchange="setDmsExtraFilter(\'' + id + '\', this.value)" style="padding:7px 10px;border:2px solid #e0e0e0;border-radius:8px;font-size:13px;background:white;">' +
+    opts.map(o => '<option value="' + o[0] + '"' + (cur === o[0] ? ' selected' : '') + '>' + o[1] + '</option>').join('') + '</select>';
+
   const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px;text-align:center;">' +
     '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
 
-  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:8px 0 12px;">' +
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0;">' +
+    sel('exec', dmsExecFilter, [['all', 'All executives']].concat(Object.keys(allExecs).sort().map(k => [k, k.charAt(0).toUpperCase() + k.slice(1)]))) +
+    sel('vehicle', dmsVehicleFilter, [['all', 'ICE + EV'], ['ice', 'ICE'], ['ev', 'EV (iQube / Orbiter)']]) +
+    sel('status', dmsStatusFilter, [['all', 'All statuses'], ['Open', 'Open'], ['Booked', 'Booked / Converted'], ['Closed', 'Closed / Lost']]) +
+    '</div>';
+
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:8px 0 12px;">' +
     card('Compared', t.total, '#667eea') + card('Matched', t.matched, '#388E3C') + card('In DMS, not CRM', t.missingCrm, '#e65100') +
     card('In CRM, not DMS', t.missingDms, '#c62828') + card('With problems', t.withProblems, '#9C27B0') + '</div>';
 
   html += '<div style="overflow-x:auto;margin-bottom:12px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:#f0f2ff;color:#444;text-align:right;">' +
     ['Executive', 'Total', 'Matched', 'In DMS not CRM', 'In CRM not DMS', 'Name differs', 'Model differs', 'Status differs', 'Comment flags']
       .map((h, i) => '<th style="padding:7px 8px;text-align:' + (i === 0 ? 'left' : 'right') + ';">' + h + '</th>').join('') + '</tr></thead><tbody>' +
-    dmsResult.byExecutive.map(e => '<tr style="border-bottom:1px solid #eee;text-align:right;"><td style="text-align:left;padding:7px 8px;font-weight:700;">' + esc(e.executive) + '</td>' +
+    execList.map(e => '<tr style="border-bottom:1px solid #eee;text-align:right;"><td style="text-align:left;padding:7px 8px;font-weight:700;">' + esc(e.executive) + '</td>' +
       [e.total, e.matched, e.missingCrm, e.missingDms, e.nameDiff, e.modelDiff, e.statusDiff, e.commentFlags].map(n => '<td style="padding:7px 8px;">' + n + '</td>').join('') + '</tr>').join('') +
     '</tbody></table></div>';
 
