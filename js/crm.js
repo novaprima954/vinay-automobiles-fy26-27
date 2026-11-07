@@ -117,7 +117,7 @@ function switchTab(tab) {
   if (tab === 'myBookings' && (currentUser.role === 'financier' || currentUser.role === 'admin')) loadFinancierBookings();
   // All Leads is load-on-demand (see the "Load List" button in the tab) — no auto-load here.
   if (tab === 'admin') {
-    if (currentUser.role === 'admin') { loadAdmin(); initConversionReportDates(); }
+    if (currentUser.role === 'admin') { loadAdmin(); initConversionReportDates(); initDmsDates(); }
     else if (currentUser.role === 'financier') {
       // Show financier's own analytics in the admin tab
       const container = document.getElementById('finAnalyticsContent');
@@ -2258,6 +2258,183 @@ function renderLeadDetail(lead) {
 // only when the sale is actually saved there (and linked to it by Lead ID / Receipt No).
 function convertLead(leadId, name) {
   window.location.href = 'sales.html?leadId=' + encodeURIComponent(leadId);
+}
+
+// ── DMS vs CRM COMPARISON (admin) ──────────
+
+let dmsResult = null;
+let dmsFilter = 'all';
+
+function initDmsDates() {
+  const f = document.getElementById('dmsFromDate'), t = document.getElementById('dmsToDate');
+  if (!f || !t || f.value) return;
+  const now = new Date();
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  f.value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
+  t.value = iso(now);
+}
+
+// '01-Nov-2026' / '01-Nov-26' / '2026-11-01' / '01/11/2026' -> 'yyyy-MM-dd'
+function _dmsParseDate(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return isNaN(v.getTime()) ? '' : v.getFullYear() + '-' + String(v.getMonth() + 1).padStart(2, '0') + '-' + String(v.getDate()).padStart(2, '0');
+  const s = String(v).trim();
+  let m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s);
+  if (m) return m[1] + '-' + m[2] + '-' + m[3];
+  m = /^(\d{1,2})[-\/ ]([A-Za-z]{3})[a-z]*[-\/ ,]+(\d{2,4})/.exec(s);
+  if (m) {
+    const mi = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'].indexOf(m[2].toLowerCase());
+    if (mi >= 0) {
+      const y = m[3].length === 2 ? '20' + m[3] : m[3];
+      return y + '-' + String(mi + 1).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+    }
+  }
+  m = /^(\d{1,2})[\/-](\d{1,2})[\/-](\d{4})/.exec(s);
+  if (m) return m[3] + '-' + String(m[2]).padStart(2, '0') + '-' + String(m[1]).padStart(2, '0');
+  return '';
+}
+
+// Reads the DMS export: a tab-separated text file with an .xls name (as exported), or a real xls/xlsx/csv.
+async function _dmsReadFile(file) {
+  const buf = await file.arrayBuffer();
+  const b = new Uint8Array(buf);
+  const isBinary = (b[0] === 0x50 && b[1] === 0x4B) || (b[0] === 0xD0 && b[1] === 0xCF); // xlsx (zip) / old xls (OLE)
+  let table;
+  if (isBinary && typeof XLSX !== 'undefined') {
+    const wb = XLSX.read(buf, { type: 'array' });
+    table = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header: 1, raw: false, defval: '' });
+  } else {
+    const text = new TextDecoder('utf-8').decode(buf).replace(/^﻿/, '');
+    const delim = text.indexOf('\t') !== -1 ? '\t' : ',';
+    table = text.split(/\r?\n/).map(line => line.split(delim));
+  }
+
+  // header row = the first row that has both "Enquiry No" and "Mobile"
+  const norm = s => String(s || '').toLowerCase().replace(/[^a-z]/g, '');
+  let hi = -1;
+  for (let i = 0; i < Math.min(table.length, 15); i++) {
+    const cells = table[i].map(norm);
+    if (cells.indexOf('enquiryno') !== -1 && cells.indexOf('mobile') !== -1) { hi = i; break; }
+  }
+  if (hi < 0) throw new Error('This does not look like the DMS enquiry export (no "Enquiry No" and "Mobile" header found).');
+  const col = {};
+  table[hi].forEach((h, i) => { col[norm(h)] = i; });
+  const get = (r, key) => { const i = col[key]; return i === undefined ? '' : String(r[i] === undefined || r[i] === null ? '' : r[i]).trim(); };
+
+  const rows = [];
+  for (let i = hi + 1; i < table.length; i++) {
+    const r = table[i];
+    if (!get(r, 'enquiryno')) continue;
+    rows.push({
+      enqNo: get(r, 'enquiryno'), date: _dmsParseDate(get(r, 'enquirydate')), name: get(r, 'customername'),
+      mobile: get(r, 'mobile') || get(r, 'phone'), model: get(r, 'enquiredmodel'), salesman: get(r, 'enquirysalesman'),
+      category: get(r, 'enquirycategory'), status: get(r, 'enquirystatus'), fuNo: get(r, 'followupno'),
+      fuDate: _dmsParseDate(get(r, 'followupdate')), fuType: get(r, 'followuptype'), fuComment: get(r, 'followupcomments'),
+      nextFu: _dmsParseDate(get(r, 'nextfollowupdate'))
+    });
+  }
+  return rows;
+}
+
+async function runDmsComparison() {
+  const box = document.getElementById('dmsCompareContent');
+  const btn = document.getElementById('dmsCompareBtn');
+  const file = document.getElementById('dmsFile').files[0];
+  if (!file) { showMessage('Choose the DMS file first', 'error'); return; }
+  btn.disabled = true;
+  box.innerHTML = '<div class="loading"><div class="spinner"></div><div>Reading file and comparing…</div></div>';
+  try {
+    const rows = await _dmsReadFile(file);
+    if (rows.length === 0) { box.innerHTML = errorHtml('No enquiries found in the file'); return; }
+    const r = await API.compareDmsEnquiries(rows, document.getElementById('dmsFromDate').value, document.getElementById('dmsToDate').value);
+    if (!r.success) { box.innerHTML = errorHtml(r.message); return; }
+    dmsResult = r; dmsFilter = 'all';
+    document.getElementById('dmsExportBtn').style.display = '';
+    renderDmsComparison();
+  } catch (e) {
+    box.innerHTML = errorHtml(e.message || 'Could not compare');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function setDmsFilter(f) { dmsFilter = f; renderDmsComparison(); }
+
+function _dmsRowVisible(r) {
+  if (dmsFilter === 'matched_ok') return r.type === 'matched' && r.problems === 0;
+  if (dmsFilter === 'mismatch') return r.type === 'matched' && r.problems > 0;
+  if (dmsFilter === 'missing_crm') return r.type === 'missing_crm';
+  if (dmsFilter === 'missing_dms') return r.type === 'missing_dms';
+  if (dmsFilter === 'flags') return r.flags.some(f => f.indexOf('DMS Open') === 0 || f.indexOf('No follow-up') === 0);
+  return true;
+}
+
+function renderDmsComparison() {
+  const box = document.getElementById('dmsCompareContent');
+  if (!dmsResult) { box.innerHTML = ''; return; }
+  const t = dmsResult.totals;
+  const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px;text-align:center;">' +
+    '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
+
+  let html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;margin:8px 0 12px;">' +
+    card('Compared', t.total, '#667eea') + card('Matched', t.matched, '#388E3C') + card('In DMS, not CRM', t.missingCrm, '#e65100') +
+    card('In CRM, not DMS', t.missingDms, '#c62828') + card('With problems', t.withProblems, '#9C27B0') + '</div>';
+
+  html += '<div style="overflow-x:auto;margin-bottom:12px;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;"><thead><tr style="background:#f0f2ff;color:#444;text-align:right;">' +
+    ['Executive', 'Total', 'Matched', 'In DMS not CRM', 'In CRM not DMS', 'Name differs', 'Model differs', 'Status differs', 'Comment flags']
+      .map((h, i) => '<th style="padding:7px 8px;text-align:' + (i === 0 ? 'left' : 'right') + ';">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+    dmsResult.byExecutive.map(e => '<tr style="border-bottom:1px solid #eee;text-align:right;"><td style="text-align:left;padding:7px 8px;font-weight:700;">' + esc(e.executive) + '</td>' +
+      [e.total, e.matched, e.missingCrm, e.missingDms, e.nameDiff, e.modelDiff, e.statusDiff, e.commentFlags].map(n => '<td style="padding:7px 8px;">' + n + '</td>').join('') + '</tr>').join('') +
+    '</tbody></table></div>';
+
+  const chips = [['all', 'All'], ['matched_ok', '✅ Matched OK'], ['mismatch', '⚠️ Matched with differences'], ['missing_crm', 'In DMS, not CRM'], ['missing_dms', 'In CRM, not DMS'], ['flags', 'DMS comment flags']];
+  html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">' + chips.map(c =>
+    '<span onclick="setDmsFilter(\'' + c[0] + '\')" style="cursor:pointer;padding:5px 12px;border-radius:16px;font-size:12px;font-weight:700;' +
+    (dmsFilter === c[0] ? 'background:#667eea;color:white;' : 'background:#f0f2ff;color:#667eea;') + '">' + c[1] + '</span>').join('') + '</div>';
+
+  const rows = dmsResult.rows.filter(_dmsRowVisible);
+  const td = 'padding:7px 8px;vertical-align:top;border-bottom:1px solid #eee;';
+  const dim = s => '<div style="color:#999;font-size:11px;">' + s + '</div>';
+  const diff = bad => bad ? 'background:#fff3e0;' : '';
+  html += '<div style="font-size:12px;color:#777;margin-bottom:6px;">' + rows.length + ' row' + (rows.length === 1 ? '' : 's') + '</div>' +
+    '<div style="overflow-x:auto;"><table style="width:100%;border-collapse:collapse;font-size:12.5px;min-width:1100px;"><thead><tr style="background:#f0f2ff;color:#444;text-align:left;">' +
+    ['Mobile', 'Name (DMS / CRM)', 'Model (DMS / CRM)', 'Executive (DMS / CRM)', 'Dates (DMS / CRM)', 'Status (DMS / CRM)', 'Follow-up comment (DMS / CRM)', 'Flags']
+      .map(h => '<th style="padding:7px 8px;white-space:nowrap;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+    rows.map(r => {
+      const d = r.dms, c = r.crm;
+      const nameBad = r.nameLevel === 'different', nameMid = r.nameLevel === 'similar';
+      return '<tr>' +
+        '<td style="' + td + 'white-space:nowrap;font-weight:700;">' + esc(r.mobile) + '</td>' +
+        '<td style="' + td + (nameBad ? diff(true) : (nameMid ? 'background:#fffde7;' : '')) + '">' + (d ? esc(d.name) : '—') + dim(c ? esc(c.name) + (r.nameSimilarity !== undefined ? ' · ' + r.nameSimilarity + '%' : '') : '—') + '</td>' +
+        '<td style="' + td + diff(r.modelSame === false) + '">' + (d ? esc(d.baseModel) : '—') + dim(c ? esc(c.baseModel || c.model || '—') : '—') + '</td>' +
+        '<td style="' + td + diff(r.executiveSame === false) + '">' + (d ? esc(d.salesman) : '—') + dim(c ? esc(c.assignedTo || 'Pool') : '—') + '</td>' +
+        '<td style="' + td + 'white-space:nowrap;' + diff(r.dateGapDays !== undefined && r.dateGapDays !== null && Math.abs(r.dateGapDays) > 1) + '">' + (d ? esc(d.date) : '—') + dim(c ? esc(c.createdDate) : '—') + '</td>' +
+        '<td style="' + td + diff(r.statusSame === false) + '">' + (d ? esc(d.status) : '—') + dim(c ? esc(c.status) : '—') + '</td>' +
+        '<td style="' + td + 'max-width:280px;">' + (d ? esc(d.fuComment || '—') + (d.nextFu ? dim('next: ' + esc(d.nextFu)) : '') : '—') +
+          dim(c ? esc((c.lastNote || '—') + (c.lostReason && c.status === 'Lost' ? ' · lost: ' + c.lostReason : '')) : '—') + '</td>' +
+        '<td style="' + td + 'font-size:12px;color:#e65100;font-weight:600;">' + (r.flags.length ? r.flags.map(esc).join('<br>') : '<span style="color:#2e7d32;">✅ OK</span>') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+
+  box.innerHTML = html;
+}
+
+function exportDmsComparison() {
+  if (!dmsResult || typeof XLSX === 'undefined') return;
+  const rows = dmsResult.rows.filter(_dmsRowVisible).map(r => {
+    const d = r.dms || {}, c = r.crm || {};
+    return {
+      Result: r.type === 'matched' ? 'Matched' : (r.type === 'missing_crm' ? 'In DMS, not in CRM' : 'In CRM, not in DMS'),
+      Mobile: r.mobile, 'DMS Name': d.name || '', 'CRM Name': c.name || '', 'Name match': r.nameLevel ? r.nameLevel + ' (' + r.nameSimilarity + '%)' : '',
+      'DMS Model': d.model || '', 'CRM Model': c.model || '', 'DMS Salesman': d.salesman || '', 'CRM Executive': c.assignedTo || '',
+      'DMS Enquiry Date': d.date || '', 'CRM Created': c.createdDate || '', 'DMS Status': d.status || '', 'CRM Status': c.status || '',
+      'DMS Follow-up Comment': d.fuComment || '', 'DMS Next Follow-up': d.nextFu || '', 'CRM Last Note': c.lastNote || '', 'CRM Follow-up Date': c.followUpDate || '',
+      Flags: (r.flags || []).join('; ')
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'DMS vs CRM');
+  XLSX.writeFile(wb, 'DMS_vs_CRM_' + new Date().toISOString().split('T')[0] + '.xlsx');
 }
 
 // ── CONVERSION REPORT (admin) ──────────────

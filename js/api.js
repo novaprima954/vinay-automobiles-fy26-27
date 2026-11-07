@@ -634,6 +634,11 @@ const API = {
     return await this.call('getLeadForSale', { sessionId, leadId });
   },
 
+  async compareDmsEnquiries(rows, fromDate, toDate) {
+    const sessionId = SessionManager.getSessionId();
+    return await this.call('compareDmsEnquiries', { sessionId, rows: JSON.stringify(rows), fromDate: fromDate || '', toDate: toDate || '' });
+  },
+
   async getConversionReport(fromDate, toDate, vehicleType) {
     const sessionId = SessionManager.getSessionId();
     return await this.call('getConversionReport', { sessionId, fromDate: fromDate || '', toDate: toDate || '', vehicleType: vehicleType || 'all' });
