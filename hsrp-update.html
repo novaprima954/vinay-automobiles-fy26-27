@@ -735,6 +735,9 @@
         <button class="btn btn-secondary" id="downloadBtn" onclick="downloadData()" style="display: none;">
           ⬇️ Download CSV
         </button>
+        <button class="btn btn-secondary" id="sendWaBtn" onclick="showWaModal()">
+          💬 Send WhatsApp
+        </button>
         <button class="btn btn-secondary" id="exportPdfBtn" onclick="showPdfExportModal()">
           📄 Export to PDF
         </button>
@@ -750,7 +753,7 @@
             <option value="Received">Received</option>
             <option value="Fitted">Fitted</option>
           </select>
-          <span id="bulkDateWrap" style="display: none;">Fitment date
+          <span id="bulkDateWrap" style="display: none;"><span id="bulkDateLabel">Fitment date</span>
             <input type="date" id="bulkFitDate">
           </span>
           <button class="btn btn-primary" id="bulkApplyBtn" onclick="applyBulkStatus()" style="font-size: 13px; padding: 8px 16px;">Apply to selected</button>
@@ -881,6 +884,44 @@
   </div>
 
   <!-- PDF Export Modal -->
+  <div id="waModal" class="modal" style="display: none;">
+    <div class="modal-content" style="max-width: 640px;">
+      <div class="modal-header">
+        <h2>💬 Number Plate Received — WhatsApp</h2>
+        <button class="modal-close" onclick="closeWaModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p style="margin-bottom: 14px; color: #666; font-size: 13px;">
+          Customers of <strong>Vinay Automobiles</strong> whose number plate status was set to <strong>Received</strong> on the chosen date.
+          Each customer is messaged once.
+        </p>
+        <div style="display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 14px;">
+          <div class="form-group" style="margin: 0;">
+            <label for="waDate">Received date</label>
+            <input type="date" id="waDate">
+          </div>
+          <button class="btn btn-primary" id="waFindBtn" onclick="findWaCustomers()">🔍 Find</button>
+        </div>
+        <div id="waResults" style="display: none;">
+          <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 13px;">
+            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: 600;">
+              <input type="checkbox" id="waSelectAll" onchange="toggleWaSelectAll()" checked> Select all
+            </label>
+            <span id="waCount" style="color: #666;"></span>
+          </div>
+          <div id="waList" style="max-height: 280px; overflow-y: auto; border: 1px solid #e0e0e0; border-radius: 8px;"></div>
+          <div id="waSkipped" style="margin-top: 8px; font-size: 12px; color: #b26a00;"></div>
+          <div id="waProgress" style="display: none; margin-top: 10px; font-size: 13px; font-weight: 600; color: #3730a3;"></div>
+          <div id="waSummary" style="margin-top: 10px; font-size: 13px;"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" onclick="closeWaModal()">Close</button>
+        <button class="btn btn-primary" id="waSendBtn" onclick="sendWaMessages()" style="display: none;">📤 Send WhatsApp to Selected</button>
+      </div>
+    </div>
+  </div>
+
   <div id="pdfExportModal" class="modal" style="display: none;">
     <div class="modal-content" style="max-width: 500px;">
       <div class="modal-header">
@@ -920,9 +961,9 @@
   </div>
 
   <script src="js/config.js"></script>
-  <script src="js/api.js?v=6"></script>
+  <script src="js/api.js?v=8"></script>
   <script src="js/auth.js"></script>
-  <script src="js/hsrp-update.js?v=2"></script>
+  <script src="js/hsrp-update.js?v=3"></script>
 
 </body>
 </html>

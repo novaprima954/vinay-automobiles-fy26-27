@@ -768,8 +768,10 @@ function clearSelection() {
 function onBulkStatusChange() {
   const status = document.getElementById('bulkStatus').value;
   const wrap = document.getElementById('bulkDateWrap');
-  wrap.style.display = status === 'Fitted' ? 'inline' : 'none';
-  if (status === 'Fitted' && !document.getElementById('bulkFitDate').value) {
+  const needsDate = status === 'Fitted' || status === 'Received';
+  wrap.style.display = needsDate ? 'inline' : 'none';
+  document.getElementById('bulkDateLabel').textContent = status === 'Received' ? 'Received date ' : 'Fitment date ';
+  if (needsDate && !document.getElementById('bulkFitDate').value) {
     document.getElementById('bulkFitDate').value = new Date().toISOString().split('T')[0];
   }
 }
@@ -781,9 +783,9 @@ async function applyBulkStatus() {
   if (!newStatus) { alert('Choose the status to change to'); return; }
 
   let fitmentDate = '';
-  if (newStatus === 'Fitted') {
+  if (newStatus === 'Fitted' || newStatus === 'Received') {
     fitmentDate = document.getElementById('bulkFitDate').value;
-    if (!fitmentDate) { alert('Pick the fitment date'); return; }
+    if (!fitmentDate) { alert('Pick the ' + (newStatus === 'Received' ? 'received' : 'fitment') + ' date'); return; }
   }
 
   // Status only moves forward - work out which selected rows would be skipped before asking
@@ -799,7 +801,7 @@ async function applyBulkStatus() {
     return;
   }
   let msg = 'Change ' + eligible.length + ' record' + (eligible.length === 1 ? '' : 's') + ' to ' + newStatus +
-    (newStatus === 'Fitted' ? ' with fitment date ' + fitmentDate : '') + '?';
+    (newStatus === 'Fitted' ? ' with fitment date ' + fitmentDate : (newStatus === 'Received' ? ' with received date ' + fitmentDate : '')) + '?';
   if (blocked > 0) msg += '\n\n' + blocked + ' selected row' + (blocked === 1 ? ' is' : 's are') + ' already at or beyond ' + newStatus + ' and will be skipped.';
   if (newStatus === 'Fitted') msg += '\n\nFitted rows cannot be changed again from this screen.';
   if (!confirm(msg)) return;
@@ -834,6 +836,130 @@ async function applyBulkStatus() {
     btn.textContent = oldLabel;
     updateBulkBar();
   }
+}
+
+// ==========================================
+// NUMBER PLATE RECEIVED - WHATSAPP
+// ==========================================
+
+let waCustomers = [];
+
+function showWaModal() {
+  document.getElementById('waDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('waResults').style.display = 'none';
+  document.getElementById('waSendBtn').style.display = 'none';
+  document.getElementById('waModal').style.display = 'flex';
+}
+
+function closeWaModal() {
+  document.getElementById('waModal').style.display = 'none';
+}
+
+function _waEsc(s) {
+  return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+async function findWaCustomers() {
+  const btn = document.getElementById('waFindBtn');
+  const date = document.getElementById('waDate').value;
+  if (!date) { alert('Pick the received date'); return; }
+  btn.disabled = true; btn.textContent = '⏳ Searching…';
+  document.getElementById('waSummary').innerHTML = '';
+  try {
+    const r = await API.getNumberPlateWhatsAppCandidates(date);
+    if (!r.success) { alert(r.message || 'Search failed'); return; }
+    waCustomers = r.customers || [];
+    document.getElementById('waResults').style.display = 'block';
+    document.getElementById('waProgress').style.display = 'none';
+
+    const pending = waCustomers.filter(c => !c.sentOn).length;
+    document.getElementById('waCount').textContent = waCustomers.length + ' found · ' + pending + ' not yet messaged';
+    document.getElementById('waSelectAll').checked = true;
+
+    const list = document.getElementById('waList');
+    if (waCustomers.length === 0) {
+      list.innerHTML = '<div style="padding:16px;color:#999;font-size:13px;text-align:center;">No customers found for this date</div>';
+    } else {
+      list.innerHTML = waCustomers.map((c, idx) =>
+        '<label style="display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid #f3f3f3;cursor:pointer;font-size:13px;">' +
+        '<input type="checkbox" class="wa-cb" value="' + idx + '"' + (c.sentOn ? ' disabled' : ' checked') + ' onchange="updateWaSendButton()">' +
+        '<span style="flex:1;"><strong>' + _waEsc(c.customerName) + '</strong>' +
+        (c.sentOn ? ' <span style="background:#e8f5e9;color:#2e7d32;font-size:10px;font-weight:700;padding:2px 6px;border-radius:8px;">✅ Sent ' + _waEsc(c.sentOn) + '</span>' : '') +
+        '<br><span style="color:#888;font-size:11px;">' + _waEsc(c.mobileNo) + ' · ' + _waEsc(c.registrationNo) + ' · ' + _waEsc(c.modelName) + '</span></span></label>'
+      ).join('');
+    }
+
+    const skipped = [];
+    if (r.skippedNoRegistration) skipped.push(r.skippedNoRegistration + ' without a registration number');
+    if (r.skippedNoMobile) skipped.push(r.skippedNoMobile + ' without a mobile number');
+    document.getElementById('waSkipped').textContent = skipped.length ? '⚠️ Skipped: ' + skipped.join(', ') : '';
+    updateWaSendButton();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Find';
+  }
+}
+
+function toggleWaSelectAll() {
+  const checked = document.getElementById('waSelectAll').checked;
+  document.querySelectorAll('.wa-cb:not(:disabled)').forEach(cb => { cb.checked = checked; });
+  updateWaSendButton();
+}
+
+function updateWaSendButton() {
+  const n = document.querySelectorAll('.wa-cb:checked').length;
+  const btn = document.getElementById('waSendBtn');
+  btn.style.display = waCustomers.length ? '' : 'none';
+  btn.disabled = n === 0;
+  btn.textContent = '📤 Send WhatsApp to ' + n + ' selected';
+}
+
+async function sendWaMessages() {
+  const idx = Array.from(document.querySelectorAll('.wa-cb:checked')).map(cb => parseInt(cb.value, 10));
+  if (idx.length === 0) { alert('Select at least one customer'); return; }
+  if (!confirm('Send the number plate WhatsApp message to ' + idx.length + ' customer' + (idx.length === 1 ? '' : 's') + '?')) return;
+
+  const btn = document.getElementById('waSendBtn');
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1'; btn.disabled = true;
+  const progress = document.getElementById('waProgress');
+  progress.style.display = 'block';
+
+  const srNos = idx.map(i => waCustomers[i].srNo);
+  const BATCH = 20;
+  let sent = 0, failed = 0, skipped = 0;
+  const failedNames = [];
+  try {
+    for (let i = 0; i < srNos.length; i += BATCH) {
+      progress.textContent = 'Sending ' + Math.min(i + BATCH, srNos.length) + ' of ' + srNos.length + '…';
+      const r = await API.sendNumberPlateWhatsAppBatch(srNos.slice(i, i + BATCH));
+      if (r.success && r.results) {
+        r.results.forEach(res => {
+          if (res.success) {
+            sent++;
+            const c = waCustomers.find(x => String(x.srNo) === String(res.srNo));
+            if (c) c.sentOn = 'today';
+          } else if (res.skipped) skipped++;
+          else { failed++; failedNames.push(res.customerName || res.srNo); }
+        });
+      } else {
+        failed += srNos.slice(i, i + BATCH).length;
+        alert('Error: ' + (r.message || 'Batch failed'));
+      }
+    }
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    delete btn.dataset.busy;
+    progress.style.display = 'none';
+  }
+
+  document.getElementById('waSummary').innerHTML =
+    '<div style="color:#166534;font-weight:700;">✅ Sent: ' + sent + '</div>' +
+    (skipped ? '<div style="color:#b26a00;font-weight:700;margin-top:4px;">⏭️ Skipped (already sent / no longer eligible): ' + skipped + '</div>' : '') +
+    (failed ? '<div style="color:#dc3545;font-weight:700;margin-top:4px;">❌ Failed: ' + failed + ' (' + failedNames.slice(0, 5).map(_waEsc).join(', ') + (failedNames.length > 5 ? '…' : '') + ')</div>' : '');
+  await findWaCustomers(); // refresh so sent customers show their Sent tag
 }
 
 /**

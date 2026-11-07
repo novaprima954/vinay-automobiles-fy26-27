@@ -946,6 +946,18 @@ const API = {
     });
   },
 
+  async getNumberPlateWhatsAppCandidates(date) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getNumberPlateWhatsAppCandidates', { sessionId: session.sessionId, date: date || '' });
+  },
+
+  async sendNumberPlateWhatsAppBatch(srNos) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('sendNumberPlateWhatsAppBatch', { sessionId: session.sessionId, srNos: JSON.stringify(srNos) });
+  },
+
   /**
    * Export HSRP to PDF
    */
