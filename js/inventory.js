@@ -319,10 +319,13 @@ async function submitStockIn() {
   const qty        = parseInt(document.getElementById('siQty').value);
   const date       = document.getElementById('siDate').value;
   const remarks    = document.getElementById('siRemarks').value;
-  const invoiceNo  = document.getElementById('siInvoiceNo').value;
+  const invoiceNo  = document.getElementById('siInvoiceNo').value.trim();
 
   if (!skuId || !locationId || !qty || qty < 1) {
     showMessage('Please fill Accessory, Location, and Quantity', 'error'); return;
+  }
+  if (!invoiceNo) {
+    showMessage('Invoice number is required for Stock In', 'error'); return;
   }
 
   const submitBtn = document.getElementById('siSubmitBtn');
@@ -710,7 +713,7 @@ async function submitOtcSale() {
   const items = collectSkuRows('otcSkuList');
 
   if (!customer || !receiptNo || !locationId || items.length === 0) {
-    showMessage('Fill Customer Name, Receipt No, Location, and at least one item', 'error'); return;
+    showMessage('Fill Customer Name, OTC Receipt / Invoice No, Location, and at least one item', 'error'); return;
   }
 
   const submitBtn = document.getElementById('otcSubmitBtn');
@@ -795,6 +798,9 @@ async function submitAdSale() {
 
   if (!adName || !locationId || items.length === 0) {
     showMessage('Select AD Name, Location, and add at least one item', 'error'); return;
+  }
+  if (!invoiceNo) {
+    showMessage('Busy invoice number is required for an AD sale', 'error'); return;
   }
 
   const submitBtn = document.getElementById('adSubmitBtn');
@@ -1248,12 +1254,29 @@ function initReconDates() {
   document.getElementById('rs_toDate').value = t.value;
 }
 
+// Repeated-entry reports share one panel: Stock In, OTC Sale and AD Sale
+let reconRepeatType = 'STOCK_IN';
+const RECON_REPEAT_INFO = {
+  STOCK_IN: { noun: 'Stock In entries', inv: 'Invoice', party: '', intro: 'Looks for the same invoice number entered more than once in Stock In.' },
+  OTC_SALE: { noun: 'OTC sale entries', inv: 'OTC receipt', party: 'customer', intro: 'Looks for the same OTC receipt / invoice number entered more than once for the same SKU and customer.' },
+  AD_SALE:  { noun: 'AD sale entries', inv: 'Busy invoice', party: 'AD', intro: 'Looks for the same Busy invoice number entered more than once for the same SKU and AD.' }
+};
+
 function showReconKind(kind) {
   const acc = kind === 'acc';
   document.getElementById('rcAccBlock').style.display = acc ? '' : 'none';
   document.getElementById('rcStockBlock').style.display = acc ? 'none' : '';
-  document.getElementById('rcKindAcc').className = acc ? 'btn-primary' : 'btn-secondary';
-  document.getElementById('rcKindStock').className = acc ? 'btn-secondary' : 'btn-primary';
+  document.getElementById('rcKindAcc').className   = kind === 'acc'   ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('rcKindStock').className = kind === 'stock' ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('rcKindOtc').className   = kind === 'otc'   ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('rcKindAd').className    = kind === 'ad'    ? 'btn-primary' : 'btn-secondary';
+  if (!acc) {
+    const t = kind === 'otc' ? 'OTC_SALE' : (kind === 'ad' ? 'AD_SALE' : 'STOCK_IN');
+    if (t !== reconRepeatType) { stockReconData = null; document.getElementById('rs_content').innerHTML = ''; }
+    reconRepeatType = t;
+    document.getElementById('rsIntro').textContent = RECON_REPEAT_INFO[t].intro +
+      ' Entries in the date range are checked against all history, so a repeat entered in another month is still caught. Read-only — nothing is changed here.';
+  }
 }
 
 let stockReconData = null;
@@ -1261,10 +1284,11 @@ let stockReconData = null;
 async function loadStockInRecon() {
   const btn = document.getElementById('rs_btn'), st = document.getElementById('rs_status');
   btn.disabled = true; btn.textContent = '⏳ Checking…';
-  st.style.display = 'block'; st.style.background = '#eef2ff'; st.style.color = '#3730a3'; st.textContent = 'Reading Stock In history…';
+  st.style.display = 'block'; st.style.background = '#eef2ff'; st.style.color = '#3730a3'; st.textContent = 'Reading transaction history…';
   try {
     const res = await API.inventoryCall('getInvStockInReconciliation', {
       sessionId: invSessionId,
+      txnType: reconRepeatType,
       fromDate: document.getElementById('rs_fromDate').value,
       toDate: document.getElementById('rs_toDate').value
     });
@@ -1286,152 +1310,66 @@ function renderStockInRecon() {
   const box = document.getElementById('rs_content');
   if (!stockReconData) { box.innerHTML = ''; return; }
   const d = stockReconData, s = d.summary;
+  const info = RECON_REPEAT_INFO[d.txnType || 'STOCK_IN'];
+  const isSale = d.txnType === 'OTC_SALE' || d.txnType === 'AD_SALE';
   const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px 14px;text-align:center;min-width:110px;">' +
     '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
 
   let html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' +
-    card('Stock In entries', s.stockInRows, '#667eea') + card('🔴 Double click', s.doubleClick, '#c62828') +
-    card('🟠 Same invoice + SKU, same qty', s.sameQty, '#e65100') + card('🟡 Same invoice + SKU, different qty', s.diffQty, '#b26a00') +
-    card('Invoice on different days', s.multiDay, '#6a1b9a') + card('Typed differently', s.variants, '#6a1b9a') +
-    card('No invoice number', s.blank, '#555') + '</div>';
+    card(info.noun, s.stockInRows, '#667eea') + card('🔴 Double click', s.doubleClick, '#c62828') +
+    card('🟠 Same ' + info.inv.toLowerCase() + ' + SKU, same qty', s.sameQty, '#e65100') + card('🟡 Same ' + info.inv.toLowerCase() + ' + SKU, different qty', s.diffQty, '#b26a00') +
+    card(info.inv + ' on different days', s.multiDay, '#6a1b9a') + card('Typed differently', s.variants, '#6a1b9a') +
+    (isSale ? card('Same number, different ' + info.party, s.partyDiffers || 0, '#6a1b9a') : '') +
+    card('No ' + info.inv.toLowerCase() + ' number', s.blank, '#555') + '</div>';
 
   const rowsHtml = rows => '<div style="font-size:12px;color:#555;margin-top:4px;">' + rows.map(r =>
-    _rcEsc(r.dateTime) + ' · ' + r.qty + ' × ' + _rcEsc(r.skuName) + (r.invoice ? ' · inv ' + _rcEsc(r.invoice) : '') +
+    _rcEsc(r.dateTime) + ' · ' + r.qty + ' × ' + _rcEsc(r.skuName) + (r.invoice ? ' · ' + _rcEsc(r.invoice) : '') +
+    (isSale && r.party ? ' · ' + _rcEsc(r.party) : '') +
     (r.enteredBy ? ' · ' + _rcEsc(r.enteredBy) : '') + (r.remarks ? ' · ' + _rcEsc(r.remarks) : '')).join('<br>') + '</div>';
   const box1 = (inner, border) => '<div style="background:#fafbff;border:1px solid #e8eaf6;border-left:4px solid ' + border + ';border-radius:8px;padding:8px 12px;margin:6px 0;font-size:13px;">' + inner + '</div>';
   const title = t => '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:20px 0 4px;">' + t + '</div>';
   const hint = t => '<div style="font-size:12px;color:#999;margin-bottom:6px;">' + t + '</div>';
+  const partyTxt = who => isSale && who ? ' · ' + _rcEsc(who) : '';
 
   const kinds = {
-    double_click: ['🔴 Likely double click — same invoice, SKU and qty entered within 3 minutes', '#c62828'],
-    same_qty:     ['🟠 Same invoice and SKU entered again with the same quantity', '#e65100'],
-    diff_qty:     ['🟡 Same invoice and SKU entered again with a different quantity — check for a partial delivery or correction', '#b26a00']
+    double_click: ['🔴 Likely double click — same ' + info.inv.toLowerCase() + ', SKU and qty entered within 3 minutes', '#c62828'],
+    same_qty:     ['🟠 Same ' + info.inv.toLowerCase() + ' and SKU entered again with the same quantity', '#e65100'],
+    diff_qty:     ['🟡 Same ' + info.inv.toLowerCase() + ' and SKU entered again with a different quantity — check for a partial entry or correction', '#b26a00']
   };
   ['double_click', 'same_qty', 'diff_qty'].forEach(k => {
     const list = d.repeats.filter(r => r.kind === k);
     if (!list.length) return;
     html += title(kinds[k][0] + ' (' + list.length + ')');
-    html += list.map(r => box1('<strong>Invoice ' + _rcEsc(r.invoice) + '</strong> · ' + _rcEsc(r.skuName) + ' · total qty ' + r.totalQty + rowsHtml(r.rows), kinds[k][1])).join('');
+    html += list.map(r => box1('<strong>' + info.inv + ' ' + _rcEsc(r.invoice) + '</strong> · ' + _rcEsc(r.skuName) + partyTxt(r.rows[0] && r.rows[0].party) + ' · total qty ' + r.totalQty + rowsHtml(r.rows), kinds[k][1])).join('');
   });
 
+  if (d.partyDiffers && d.partyDiffers.length) {
+    html += title('Same ' + info.inv.toLowerCase() + ' number used for different ' + info.party + 's (' + d.partyDiffers.length + ')') + hint('A receipt / invoice number belongs to one ' + info.party + '. Check for a wrong number or a typo.');
+    html += d.partyDiffers.map(x => box1('<strong>' + info.inv + ' ' + _rcEsc(x.invoice) + '</strong> · ' + x.parties.map(_rcEsc).join('  /  ') + rowsHtml(x.rows), '#6a1b9a')).join('');
+  }
   if (d.multiDay.length) {
-    html += title('Same invoice number on different days (' + d.multiDay.length + ')') + hint('One invoice usually arrives in one go. SKUs may differ; check the dates.');
-    html += d.multiDay.map(x => box1('<strong>Invoice ' + _rcEsc(x.invoice) + '</strong> · ' + x.days.map(_rcEsc).join(', ') + rowsHtml(x.rows), '#6a1b9a')).join('');
+    html += title('Same ' + info.inv.toLowerCase() + ' number on different days (' + d.multiDay.length + ')') + hint('One ' + info.inv.toLowerCase() + ' number usually belongs to one day. SKUs may differ; check the dates.');
+    html += d.multiDay.map(x => box1('<strong>' + info.inv + ' ' + _rcEsc(x.invoice) + '</strong> · ' + x.days.map(_rcEsc).join(', ') + rowsHtml(x.rows), '#6a1b9a')).join('');
   }
   if (d.variants.length) {
-    html += title('Same invoice typed differently (' + d.variants.length + ')') + hint('Treated as one invoice, ignoring case, spaces and dashes.');
+    html += title('Same number typed differently (' + d.variants.length + ')') + hint('Treated as one number, ignoring case, spaces and dashes.');
     html += d.variants.map(x => box1('<strong>' + x.spellings.map(_rcEsc).join('  /  ') + '</strong>' + rowsHtml(x.rows), '#6a1b9a')).join('');
   }
   if (d.blankRepeats.length) {
-    html += title('Repeated entries with no invoice number (' + d.blankRepeats.length + ')') + hint('Same SKU, quantity and date, no invoice number to confirm.');
+    html += title('Repeated entries with no ' + info.inv.toLowerCase() + ' number (' + d.blankRepeats.length + ')') + hint('Same SKU, quantity and date, with no number to confirm.');
     html += d.blankRepeats.map(x => box1('<strong>' + _rcEsc(x.skuName) + '</strong> · qty ' + x.qty + ' · ' + _rcEsc(x.date) + rowsHtml(x.rows), '#555')).join('');
   }
   if (d.blankRows.length) {
-    html += title('Stock In entries with no invoice number (' + s.blank + ')') + hint('These cannot be checked for repeats.');
+    html += title('Entries with no ' + info.inv.toLowerCase() + ' number (' + s.blank + ')') + hint('These cannot be checked for repeats.');
     html += '<div style="overflow-x:auto;"><table class="report-table" style="min-width:700px;"><thead><tr>' +
-      ['Date', 'SKU', 'Qty', 'Location', 'Entered by', 'Remarks'].map(h => '<th style="text-align:left;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
-      d.blankRows.map(r => '<tr><td>' + _rcEsc(r.dateTime) + '</td><td>' + _rcEsc(r.skuName) + '</td><td>' + r.qty + '</td><td>' + _rcEsc(r.location) +
+      ['Date', 'SKU', 'Qty', isSale ? info.party : 'Location', 'Entered by', 'Remarks'].map(h => '<th style="text-align:left;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+      d.blankRows.map(r => '<tr><td>' + _rcEsc(r.dateTime) + '</td><td>' + _rcEsc(r.skuName) + '</td><td>' + r.qty + '</td><td>' + _rcEsc(isSale ? r.party : r.location) +
         '</td><td>' + _rcEsc(r.enteredBy) + '</td><td>' + _rcEsc(r.remarks) + '</td></tr>').join('') + '</tbody></table></div>';
   }
 
-  if (!d.repeats.length && !d.multiDay.length && !d.variants.length && !d.blankRepeats.length) {
-    html += '<div style="color:#2e7d32;padding:12px;background:#f1f8f1;border-radius:8px;">No repeated invoice entries found for this period 🎉</div>';
+  if (!d.repeats.length && !d.multiDay.length && !d.variants.length && !d.blankRepeats.length && !(d.partyDiffers && d.partyDiffers.length)) {
+    html += '<div style="color:#2e7d32;padding:12px;background:#f1f8f1;border-radius:8px;">No repeated entries found for this period 🎉</div>';
   }
-  box.innerHTML = html;
-}
-
-function _rcEsc(s) {
-  return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-}
-
-async function loadReconciliation() {
-  const btn = document.getElementById('rc_btn'), st = document.getElementById('rc_status');
-  btn.disabled = true; btn.textContent = '⏳ Checking…';
-  st.style.display = 'block'; st.style.background = '#eef2ff'; st.style.color = '#3730a3'; st.textContent = 'Reading bookings and stock transactions…';
-  try {
-    const res = await API.inventoryCall('getInvReconciliation', {
-      sessionId: invSessionId,
-      fromDate: document.getElementById('rc_fromDate').value,
-      toDate: document.getElementById('rc_toDate').value
-    });
-    if (!res.success) {
-      st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = res.message || 'Could not load the report';
-      return;
-    }
-    reconData = res;
-    st.style.display = 'none';
-    renderReconciliation();
-  } catch (e) {
-    st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = 'Error: ' + e.message;
-  } finally {
-    btn.disabled = false; btn.textContent = 'Generate';
-  }
-}
-
-function renderReconciliation() {
-  const box = document.getElementById('rc_content');
-  if (!reconData) { box.innerHTML = ''; return; }
-  const d = reconData, s = d.summary;
-  const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px 14px;text-align:center;min-width:110px;">' +
-    '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
-
-  let html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' +
-    card('Bookings checked', s.bookings, '#667eea') + card('Accessories checked', s.checked, '#667eea') +
-    card('✅ OK', s.ok, '#2e7d32') + card('❌ Not deducted', s.missing, '#c62828') + card('⚠️ Short', s.short, '#e65100') +
-    card('⚠️ Deducted extra', s.extra, '#e65100') + card('Issued but not expected', s.issuedAnyway, '#6a1b9a') + '</div>';
-
-  const badge = {
-    ok:             ['✅ OK', '#e8f5e9', '#2e7d32'],
-    missing:        ['❌ Not deducted', '#ffebee', '#c62828'],
-    short:          ['⚠️ Short', '#fff3e0', '#e65100'],
-    extra:          ['⚠️ Deducted extra', '#fff3e0', '#e65100'],
-    issued_pending: ['Issued although Pending', '#f3e5f5', '#6a1b9a'],
-    issued_refused: ['Issued although Refused', '#f3e5f5', '#6a1b9a'],
-    not_ordered:    ['Issued, not ordered', '#f3e5f5', '#6a1b9a']
-  };
-  const txnText = rows => (rows || []).map(t => _rcEsc(t.date) + ' · ' + _rcEsc(t.type) + ' ' + t.qty + ' × ' + _rcEsc(t.skuName || t.skuId) +
-    (t.enteredBy ? ' · ' + _rcEsc(t.enteredBy) : '') + (t.remarks ? ' · ' + _rcEsc(t.remarks) : '')).join('<br>') || '—';
-
-  let items = d.items || [];
-  if (document.getElementById('rc_filter').value === 'problems') items = items.filter(it => it.status !== 'ok');
-
-  html += '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:6px 0;">Booking accessories (' + items.length + ')</div>';
-  if (items.length === 0) {
-    html += '<div style="color:#2e7d32;padding:12px;background:#f1f8f1;border-radius:8px;">No problems found for this period 🎉</div>';
-  } else {
-    html += '<div style="overflow-x:auto;"><table class="report-table" style="min-width:980px;"><thead><tr>' +
-      ['Receipt', 'Customer', 'Model', 'Delivery', 'Accessory', 'Expected', 'Issued', 'Status', 'Stock transactions']
-        .map(h => '<th style="text-align:left;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
-      items.map(it => {
-        const b = badge[it.status] || [it.status, '#eee', '#333'];
-        return '<tr style="vertical-align:top;">' +
-          '<td>' + _rcEsc(it.receiptNo) + '</td><td>' + _rcEsc(it.customer) + '</td>' +
-          '<td>' + _rcEsc([it.model, it.variant].filter(Boolean).join(' ')) + '</td><td>' + _rcEsc(it.deliveryDate) + '</td>' +
-          '<td style="font-weight:700;">' + _rcEsc(it.accessory) + (it.note ? ' <span style="color:#999;font-weight:400;">(' + _rcEsc(it.note) + ')</span>' : '') + '</td>' +
-          '<td>' + it.expected + '</td><td style="font-weight:700;">' + it.issued + '</td>' +
-          '<td><span style="background:' + b[1] + ';color:' + b[2] + ';padding:3px 9px;border-radius:12px;font-weight:700;font-size:12px;white-space:nowrap;">' + b[0] + '</span></td>' +
-          '<td style="font-size:12px;color:#555;">' + txnText(it.txns) + '</td></tr>';
-      }).join('') + '</tbody></table></div>';
-  }
-
-  const section = (title, hint, rows, rowHtml) => {
-    if (!rows || rows.length === 0) return '';
-    return '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:22px 0 2px;">' + title + ' (' + rows.length + ')</div>' +
-      '<div style="font-size:12px;color:#999;margin-bottom:6px;">' + hint + '</div>' + rows.map(rowHtml).join('');
-  };
-  const box1 = inner => '<div style="background:#fafbff;border:1px solid #e8eaf6;border-radius:8px;padding:8px 12px;margin:5px 0;font-size:12.5px;">' + inner + '</div>';
-
-  html += section('Repeated ISSUE rows for one booking + SKU',
-    'The same SKU was issued to the same booking more than once.', d.duplicateIssues,
-    x => box1('<strong>Receipt ' + _rcEsc(x.receiptNo) + '</strong> · ' + _rcEsc(x.skuId) + '<br>' + txnText(x.rows)));
-  html += section('Repeated OTC sale rows',
-    'Same OTC receipt + SKU + customer entered more than once — possibly a double click. Verify before acting.', d.duplicateOtc,
-    x => box1('<strong>' + _rcEsc(x.customer) + '</strong> · OTC receipt ' + _rcEsc(x.otcReceipt || '—') + ' · ' + _rcEsc(x.skuName) + '<br>' + txnText(x.rows)));
-  html += section('OTC sale to a customer whose booking also had the accessory',
-    'Matched by customer name — possible double deduction (once on the booking, once as OTC). Verify.', d.otcVsBooking,
-    x => box1('<strong>' + _rcEsc(x.customer) + '</strong> · ' + _rcEsc(x.accessory) + ' · OTC receipt ' + _rcEsc(x.otcReceipt || '—') +
-      ' · booking receipt ' + _rcEsc(x.bookingReceipt) + '<br>' + txnText([x.row])));
-
   box.innerHTML = html;
 }
 

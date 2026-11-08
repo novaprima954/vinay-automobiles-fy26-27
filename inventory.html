@@ -342,7 +342,7 @@
           </div>
           <div class="form-row">
             <div>
-              <label>Invoice No (optional)</label>
+              <label>Invoice No *</label>
               <input type="text" id="siInvoiceNo" placeholder="Supplier invoice number">
             </div>
             <div>
@@ -479,7 +479,7 @@
             </div>
             <div class="form-row">
               <div>
-                <label>OTC Receipt No</label>
+                <label>OTC Receipt / Invoice No *</label>
                 <input type="text" id="otcReceiptNo" placeholder="Receipt / bill number">
               </div>
               <div>
@@ -534,7 +534,7 @@
                 </select>
               </div>
               <div>
-                <label>Busy Invoice No</label>
+                <label>Busy Invoice No *</label>
                 <input type="text" id="adInvoiceNo" placeholder="Busy invoice number">
               </div>
             </div>
@@ -687,6 +687,8 @@
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
           <button type="button" class="btn-primary" id="rcKindAcc" onclick="showReconKind('acc')" style="padding:8px 16px;font-size:13px;">Accessories vs Inventory</button>
           <button type="button" class="btn-secondary" id="rcKindStock" onclick="showReconKind('stock')" style="padding:8px 16px;font-size:13px;">Stock In — repeated invoices</button>
+          <button type="button" class="btn-secondary" id="rcKindOtc" onclick="showReconKind('otc')" style="padding:8px 16px;font-size:13px;">OTC Sale — repeated entries</button>
+          <button type="button" class="btn-secondary" id="rcKindAd" onclick="showReconKind('ad')" style="padding:8px 16px;font-size:13px;">AD Sale — repeated entries</button>
         </div>
 
         <div id="rcAccBlock">
@@ -713,13 +715,13 @@
         </div>
 
         <div id="rcStockBlock" style="display:none;">
-          <p style="font-size:13px;color:#666;margin:0 0 14px;">
+          <p id="rsIntro" style="font-size:13px;color:#666;margin:0 0 14px;">
             Looks for the same invoice number entered more than once in Stock In. Entries in the date range are checked against all
             Stock In history, so a repeat entered in another month is still caught. Read-only — nothing is changed here.
           </p>
           <div class="filter-row" style="margin-bottom:14px;">
-            <div class="form-group"><label>Stock In From</label><input type="date" id="rs_fromDate"></div>
-            <div class="form-group"><label>Stock In To</label><input type="date" id="rs_toDate"></div>
+            <div class="form-group"><label>Entries From</label><input type="date" id="rs_fromDate"></div>
+            <div class="form-group"><label>Entries To</label><input type="date" id="rs_toDate"></div>
             <div class="form-group"><label>&nbsp;</label>
               <button class="btn-primary" id="rs_btn" onclick="loadStockInRecon()" style="padding:8px 20px;">Generate</button>
             </div>
@@ -871,6 +873,6 @@
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js?v=7"></script>
-  <script src="js/inventory.js?v=6"></script>
+  <script src="js/inventory.js?v=7"></script>
 </body>
 </html>
