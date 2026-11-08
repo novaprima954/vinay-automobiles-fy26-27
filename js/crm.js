@@ -1462,6 +1462,8 @@ async function sendBulkWaMessages() {
   const BATCH_SIZE = 20;
   let sentCount = 0, failCount = 0, skippedCount = 0;
   const failedNames = [];
+  const failReasons = {}; // reason text -> count (shown in the summary so failures can be diagnosed)
+  const addReason = msg => { const k = String(msg || 'Unknown error').slice(0, 200); failReasons[k] = (failReasons[k] || 0) + 1; };
 
   for (let i = 0; i < leadIds.length; i += BATCH_SIZE) {
     const batch = leadIds.slice(i, i + BATCH_SIZE);
@@ -1483,13 +1485,15 @@ async function sendBulkWaMessages() {
             }
           }
           else if (res.skipped) skippedCount++;
-          else { failCount++; failedNames.push(res.customerName || res.leadId); }
+          else { failCount++; failedNames.push(res.customerName || res.leadId); addReason(res.message); }
         });
       } else {
         failCount += batch.length;
+        batch.forEach(() => addReason(r.message || 'Batch failed'));
       }
     } catch(e) {
       failCount += batch.length;
+      batch.forEach(() => addReason(e.message));
     }
   }
 
@@ -1503,7 +1507,8 @@ async function sendBulkWaMessages() {
     '<div style="color:#166534;font-weight:700;">✅ Sent: ' + sentCount + '</div>' +
     (skippedCount > 0 ? '<div style="color:#b26a00;font-weight:700;margin-top:4px;">⏭️ Skipped (already sent today): ' + skippedCount + '</div>' : '') +
     (failCount > 0 ? '<div style="color:#dc3545;font-weight:700;margin-top:4px;">❌ Failed: ' + failCount +
-      (failedNames.length ? ' (' + failedNames.slice(0, 5).map(esc).join(', ') + (failedNames.length > 5 ? '…' : '') + ')' : '') + '</div>' : '');
+      (failedNames.length ? ' (' + failedNames.slice(0, 5).map(esc).join(', ') + (failedNames.length > 5 ? '…' : '') + ')' : '') + '</div>' +
+      '<div style="font-size:12px;color:#8a1c1c;margin-top:4px;">Reason: ' + Object.keys(failReasons).map(k => esc(k) + ' (' + failReasons[k] + ')').join('<br>') + '</div>' : '');
 }
 
 // ── ALL LEADS TAB ──────────────────────────
