@@ -683,7 +683,13 @@
 
       <!-- ===== REPORTS ===== -->
       <div id="panel-recon" class="inv-panel">
-        <h3>🔍 Accessories vs Inventory Reconciliation</h3>
+        <h3>🔍 Reconciliation</h3>
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;">
+          <button type="button" class="btn-primary" id="rcKindAcc" onclick="showReconKind('acc')" style="padding:8px 16px;font-size:13px;">Accessories vs Inventory</button>
+          <button type="button" class="btn-secondary" id="rcKindStock" onclick="showReconKind('stock')" style="padding:8px 16px;font-size:13px;">Stock In — repeated invoices</button>
+        </div>
+
+        <div id="rcAccBlock">
         <p style="font-size:13px;color:#666;margin:0 0 14px;">
           For bookings delivered in the date range with Account Check = Yes: accessories ordered on the booking compared with what was
           issued from stock. Pending / refused accessories are not expected. Read-only — nothing is changed here.
@@ -704,6 +710,23 @@
         </div>
         <div id="rc_status" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;"></div>
         <div id="rc_content"></div>
+        </div>
+
+        <div id="rcStockBlock" style="display:none;">
+          <p style="font-size:13px;color:#666;margin:0 0 14px;">
+            Looks for the same invoice number entered more than once in Stock In. Entries in the date range are checked against all
+            Stock In history, so a repeat entered in another month is still caught. Read-only — nothing is changed here.
+          </p>
+          <div class="filter-row" style="margin-bottom:14px;">
+            <div class="form-group"><label>Stock In From</label><input type="date" id="rs_fromDate"></div>
+            <div class="form-group"><label>Stock In To</label><input type="date" id="rs_toDate"></div>
+            <div class="form-group"><label>&nbsp;</label>
+              <button class="btn-primary" id="rs_btn" onclick="loadStockInRecon()" style="padding:8px 20px;">Generate</button>
+            </div>
+          </div>
+          <div id="rs_status" style="display:none;margin-bottom:12px;padding:10px 14px;border-radius:8px;font-size:13px;font-weight:600;"></div>
+          <div id="rs_content"></div>
+        </div>
       </div>
 
       <div id="panel-reports" class="inv-panel">
@@ -848,6 +871,6 @@
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
   <script src="js/api.js?v=7"></script>
-  <script src="js/inventory.js?v=5"></script>
+  <script src="js/inventory.js?v=6"></script>
 </body>
 </html>

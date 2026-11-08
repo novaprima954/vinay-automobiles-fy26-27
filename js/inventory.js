@@ -1244,6 +1244,100 @@ function initReconDates() {
   const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   f.value = iso(new Date(now.getFullYear(), now.getMonth(), 1));
   t.value = iso(now);
+  document.getElementById('rs_fromDate').value = f.value;
+  document.getElementById('rs_toDate').value = t.value;
+}
+
+function showReconKind(kind) {
+  const acc = kind === 'acc';
+  document.getElementById('rcAccBlock').style.display = acc ? '' : 'none';
+  document.getElementById('rcStockBlock').style.display = acc ? 'none' : '';
+  document.getElementById('rcKindAcc').className = acc ? 'btn-primary' : 'btn-secondary';
+  document.getElementById('rcKindStock').className = acc ? 'btn-secondary' : 'btn-primary';
+}
+
+let stockReconData = null;
+
+async function loadStockInRecon() {
+  const btn = document.getElementById('rs_btn'), st = document.getElementById('rs_status');
+  btn.disabled = true; btn.textContent = '⏳ Checking…';
+  st.style.display = 'block'; st.style.background = '#eef2ff'; st.style.color = '#3730a3'; st.textContent = 'Reading Stock In history…';
+  try {
+    const res = await API.inventoryCall('getInvStockInReconciliation', {
+      sessionId: invSessionId,
+      fromDate: document.getElementById('rs_fromDate').value,
+      toDate: document.getElementById('rs_toDate').value
+    });
+    if (!res.success) {
+      st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = res.message || 'Could not load the report';
+      return;
+    }
+    stockReconData = res;
+    st.style.display = 'none';
+    renderStockInRecon();
+  } catch (e) {
+    st.style.background = '#fdecea'; st.style.color = '#b71c1c'; st.textContent = 'Error: ' + e.message;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Generate';
+  }
+}
+
+function renderStockInRecon() {
+  const box = document.getElementById('rs_content');
+  if (!stockReconData) { box.innerHTML = ''; return; }
+  const d = stockReconData, s = d.summary;
+  const card = (label, val, color) => '<div style="background:#f8f9fa;border-radius:10px;padding:10px 14px;text-align:center;min-width:110px;">' +
+    '<div style="font-size:22px;font-weight:800;color:' + color + ';">' + val + '</div><div style="font-size:11px;color:#888;">' + label + '</div></div>';
+
+  let html = '<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:16px;">' +
+    card('Stock In entries', s.stockInRows, '#667eea') + card('🔴 Double click', s.doubleClick, '#c62828') +
+    card('🟠 Same invoice + SKU, same qty', s.sameQty, '#e65100') + card('🟡 Same invoice + SKU, different qty', s.diffQty, '#b26a00') +
+    card('Invoice on different days', s.multiDay, '#6a1b9a') + card('Typed differently', s.variants, '#6a1b9a') +
+    card('No invoice number', s.blank, '#555') + '</div>';
+
+  const rowsHtml = rows => '<div style="font-size:12px;color:#555;margin-top:4px;">' + rows.map(r =>
+    _rcEsc(r.dateTime) + ' · ' + r.qty + ' × ' + _rcEsc(r.skuName) + (r.invoice ? ' · inv ' + _rcEsc(r.invoice) : '') +
+    (r.enteredBy ? ' · ' + _rcEsc(r.enteredBy) : '') + (r.remarks ? ' · ' + _rcEsc(r.remarks) : '')).join('<br>') + '</div>';
+  const box1 = (inner, border) => '<div style="background:#fafbff;border:1px solid #e8eaf6;border-left:4px solid ' + border + ';border-radius:8px;padding:8px 12px;margin:6px 0;font-size:13px;">' + inner + '</div>';
+  const title = t => '<div style="font-weight:800;color:#555;text-transform:uppercase;font-size:12px;margin:20px 0 4px;">' + t + '</div>';
+  const hint = t => '<div style="font-size:12px;color:#999;margin-bottom:6px;">' + t + '</div>';
+
+  const kinds = {
+    double_click: ['🔴 Likely double click — same invoice, SKU and qty entered within 3 minutes', '#c62828'],
+    same_qty:     ['🟠 Same invoice and SKU entered again with the same quantity', '#e65100'],
+    diff_qty:     ['🟡 Same invoice and SKU entered again with a different quantity — check for a partial delivery or correction', '#b26a00']
+  };
+  ['double_click', 'same_qty', 'diff_qty'].forEach(k => {
+    const list = d.repeats.filter(r => r.kind === k);
+    if (!list.length) return;
+    html += title(kinds[k][0] + ' (' + list.length + ')');
+    html += list.map(r => box1('<strong>Invoice ' + _rcEsc(r.invoice) + '</strong> · ' + _rcEsc(r.skuName) + ' · total qty ' + r.totalQty + rowsHtml(r.rows), kinds[k][1])).join('');
+  });
+
+  if (d.multiDay.length) {
+    html += title('Same invoice number on different days (' + d.multiDay.length + ')') + hint('One invoice usually arrives in one go. SKUs may differ; check the dates.');
+    html += d.multiDay.map(x => box1('<strong>Invoice ' + _rcEsc(x.invoice) + '</strong> · ' + x.days.map(_rcEsc).join(', ') + rowsHtml(x.rows), '#6a1b9a')).join('');
+  }
+  if (d.variants.length) {
+    html += title('Same invoice typed differently (' + d.variants.length + ')') + hint('Treated as one invoice, ignoring case, spaces and dashes.');
+    html += d.variants.map(x => box1('<strong>' + x.spellings.map(_rcEsc).join('  /  ') + '</strong>' + rowsHtml(x.rows), '#6a1b9a')).join('');
+  }
+  if (d.blankRepeats.length) {
+    html += title('Repeated entries with no invoice number (' + d.blankRepeats.length + ')') + hint('Same SKU, quantity and date, no invoice number to confirm.');
+    html += d.blankRepeats.map(x => box1('<strong>' + _rcEsc(x.skuName) + '</strong> · qty ' + x.qty + ' · ' + _rcEsc(x.date) + rowsHtml(x.rows), '#555')).join('');
+  }
+  if (d.blankRows.length) {
+    html += title('Stock In entries with no invoice number (' + s.blank + ')') + hint('These cannot be checked for repeats.');
+    html += '<div style="overflow-x:auto;"><table class="report-table" style="min-width:700px;"><thead><tr>' +
+      ['Date', 'SKU', 'Qty', 'Location', 'Entered by', 'Remarks'].map(h => '<th style="text-align:left;">' + h + '</th>').join('') + '</tr></thead><tbody>' +
+      d.blankRows.map(r => '<tr><td>' + _rcEsc(r.dateTime) + '</td><td>' + _rcEsc(r.skuName) + '</td><td>' + r.qty + '</td><td>' + _rcEsc(r.location) +
+        '</td><td>' + _rcEsc(r.enteredBy) + '</td><td>' + _rcEsc(r.remarks) + '</td></tr>').join('') + '</tbody></table></div>';
+  }
+
+  if (!d.repeats.length && !d.multiDay.length && !d.variants.length && !d.blankRepeats.length) {
+    html += '<div style="color:#2e7d32;padding:12px;background:#f1f8f1;border-radius:8px;">No repeated invoice entries found for this period 🎉</div>';
+  }
+  box.innerHTML = html;
 }
 
 function _rcEsc(s) {
