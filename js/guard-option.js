@@ -5,7 +5,7 @@
 // To change prices or add models later, edit AMOUNTS_BY_MODEL only.
 const GuardOption = (function () {
   const AMOUNTS_BY_MODEL = {   // lower-case model name -> allowed guard amounts
-    'jupiter 110': [2700, 2425],
+    'jupiter 110': [2700, 2225],
     'jupiter 125': [2585, 2150]
   };
 
@@ -18,7 +18,10 @@ const GuardOption = (function () {
   }
 
   function optionsHtml(selected, model) {
-    return '<option value="">-- Guard amount --</option>' + amountsFor(model).map(function (a) {
+    // A booking saved with an older price (no longer in the list) still shows its saved amount
+    const list = amountsFor(model).slice();
+    if (selected && list.indexOf(Number(selected)) === -1) list.push(Number(selected));
+    return '<option value="">-- Guard amount --</option>' + list.map(function (a) {
       return '<option value="' + a + '"' + (String(selected) === String(a) ? ' selected' : '') + '>₹' + a + '</option>';
     }).join('');
   }

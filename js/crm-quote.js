@@ -21,7 +21,7 @@ const PM_CACHE_KEY = 'pm_cache_v1';
 const MANUAL_ACC = { guardPrice: 'guard', helmetPrice: 'helmet' };
 // Preset "other" price pre-filled in the manual box, per model (lower-case) - still editable/clearable.
 const MANUAL_ACC_PRESETS = {
-  guardPrice: { 'jupiter 110': 2425, 'jupiter 125': 2150 }
+  guardPrice: { 'jupiter 110': 2225, 'jupiter 125': 2150 }
 };
 function _manualPreset(key, model) {
   const p = MANUAL_ACC_PRESETS[key];
