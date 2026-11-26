@@ -951,6 +951,12 @@ const API = {
     });
   },
 
+  async getNumberPlateDashboard(year) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getNumberPlateDashboard', { sessionId: session.sessionId, year: year });
+  },
+
   async getNumberPlateWhatsAppCandidates(date) {
     const session = SessionManager.getSession();
     if (!session) throw new Error('No session');

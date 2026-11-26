@@ -519,6 +519,25 @@
     .btn-cancel-modal:hover {
       background: #e0e0e0;
     }
+
+    /* Dashboard (same look as HSRP Update) */
+    .plate-dash-section {
+      background: white; border-radius: 12px; padding: 24px 30px; margin-bottom: 20px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .plate-dash-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px; }
+    .plate-dash-header h2 { margin: 0; color: #333; font-size: 20px; }
+    .plate-dash-filters { display: flex; gap: 8px; align-items: center; }
+    .plate-dash-filters select { padding: 8px 12px; border: 2px solid #ddd; border-radius: 7px; font-size: 14px; font-weight: 600; cursor: pointer; }
+    .plate-dash-filters select:focus { border-color: #667eea; outline: none; }
+    .plate-dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+    .plate-dash-card { border-radius: 10px; padding: 22px 16px; text-align: center; }
+    .plate-dash-count { font-size: 38px; font-weight: 800; line-height: 1; }
+    .plate-dash-label { font-size: 13px; font-weight: 600; margin-top: 6px; opacity: 0.85; }
+    .plate-card-vehicles { background: #ede7f6; color: #4527a0; }
+    .plate-card-ordered  { background: #e3f2fd; color: #1565c0; }
+    .plate-card-pending  { background: #fff3e0; color: #e65100; }
+    .plate-dash-loading { text-align: center; color: #999; padding: 20px; grid-column: 1 / -1; }
   </style>
 </head>
 <body>
@@ -534,6 +553,20 @@
 
     <!-- Message -->
     <div id="statusMessage" class="message"></div>
+
+    <!-- Dashboard: vehicles and ordered number plates for the chosen month (HSRP sheet, by invoice date) -->
+    <div class="plate-dash-section">
+      <div class="plate-dash-header">
+        <h2>📊 Dashboard <span style="font-size:12px;font-weight:500;color:#888;">· Account Check = Yes, by delivery date (Data sheet)</span></h2>
+        <div class="plate-dash-filters">
+          <select id="plateDashMonth" onchange="loadPlateDashboard()"></select>
+          <select id="plateDashYear" onchange="loadPlateDashboard()"></select>
+        </div>
+      </div>
+      <div class="plate-dash-cards" id="plateDashCards">
+        <div class="plate-dash-loading">Loading dashboard...</div>
+      </div>
+    </div>
 
     <!-- Upload Area -->
     <div class="upload-card">
@@ -633,7 +666,7 @@
 
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/api.js?v=4"></script>
-  <script src="js/number-plate-upload.js"></script>
+  <script src="js/api.js?v=10"></script>
+  <script src="js/number-plate-upload.js?v=4"></script>
 </body>
 </html>

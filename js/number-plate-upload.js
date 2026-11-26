@@ -32,12 +32,72 @@ document.addEventListener('DOMContentLoaded', async function() {
     return;
   }
   
+  // Dashboard: vehicles and ordered number plates for the chosen month
+  initPlateDashFilters();
+  loadPlateDashboard();
+
   // Setup drag and drop
   setupDragAndDrop();
   
   // Setup file input
   document.getElementById('fileInput').addEventListener('change', handleFileSelect);
 });
+
+// ==========================================
+// DASHBOARD (numbers only) - from the HSRP sheet, by invoice month
+// ==========================================
+
+let plateDashCache = {}; // year -> { month: { vehicles, numberPlates } }
+
+function initPlateDashFilters() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const monthSel = document.getElementById('plateDashMonth');
+  months.forEach((m, i) => {
+    const opt = document.createElement('option');
+    opt.value = i + 1;
+    opt.textContent = m;
+    if (i === now.getMonth()) opt.selected = true;
+    monthSel.appendChild(opt);
+  });
+  const yearSel = document.getElementById('plateDashYear');
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y;
+    if (y === now.getFullYear()) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+}
+
+// Counts come from the Data sheet (server side); one request per year, then month changes are instant
+async function loadPlateDashboard() {
+  const box = document.getElementById('plateDashCards');
+  const year = parseInt(document.getElementById('plateDashYear').value, 10);
+  try {
+    if (!plateDashCache[year]) {
+      box.innerHTML = '<div class="plate-dash-loading">⏳ Loading...</div>';
+      const r = await API.getNumberPlateDashboard(year);
+      if (!r.success) { box.innerHTML = '<div class="plate-dash-loading">Failed to load dashboard: ' + (r.message || '') + '</div>'; return; }
+      plateDashCache[year] = r.months;
+    }
+    renderPlateDashboard();
+  } catch (e) {
+    box.innerHTML = '<div class="plate-dash-loading">Error loading dashboard</div>';
+    console.error('Dashboard error:', e);
+  }
+}
+
+function renderPlateDashboard() {
+  const month = parseInt(document.getElementById('plateDashMonth').value, 10);
+  const year  = parseInt(document.getElementById('plateDashYear').value, 10);
+  const m = (plateDashCache[year] && plateDashCache[year][month]) || { vehicles: 0, numberPlates: 0, pending: 0 };
+
+  document.getElementById('plateDashCards').innerHTML =
+    '<div class="plate-dash-card plate-card-vehicles"><div class="plate-dash-count">' + m.vehicles + '</div><div class="plate-dash-label">🏍️ Vehicles</div></div>' +
+    '<div class="plate-dash-card plate-card-ordered"><div class="plate-dash-count">' + m.numberPlates + '</div><div class="plate-dash-label">🔖 Number Plate Numbers</div></div>' +
+    '<div class="plate-dash-card plate-card-pending"><div class="plate-dash-count">' + m.pending + '</div><div class="plate-dash-label">⏳ Pending (no number yet)</div></div>';
+}
 
 /**
  * Setup drag and drop
