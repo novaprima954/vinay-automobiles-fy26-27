@@ -192,6 +192,12 @@ async function saveActivity() {
     mismatchReasonEl.focus();
     return;
   }
+  // The reason must be a real explanation: more than 4 words
+  if (checkMismatch() && mismatchReasonEl.value.trim().split(/\s+/).length <= 4) {
+    showMsg('Please write a proper reason — more than 4 words', 'error');
+    mismatchReasonEl.focus();
+    return;
+  }
 
   const btn = document.getElementById('btnSave');
   btn.disabled = true; btn.textContent = 'Saving…';
@@ -244,8 +250,12 @@ function buildMorningMessage(proposedSale) {
 function buildEveningMessage(proposedSale, data) {
   const sd = _systemData || { crmWalkIns:0, crmWalkInsIce:0, crmWalkInsEv:0, crmWalkInsMonth:0, crmWalkInsMonthIce:0, crmWalkInsMonthEv:0, bookingsSystemCount:0, bookingVariants:[], salesToday:0, iceMonthToDate:0, evMonthToDate:0, totalMonthToDate:0 };
 
+  // One numbered line per booking, with the days it took to convert the lead ("NA" when not made from a lead)
   const variantLines = sd.bookingVariants.length
-    ? sd.bookingVariants.map(function(v, i) { return (i+1) + '. ' + v.variant + ' - ' + v.qty; }).join('\n')
+    ? sd.bookingVariants.map(function(v, i) {
+        const days = (v.days === null || v.days === undefined) ? 'NA' : (v.days + (v.days === 1 ? ' day' : ' days'));
+        return (i+1) + '. ' + v.variant + ' - ' + days;
+      }).join('\n')
     : '—';
 
   const proposedSaleText = proposedSale === null ? 'Not entered' : pad2(proposedSale);
@@ -256,6 +266,7 @@ function buildEveningMessage(proposedSale, data) {
     + 'Name : *' + currentUser.name + '*\n\n'
     + '*Today Proposed Booking* : ' + proposedSaleText + '\n\n'
     + '*Enquiry as per System* : ' + pad2(sd.crmWalkInsIce || 0) + '+' + pad2(sd.crmWalkInsEv || 0) + '\n'
+    + '*TR* : ' + pad2(data.testRides || 0) + ', *GR* : ' + pad2(data.googleRatings || 0) + '\n'
     + '*Booking* : ' + pad2(data.bookingsManual) + '\n'
     + '*Booking as per System* : ' + pad2(sd.bookingsSystemCount) + '\n'
     + '*Booking Vehicle Name* : \n\n'
@@ -265,7 +276,8 @@ function buildEveningMessage(proposedSale, data) {
     + 'Total ICE Sale : ' + sd.iceMonthToDate + '\n'
     + 'Total EV Sale : ' + pad2(sd.evMonthToDate) + '\n\n'
     + '*Total All Vehicle Sale: ' + sd.totalMonthToDate + '*'
-    + '\n*Total All Enquiry: ' + pad2(sd.crmWalkInsMonthIce || 0) + '+' + pad2(sd.crmWalkInsMonthEv || 0) + '*';
+    + '\n*Total All Enquiry: ' + pad2(sd.crmWalkInsMonthIce || 0) + '+' + pad2(sd.crmWalkInsMonthEv || 0) + '*'
+    + '\n*Total EW Sold: ' + pad2(sd.ewMonthIce || 0) + '+' + pad2(sd.ewMonthEv || 0) + '*';
 }
 
 function showWhatsAppModal(message) {
