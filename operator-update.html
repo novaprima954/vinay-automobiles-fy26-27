@@ -3,731 +3,165 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta name="HandheldFriendly" content="true">
-  <meta name="MobileOptimized" content="width">
   <meta name="robots" content="noindex, nofollow">
-  <title>Operator - Update Status</title>
+  <title>Operator - DMS, Insurance & RTO</title>
   <link rel="stylesheet" href="css/common.css">
   <style>
-    body {
-      background: #f5f5f5;
-      padding: 0;
-      margin: 0;
-    }
-
-    .operator-container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding-bottom: 20px;
-    }
-
-    /* Header */
-    .operator-header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      padding: 15px 20px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-      display: flex;
-      align-items: center;
-      gap: 15px;
-    }
-
-    .btn-back {
-      background: rgba(255,255,255,0.2);
-      border: none;
-      color: white;
-      font-size: 18px;
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      cursor: pointer;
-    }
-
-    .header-title {
-      font-size: 20px;
-      font-weight: 700;
-      flex: 1;
-    }
-
-    /* Month Filter */
-    .month-filter {
-      background: white;
-      margin: 20px;
-      padding: 15px 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    .month-filter-label {
-      font-weight: 600;
-      margin-bottom: 10px;
-      color: #333;
-      font-size: 14px;
-      display: block;
-    }
-
-    .month-select {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    /* Pending Cards */
-    .pending-cards {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 15px;
-      padding: 0 20px 20px 20px;
-    }
-
-    @media (max-width: 600px) {
-      .pending-cards {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .pending-card {
-      background: white;
-      border-radius: 12px;
-      padding: 20px;
-      text-align: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .pending-card:active {
-      transform: scale(0.95);
-    }
-
-    .pending-icon {
-      font-size: 32px;
-      margin-bottom: 10px;
-    }
-
-    .pending-label {
-      font-size: 12px;
-      color: #999;
-      font-weight: 600;
-      text-transform: uppercase;
-      margin-bottom: 5px;
-    }
-
-    .pending-count {
-      font-size: 28px;
-      font-weight: 700;
-      color: #333;
-    }
-
-    .pending-card.dms { border-left: 5px solid #FF9800; }
-    .pending-card.insurance { border-left: 5px solid #2196F3; }
-    .pending-card.vahan { border-left: 5px solid #4CAF50; }
-
-    /* Search Section */
-    .search-section {
-      background: white;
-      margin: 0 20px 20px 20px;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    }
-
-    .search-header {
-      font-size: 16px;
-      font-weight: 700;
-      margin-bottom: 15px;
-      color: #333;
-    }
-
-    .form-group {
-      margin-bottom: 15px;
-    }
-
-    .form-label {
-      display: block;
-      font-weight: 600;
-      margin-bottom: 8px;
-      color: #333;
-      font-size: 14px;
-    }
-
-    .form-input, .form-select {
-      width: 100%;
-      padding: 12px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      font-size: 16px;
-      box-sizing: border-box;
-    }
-
-    .btn-search {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-    }
-
-    /* Results List */
-    .results-section {
-      margin: 0 20px 20px 20px;
-      display: none;
-    }
-
-    .results-header {
-      background: white;
-      padding: 15px 20px;
-      border-radius: 12px 12px 0 0;
-      font-weight: 700;
-      color: #333;
-    }
-
-    .result-item {
-      background: white;
-      padding: 15px 20px;
-      border-bottom: 1px solid #f0f0f0;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-
-    .result-item:last-child {
-      border-radius: 0 0 12px 12px;
-    }
-
-    .result-item:hover {
-      background: #f8f9fa;
-    }
-
-    .result-item:active {
-      background: #e9ecef;
-    }
-
-    .result-name {
-      font-weight: 700;
-      color: #333;
-      margin-bottom: 5px;
-    }
-
-    .result-details {
-      font-size: 13px;
-      color: #666;
-      margin-bottom: 5px;
-    }
-
-    .result-vehicle-info {
-      font-size: 12px;
-      color: #1565c0;
-      font-family: 'Courier New', monospace;
-      padding: 5px 8px;
-      background: #e3f2fd;
-      border-radius: 4px;
-      display: inline-block;
-    }
-
-    /* Update Form */
-    .update-section {
-      background: white;
-      margin: 0 20px 20px 20px;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-      display: none;
-    }
-
-    .customer-details {
-      background: #f8f9fa;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-    }
-
-    .detail-row {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 8px;
-      font-size: 14px;
-    }
-
-    .detail-label {
-      color: #666;
-      font-weight: 600;
-    }
-
-    .detail-value {
-      color: #333;
-      font-weight: 700;
-    }
-
-    /* Workflow Warning */
-    .workflow-warning {
-      background: #fff3cd;
-      border-left: 4px solid #ffc107;
-      padding: 12px 15px;
-      border-radius: 8px;
-      margin-bottom: 20px;
-      font-size: 13px;
-      color: #856404;
-    }
-
-    .workflow-warning strong {
-      display: block;
-      margin-bottom: 5px;
-      font-size: 14px;
-    }
-
-    /* Vehicle Numbers Section */
-    .vehicle-numbers-section {
-      background: #e3f2fd;
-      padding: 15px;
-      border-radius: 10px;
-      margin-bottom: 20px;
-      border-left: 4px solid #1565c0;
-      position: relative;
-    }
-
-    .vehicle-numbers-header {
-      font-weight: 700;
-      color: #1565c0;
-      margin-bottom: 15px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 15px;
-    }
-
-    .locked-badge {
-      background: #4CAF50;
-      color: white;
-      padding: 3px 10px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      margin-left: auto;
-    }
-
-    .monospace-input {
-      font-family: 'Courier New', monospace;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    .monospace-input:disabled {
-      background: #e0e0e0;
-      cursor: not-allowed;
-    }
-
-    /* Status Sections */
-    .status-section {
-      margin-bottom: 20px;
-      padding: 15px;
-      border: 2px solid #e0e0e0;
-      border-radius: 10px;
-      position: relative;
-      transition: all 0.3s;
-    }
-
-    .status-section.locked {
-      background: #f5f5f5;
-      border-color: #bdbdbd;
-    }
-
-    .status-section.locked::after {
-      content: '🔒';
-      position: absolute;
-      top: 15px;
-      right: 15px;
-      font-size: 20px;
-      opacity: 0.3;
-    }
-
-    .status-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-
-    .status-title {
-      font-weight: 700;
-      color: #333;
-      font-size: 15px;
-    }
-
-    .status-badge {
-      padding: 5px 12px;
-      border-radius: 12px;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-    }
-
-    .badge-locked {
-      background: #4CAF50;
-      color: white;
-    }
-
-    .badge-pending {
-      background: #FF9800;
-      color: white;
-    }
-
-    .status-options {
-      display: flex;
-      gap: 20px;
-      margin-bottom: 10px;
-    }
-
-    .radio-option {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 14px;
-      cursor: pointer;
-    }
-
-    .radio-option input[type="radio"] {
-      width: 18px;
-      height: 18px;
-      cursor: pointer;
-    }
-
-    .radio-option input[type="radio"]:disabled {
-      cursor: not-allowed;
-    }
-
-    .status-info {
-      font-size: 12px;
-      color: #666;
-      margin-top: 8px;
-      font-style: italic;
-    }
-
-    /* Number Plate Input */
-    .number-plate-input {
-      font-family: 'Courier New', monospace;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      font-weight: 600;
-    }
-
-    .number-plate-input:disabled {
-      background: #e0e0e0;
-      cursor: not-allowed;
-    }
-
-    /* Buttons */
-    .btn-update {
-      width: 100%;
-      padding: 16px;
-      background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
-      color: white;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 20px;
-      transition: all 0.3s;
-    }
-
-    .btn-update:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
-    }
-
-    .btn-cancel {
-      width: 100%;
-      padding: 14px;
-      background: #f0f0f0;
-      color: #333;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 700;
-      cursor: pointer;
-      margin-top: 10px;
-    }
-
-    /* Message */
-    .message {
-      padding: 12px 20px;
-      margin: 20px;
-      border-radius: 10px;
-      font-weight: 600;
-      text-align: center;
-      display: none;
-    }
-
-    .message.success {
-      display: block;
-      background: #d4edda;
-      color: #155724;
-      border: 1px solid #c3e6cb;
-    }
-
-    .message.error {
-      display: block;
-      background: #f8d7da;
-      color: #721c24;
-      border: 1px solid #f5c6cb;
-    }
-
-    /* Loading */
-    .loading {
-      text-align: center;
-      padding: 40px;
-      display: none;
-    }
-
-    .spinner {
-      width: 40px;
-      height: 40px;
-      border: 4px solid #f3f3f3;
-      border-top: 4px solid #667eea;
-      border-radius: 50%;
-      animation: spin 1s linear infinite;
-      margin: 0 auto 10px;
-    }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    * { box-sizing: border-box; }
+    body { background: #f4f5f9; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    .op-container { max-width: 1500px; margin: 0 auto; padding: 0 14px 40px; }
+
+    .op-header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 20px;
+      position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; margin: 0 -14px 16px;
+    }
+    .op-header h1 { margin: 0; font-size: 19px; flex: 1; }
+    .op-header .who { font-size: 13px; opacity: 0.9; }
+    .btn-back { background: rgba(255,255,255,0.2); border: none; color: white; font-size: 18px; padding: 6px 12px; border-radius: 8px; cursor: pointer; }
+
+    .card { background: white; border-radius: 12px; padding: 18px 20px; margin-bottom: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+    .dash-head { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+    .dash-head h2 { margin: 0; font-size: 18px; color: #333; }
+    .dash-filters { display: flex; gap: 8px; }
+    .dash-filters select, .search-row input, .bulk-bar select, .bulk-bar input[type="date"], .modal-body input[type="date"] {
+      padding: 8px 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 14px; background: white;
+    }
+    .dash-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+    .dash-card { border-radius: 10px; padding: 18px 12px; text-align: center; cursor: pointer; border: 2px solid transparent; transition: transform .15s, box-shadow .15s; user-select: none; }
+    .dash-card:hover { transform: translateY(-3px); box-shadow: 0 6px 16px rgba(0,0,0,0.12); }
+    .dash-card.active { border-color: #333; transform: translateY(-3px); }
+    .dash-count { font-size: 34px; font-weight: 800; line-height: 1; }
+    .dash-label { font-size: 13px; font-weight: 700; margin-top: 6px; }
+    .dash-sub { font-size: 11px; margin-top: 3px; opacity: 0.8; }
+    .c-all { background: #ede7f6; color: #4527a0; } .c-dms { background: #e3f2fd; color: #1565c0; }
+    .c-ins { background: #fff8e1; color: #e65100; } .c-rto { background: #fce4ec; color: #b71c1c; } .c-done { background: #e8f5e9; color: #2e7d32; }
+
+    .search-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+    .search-row input { flex: 1; min-width: 220px; }
+    .btn { padding: 9px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; }
+    .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+    .btn-secondary { background: #eef0fb; color: #4a4f9a; }
+    .btn-danger { background: #fdecea; color: #b71c1c; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    .filter-label { font-size: 13px; color: #666; margin: 4px 0 10px; font-weight: 600; }
+    .bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 12px; background: #f0f4ff; border: 1px solid #c7d2fe; border-radius: 10px; font-size: 14px; }
+    .bulk-bar .count { font-weight: 800; color: #3730a3; min-width: 90px; }
+    .bulk-bar label.opt { display: flex; align-items: center; gap: 6px; font-weight: 600; cursor: pointer; }
+    .bulk-bar .hint { margin-left: auto; color: #777; font-size: 12px; }
+
+    .table-wrap { overflow-x: auto; }
+    table.op-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 1050px; }
+    .op-table th { background: #f0f2ff; color: #444; text-align: left; padding: 9px 10px; white-space: nowrap; }
+    .op-table td { padding: 9px 10px; border-bottom: 1px solid #eee; vertical-align: top; }
+    .op-table tr.done-row { background: #f6fbf6; }
+    .stage { font-size: 12px; line-height: 1.35; }
+    .stage.pend { color: #b26a00; font-weight: 700; }
+    .stage.ok { color: #2e7d32; }
+    .stage .who-name { color: #666; }
+    input.row-cb, #selectAll { width: 17px; height: 17px; cursor: pointer; }
+    .empty { text-align: center; color: #999; padding: 40px 10px; }
+
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 100; padding: 14px; }
+    .modal.show { display: flex; }
+    .modal-content { background: white; border-radius: 12px; width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 30px rgba(0,0,0,.3); }
+    .modal-head { display: flex; justify-content: space-between; align-items: center; padding: 14px 18px; border-bottom: 1px solid #eee; }
+    .modal-head h3 { margin: 0; font-size: 17px; }
+    .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+    .modal-body { padding: 16px 18px; }
+    .modal-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 18px; border-top: 1px solid #eee; }
+    .stage-opt { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 14px; font-weight: 600; }
+    .stage-opt small { font-weight: 400; color: #777; }
+    .toast { position: fixed; top: 16px; right: 16px; background: #333; color: white; padding: 10px 16px; border-radius: 8px; z-index: 200; display: none; max-width: 360px; font-size: 14px; }
+    .toast.ok { background: #2e7d32; } .toast.err { background: #c62828; } .toast.show { display: block; }
   </style>
 </head>
 <body>
-  <div class="operator-container">
-    <!-- Header -->
-    <div class="operator-header">
-      <button class="btn-back" onclick="goBack()">←</button>
-      <div class="header-title">🔄 Update Status</div>
+  <div class="op-container">
+    <div class="op-header">
+      <button class="btn-back" onclick="window.location.href='home.html'">←</button>
+      <h1>🚗 Operator — DMS, Insurance &amp; RTO</h1>
+      <span class="who" id="currentUser"></span>
     </div>
 
-    <!-- Status Message -->
-    <div id="statusMessage" class="message"></div>
-
-    <!-- Month Filter -->
-    <div class="month-filter">
-      <label class="month-filter-label">📅 Filter by Month</label>
-      <select id="monthFilter" class="month-select" onchange="loadPendingCounts()">
-        <!-- Populated by JS -->
-      </select>
-    </div>
-
-    <!-- Pending Cards -->
-    <div class="pending-cards">
-      <div class="pending-card dms" onclick="showPendingList('dms')">
-        <div class="pending-icon">📋</div>
-        <div class="pending-label">DMS Pending</div>
-        <div class="pending-count" id="dmsPendingCount">0</div>
-      </div>
-
-      <div class="pending-card insurance" onclick="showPendingList('insurance')">
-        <div class="pending-icon">🛡️</div>
-        <div class="pending-label">Insurance Pending</div>
-        <div class="pending-count" id="insurancePendingCount">0</div>
-      </div>
-
-      <div class="pending-card vahan" onclick="showPendingList('vahan')">
-        <div class="pending-icon">🚗</div>
-        <div class="pending-label">Vahan Pending</div>
-        <div class="pending-count" id="vahanPendingCount">0</div>
-      </div>
-    </div>
-
-    <!-- Search Section -->
-    <div class="search-section">
-      <div class="search-header">🔍 Search Records</div>
-      
-      <div class="form-group">
-        <label class="form-label">Search By</label>
-        <select id="searchBy" class="form-select">
-          <option value="receiptNo">Receipt Number</option>
-          <option value="executive">Executive Name</option>
-          <option value="customerName">Customer Name</option>
-          <option value="mobileNo">Mobile Number</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label class="form-label">Search For</label>
-        <input type="text" id="searchValue" class="form-input" placeholder="Enter search term...">
-      </div>
-
-      <button class="btn-search" onclick="searchRecords()">🔎 SEARCH</button>
-    </div>
-
-    <!-- Loading -->
-    <div class="loading" id="loadingState">
-      <div class="spinner"></div>
-      <div>Loading...</div>
-    </div>
-
-    <!-- Results List -->
-    <div class="results-section" id="resultsSection">
-      <div class="results-header">
-        Search Results (<span id="resultCount">0</span>)
-      </div>
-      <div id="resultsList"></div>
-    </div>
-
-    <!-- Update Form -->
-    <div class="update-section" id="updateSection">
-      <div class="search-header">📝 Update Status</div>
-      
-      <!-- Customer Details -->
-      <div class="customer-details" id="customerDetails"></div>
-
-      <form id="updateForm">
-        <!-- Vehicle Numbers Section -->
-        <div class="vehicle-numbers-section" id="vehicleNumbersSection">
-          <div class="vehicle-numbers-header">
-            🔧 Vehicle Identification Numbers
-            <span id="vehicleLockedBadge" class="locked-badge" style="display: none;">🔒 LOCKED</span>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Engine Number</label>
-            <input 
-              type="text" 
-              id="engineNumber" 
-              class="form-input monospace-input" 
-              placeholder="Enter engine number"
-              maxlength="30"
-            >
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Chassis/Frame Number</label>
-            <input 
-              type="text" 
-              id="frameNumber" 
-              class="form-input monospace-input" 
-              placeholder="Enter chassis/frame number"
-              maxlength="30"
-            >
-          </div>
+    <!-- Dashboard -->
+    <div class="card">
+      <div class="dash-head">
+        <h2>📊 Dashboard <span style="font-size:12px;font-weight:500;color:#888;">· by invoice date (HSRP sheet)</span></h2>
+        <div class="dash-filters">
+          <select id="dashMonth" onchange="loadMonth()"></select>
+          <select id="dashYear" onchange="loadMonth()"></select>
         </div>
+      </div>
+      <div class="dash-cards" id="dashCards"><div class="empty" style="grid-column:1/-1;">Loading…</div></div>
+    </div>
 
-        <!-- DMS Section -->
-        <div class="status-section" id="dmsSection">
-          <div class="status-header">
-            <span class="status-title">📋 DMS (Step 1)</span>
-            <span class="status-badge badge-pending" id="dmsBadge">PENDING</span>
-          </div>
-          <div class="status-options">
-            <label class="radio-option">
-              <input type="radio" name="dmsStatus" value="Yes" id="dmsYes">
-              <span>Yes</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="dmsStatus" value="No" id="dmsNo">
-              <span>No</span>
-            </label>
-          </div>
-          <div id="dmsDateRow" style="display:none; margin-top:10px;">
-            <label class="form-label" style="font-size:12px; color:#555; margin-bottom:4px;">Date</label>
-            <input type="date" id="dmsDate" class="form-input" style="padding:10px; font-size:14px;">
-          </div>
-          <div class="status-info" id="dmsInfo"></div>
-        </div>
+    <!-- Search + list -->
+    <div class="card">
+      <div class="search-row">
+        <input type="text" id="searchBox" placeholder="Search invoice no, customer, mobile, chassis or registration no (all months)…">
+        <button class="btn btn-primary" onclick="runSearch()">🔍 Search</button>
+        <button class="btn btn-secondary" onclick="clearSearch()">✕ Clear</button>
+      </div>
+      <div class="filter-label" id="filterLabel"></div>
 
-        <!-- Insurance Section -->
-        <div class="status-section" id="insuranceSection">
-          <div class="status-header">
-            <span class="status-title">🛡️ Insurance (Step 2)</span>
-            <span class="status-badge badge-pending" id="insuranceBadge">PENDING</span>
-          </div>
-          <div class="status-options">
-            <label class="radio-option">
-              <input type="radio" name="insuranceStatus" value="Yes" id="insuranceYes">
-              <span>Yes</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="insuranceStatus" value="No" id="insuranceNo">
-              <span>No</span>
-            </label>
-          </div>
-          <div id="insuranceDateRow" style="display:none; margin-top:10px;">
-            <label class="form-label" style="font-size:12px; color:#555; margin-bottom:4px;">Date</label>
-            <input type="date" id="insuranceDate" class="form-input" style="padding:10px; font-size:14px;">
-          </div>
-          <div class="status-info" id="insuranceInfo"></div>
-        </div>
+      <div class="bulk-bar" id="bulkBar">
+        <span class="count" id="bulkCount">0 selected</span>
+        <label class="opt"><input type="checkbox" id="bulkDms" onchange="onBulkStageChange()"> DMS</label>
+        <label class="opt"><input type="checkbox" id="bulkIns" onchange="onBulkStageChange()"> Insurance</label>
+        <label class="opt"><input type="checkbox" id="bulkVah" onchange="onBulkStageChange()"> RTO</label>
+        <span id="bulkDateWrap" style="display:none;">Date <input type="date" id="bulkDate"></span>
+        <button class="btn btn-primary" id="bulkApplyBtn" onclick="applyBulk()">Apply to selected</button>
+        <button class="btn btn-secondary" onclick="clearSelection()">Clear</button>
+        <span class="hint">Max 20 at a time · done by <strong id="opName"></strong></span>
+      </div>
 
-        <!-- Vahan Section -->
-        <div class="status-section" id="vahanSection">
-          <div class="status-header">
-            <span class="status-title">🚗 Vahan/RTO (Step 3)</span>
-            <span class="status-badge badge-pending" id="vahanBadge">PENDING</span>
-          </div>
-          <div class="status-options">
-            <label class="radio-option">
-              <input type="radio" name="vahanStatus" value="Yes" id="vahanYes">
-              <span>Yes</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="vahanStatus" value="No" id="vahanNo">
-              <span>No</span>
-            </label>
-          </div>
-          <div id="vahanDateRow" style="display:none; margin-top:10px;">
-            <label class="form-label" style="font-size:12px; color:#555; margin-bottom:4px;">Date</label>
-            <input type="date" id="vahanDate" class="form-input" style="padding:10px; font-size:14px;">
-          </div>
-          <div class="status-info" id="vahanInfo"></div>
-        </div>
-
-        <!-- Number Plate Section -->
-        <div class="status-section" id="numberPlateSection">
-          <div class="status-header">
-            <span class="status-title">🔢 Number Plate (Step 4)</span>
-            <span class="status-badge badge-pending" id="numberPlateBadge">PENDING</span>
-          </div>
-          
-          <div class="form-group">
-            <label class="form-label">Number Plate Details (XX00XX0000 - No Dashes)</label>
-            <input 
-              type="text" 
-              id="numberPlateDetails" 
-              class="form-input number-plate-input" 
-              placeholder="MH31AB1234"
-              maxlength="10"
-            >
-          </div>
-
-          <div class="status-options">
-            <label class="radio-option">
-              <input type="radio" name="numberPlateFitted" value="Yes" id="numberPlateYes">
-              <span>Fitted: Yes</span>
-            </label>
-            <label class="radio-option">
-              <input type="radio" name="numberPlateFitted" value="No" id="numberPlateNo">
-              <span>Fitted: No</span>
-            </label>
-          </div>
-          <div class="status-info" id="numberPlateInfo"></div>
-        </div>
-
-        <button type="submit" class="btn-update">💾 UPDATE STATUS</button>
-        <button type="button" class="btn-cancel" onclick="cancelUpdate()">✖ CANCEL</button>
-      </form>
+      <div class="table-wrap">
+        <table class="op-table">
+          <thead><tr>
+            <th><input type="checkbox" id="selectAll" onchange="toggleSelectAll(this)" title="Select (max 20)"></th>
+            <th>Invoice</th><th>Date</th><th>Customer</th><th>Mobile</th><th>Model</th><th>Chassis No</th><th>Reg No</th>
+            <th>DMS</th><th>Insurance</th><th>RTO</th><th></th>
+          </tr></thead>
+          <tbody id="opBody"><tr><td colspan="12" class="empty">Loading…</td></tr></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
+  <!-- Single update -->
+  <div class="modal" id="updateModal">
+    <div class="modal-content">
+      <div class="modal-head"><h3 id="updTitle">Update</h3><button class="modal-close" onclick="closeModals()">×</button></div>
+      <div class="modal-body">
+        <div id="updInfo" style="font-size:13px;color:#555;margin-bottom:8px;"></div>
+        <label class="stage-opt"><input type="checkbox" id="updDms"> DMS <small id="updDmsNote"></small></label>
+        <label class="stage-opt"><input type="checkbox" id="updIns"> Insurance <small id="updInsNote"></small></label>
+        <label class="stage-opt"><input type="checkbox" id="updVah"> RTO <small id="updVahNote"></small></label>
+        <div id="updDateWrap" style="margin-top:8px;">Date <input type="date" id="updDate"></div>
+        <div style="font-size:12px;color:#777;margin-top:10px;">Saved under your name. Once Insurance or RTO is saved it is locked.</div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-secondary" onclick="closeModals()">Cancel</button>
+        <button class="btn btn-primary" id="updSaveBtn" onclick="saveSingle()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin undo -->
+  <div class="modal" id="undoModal">
+    <div class="modal-content">
+      <div class="modal-head"><h3 id="undoTitle">Undo</h3><button class="modal-close" onclick="closeModals()">×</button></div>
+      <div class="modal-body" id="undoBody"></div>
+      <div class="modal-foot"><button class="btn btn-secondary" onclick="closeModals()">Close</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
   <script src="js/config.js"></script>
   <script src="js/auth.js"></script>
-  <script src="js/api.js?v=4"></script>
-  <script src="js/operator-update.js"></script>
+  <script src="js/api.js?v=11"></script>
+  <script src="js/operator-update.js?v=2"></script>
 </body>
 </html>

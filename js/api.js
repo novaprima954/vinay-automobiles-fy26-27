@@ -951,6 +951,24 @@ const API = {
     });
   },
 
+  async getOperatorHsrpData(month, query) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('getOperatorHsrpData', { sessionId: session.sessionId, month: month || '', query: query || '' });
+  },
+
+  async applyOperatorStages(srNos, stages, date) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('applyOperatorStages', { sessionId: session.sessionId, srNos: JSON.stringify(srNos), stages: JSON.stringify(stages), date: date || '' });
+  },
+
+  async undoOperatorStage(srNo, stage) {
+    const session = SessionManager.getSession();
+    if (!session) throw new Error('No session');
+    return this.call('undoOperatorStage', { sessionId: session.sessionId, srNo: srNo, stage: stage });
+  },
+
   async getNumberPlateDashboard(year) {
     const session = SessionManager.getSession();
     if (!session) throw new Error('No session');

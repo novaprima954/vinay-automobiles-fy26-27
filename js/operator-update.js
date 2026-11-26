@@ -1,428 +1,351 @@
 // ==========================================
-// OPERATOR UPDATE PAGE LOGIC - OPTIMIZED
-// Fixed: Month filter, Number plate lock, No logging
+// OPERATOR UPDATE - DMS, Insurance and RTO (Vahan)
+// HSRP sheet is the master. Each save is mirrored into the matching Data-sheet row by the server.
 // ==========================================
 
 let currentUser = null;
-let currentRecord = null;
-let currentMonth = '';
+let opRows = [];           // vehicles currently loaded (a month, or search results)
+let activeCard = 'all';    // dashboard card used as list filter
+let searchMode = false;    // true while showing search results
+const MAX_SELECT = 20;
 
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
   const session = SessionManager.getSession();
-  
-  if (!session) {
-    window.location.href = 'index.html';
+  if (!session) { window.location.href = 'index.html'; return; }
+  currentUser = session.user;
+  if (currentUser.role !== 'operator' && currentUser.role !== 'admin') {
+    alert('Access denied. This page is only for Operator and Admin users.');
+    window.location.href = 'home.html';
     return;
   }
-  
-  currentUser = session.user;
-  
-  populateMonthSelector();
-  await loadPendingCounts();
-  
-  // FIXED: Remove dashes from number plate
-  document.getElementById('numberPlateDetails').addEventListener('input', formatNumberPlate);
-  document.getElementById('engineNumber').addEventListener('input', formatVehicleNumber);
-  document.getElementById('frameNumber').addEventListener('input', formatVehicleNumber);
-  
-  document.getElementById('updateForm').addEventListener('submit', handleUpdate);
-  
-  const urlParams = new URLSearchParams(window.location.search);
-  const receiptNo = urlParams.get('receiptNo');
-  if (receiptNo) {
-    await loadRecordDetails(receiptNo);
-  }
+  document.getElementById('currentUser').textContent = (currentUser.name || '') + ' (' + currentUser.role + ')';
+  document.getElementById('opName').textContent = currentUser.name || '';
+
+  initMonthYear();
+  document.getElementById('bulkDate').value = _yesterdayISO();
+  document.getElementById('searchBox').addEventListener('keydown', e => { if (e.key === 'Enter') runSearch(); });
+  await loadMonth();
 });
 
-function populateMonthSelector() {
-  const select = document.getElementById('monthFilter');
-  const currentDate = new Date();
-  
-  for (let i = 0; i < 12; i++) {
-    const date = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const monthName = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-    
-    const option = document.createElement('option');
-    option.value = `${year}-${month}`;
-    option.textContent = monthName;
-    select.appendChild(option);
-  }
-  
-  currentMonth = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
-  select.value = currentMonth;
+// ---------- helpers ----------
+function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+function _iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function _yesterdayISO() { const d = new Date(); d.setDate(d.getDate() - 1); return _iso(d); }
+function _todayISO() { return _iso(new Date()); }
+
+function _fmtDate(iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if (!m) return iso || '';
+  const names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return m[3] + '-' + names[parseInt(m[2], 10) - 1] + '-' + m[1];
 }
 
-async function loadPendingCounts() {
-  currentMonth = document.getElementById('monthFilter').value;
-  
-  try {
-    const response = await API.getOperatorPendingCounts(currentMonth);
-    
-    if (response.success) {
-      document.getElementById('dmsPendingCount').textContent = response.counts.dmsPending;
-      document.getElementById('insurancePendingCount').textContent = response.counts.insurancePending;
-      document.getElementById('vahanPendingCount').textContent = response.counts.vahanPending;
-    }
-  } catch (error) {
-    // Silent
-  }
+let _toastTimer = null;
+function toast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show ' + (type === 'error' ? 'err' : 'ok');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => { t.className = 'toast'; }, 5000);
 }
 
-// FIXED: Pass month filter to API
-async function showPendingList(type) {
-  showLoading(true);
-  
-  try {
-    const response = await API.getOperatorPendingList(type, currentMonth);
-    
-    showLoading(false);
-    
-    if (response.success && response.results.length > 0) {
-      displayResults(response.results);
-    } else {
-      showMessage('No pending records found for selected month', 'error');
-    }
-  } catch (error) {
-    showLoading(false);
-    showMessage('Error loading list', 'error');
+function initMonthYear() {
+  const now = new Date();
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const ms = document.getElementById('dashMonth');
+  months.forEach((m, i) => {
+    const o = document.createElement('option'); o.value = i + 1; o.textContent = m;
+    if (i === now.getMonth()) o.selected = true;
+    ms.appendChild(o);
+  });
+  const ys = document.getElementById('dashYear');
+  for (let y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+    const o = document.createElement('option'); o.value = y; o.textContent = y;
+    if (y === now.getFullYear()) o.selected = true;
+    ys.appendChild(o);
   }
 }
 
-async function searchRecords() {
-  const searchBy = document.getElementById('searchBy').value;
-  const searchValue = document.getElementById('searchValue').value.trim();
-  
-  if (!searchValue) {
-    showMessage('Please enter search term', 'error');
-    return;
-  }
-  
-  showLoading(true);
-  
-  try {
-    const response = await API.searchOperatorRecords(searchBy, searchValue);
-    
-    showLoading(false);
-    
-    if (response.success) {
-      if (response.results.length > 0) {
-        displayResults(response.results);
-      } else {
-        showMessage('No records found', 'error');
-      }
-    } else {
-      showMessage(response.message, 'error');
-    }
-  } catch (error) {
-    showLoading(false);
-    showMessage('Error searching records', 'error');
-  }
-}
-
-function displayResults(results) {
-  const resultsList = document.getElementById('resultsList');
-  const resultsSection = document.getElementById('resultsSection');
-  
-  document.getElementById('resultCount').textContent = results.length;
-  
-  resultsList.innerHTML = results.map(record => `
-    <div class="result-item" onclick="loadRecordDetails('${record.receiptNo}')">
-      <div class="result-name">${record.customerName}</div>
-      <div class="result-details">
-        Receipt: ${record.receiptNo} • ${record.variant || record.model}<br>
-        📱 ${record.mobileNo} • Executive: ${record.executiveName}
-      </div>
-      <div class="result-vehicle-info">
-        🔧 Engine: ${record.engineNumber || 'Not Set'} | 🔩 Chassis: ${record.frameNumber || 'Not Set'}
-      </div>
-    </div>
-  `).join('');
-  
-  resultsSection.style.display = 'block';
-  resultsSection.scrollIntoView({ behavior: 'smooth' });
-}
-
-async function loadRecordDetails(receiptNo) {
-  showLoading(true);
-  
-  try {
-    const response = await API.getOperatorRecordDetails(receiptNo);
-    
-    showLoading(false);
-    
-    if (response.success) {
-      currentRecord = response.record;
-      displayUpdateForm(response.record);
-    } else {
-      showMessage(response.message, 'error');
-    }
-  } catch (error) {
-    showLoading(false);
-    showMessage('Error loading record', 'error');
-  }
-}
-
-function displayUpdateForm(record) {
-  document.getElementById('customerDetails').innerHTML = `
-    <div class="detail-row">
-      <span class="detail-label">Receipt No:</span>
-      <span class="detail-value">${record.receiptNo}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Customer Name:</span>
-      <span class="detail-value">${record.customerName}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Variant:</span>
-      <span class="detail-value">${record.variant || record.model}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Mobile No:</span>
-      <span class="detail-value">${record.mobileNo}</span>
-    </div>
-    <div class="detail-row">
-      <span class="detail-label">Executive:</span>
-      <span class="detail-value">${record.executiveName}</span>
-    </div>
-  `;
-  
-  const allComplete = record.dmsStatus === 'Yes' && 
-                      record.insuranceStatus === 'Yes' && 
-                      record.vahanStatus === 'Yes';
-  
-  setupVehicleNumbers(record.engineNumber, record.frameNumber, allComplete);
-  
-  setupStatusSection('dms', record.dmsStatus, record.dmsDate, record.dmsOperator, allComplete);
-  setupStatusSection('insurance', record.insuranceStatus, record.insuranceDate, record.insuranceOperator, allComplete);
-  setupStatusSection('vahan', record.vahanStatus, record.vahanDate, record.vahanOperator, allComplete);
-  
-  // FIXED: Lock number plate when fitted=Yes
-  document.getElementById('numberPlateDetails').value = record.numberPlateDetails || '';
-  const numberPlateLocked = record.numberPlateFitted === 'Yes';
-  setupStatusSection('numberPlate', record.numberPlateFitted, record.numberPlateDate, record.numberPlateOperator, numberPlateLocked);
-  
-  document.getElementById('updateSection').style.display = 'block';
-  document.getElementById('updateSection').scrollIntoView({ behavior: 'smooth' });
-}
-
-function setupVehicleNumbers(engineNumber, frameNumber, locked) {
-  const engineInput = document.getElementById('engineNumber');
-  const frameInput = document.getElementById('frameNumber');
-  const lockedBadge = document.getElementById('vehicleLockedBadge');
-  
-  engineInput.value = engineNumber || '';
-  frameInput.value = frameNumber || '';
-  
-  if (locked) {
-    engineInput.disabled = true;
-    frameInput.disabled = true;
-    lockedBadge.style.display = 'inline-block';
-  } else {
-    engineInput.disabled = false;
-    frameInput.disabled = false;
-    lockedBadge.style.display = 'none';
-  }
-}
-
-function setupStatusSection(type, status, date, operator, forceLocked) {
-  const section   = document.getElementById(type + 'Section');
-  const badge     = document.getElementById(type + 'Badge');
-  const info      = document.getElementById(type + 'Info');
-  const yesRadio  = document.getElementById(type + 'Yes');
-  const noRadio   = document.getElementById(type + 'No');
-  const dateRow   = document.getElementById(type + 'DateRow');  // may be null for numberPlate
-  const dateInput = document.getElementById(type + 'Date');
-
-  const isLocked = (status === 'Yes') || forceLocked;
-
-  if (isLocked) {
-    section.classList.add('locked');
-    badge.textContent = 'COMPLETED ✅';
-    badge.className = 'status-badge badge-locked';
-
-    if (date && operator) {
-      info.textContent = `Completed on ${date} by ${operator}`;
-    } else if (forceLocked) {
-      info.textContent = 'All steps completed - Status locked';
-    }
-
-    yesRadio.checked = (status === 'Yes');
-    yesRadio.disabled = true;
-    noRadio.disabled = true;
-
-    if (dateRow) dateRow.style.display = 'none';
-
-    if (type === 'numberPlate') {
-      document.getElementById('numberPlateDetails').disabled = true;
-    }
-  } else {
-    section.classList.remove('locked');
-    badge.textContent = 'PENDING';
-    badge.className = 'status-badge badge-pending';
-    info.textContent = '';
-
-    yesRadio.disabled = false;
-    noRadio.disabled = false;
-
-    if (status === 'Yes') {
-      yesRadio.checked = true;
-      if (dateRow) { dateRow.style.display = 'block'; }
-    } else if (status === 'No') {
-      noRadio.checked = true;
-      if (dateRow) dateRow.style.display = 'none';
-    } else {
-      yesRadio.checked = false;
-      noRadio.checked = false;
-      if (dateRow) dateRow.style.display = 'none';
-    }
-
-    // Set default date to today on the date input
-    if (dateInput && !dateInput.value) {
-      dateInput.value = new Date().toISOString().split('T')[0];
-    }
-
-    // Wire up show/hide on radio change
-    if (dateRow) {
-      yesRadio.onchange = function() {
-        if (this.checked) {
-          dateRow.style.display = 'block';
-          if (!dateInput.value) dateInput.value = new Date().toISOString().split('T')[0];
-        }
-      };
-      noRadio.onchange = function() {
-        if (this.checked) dateRow.style.display = 'none';
-      };
-    }
-
-    if (type === 'numberPlate') {
-      document.getElementById('numberPlateDetails').disabled = false;
-    }
-  }
-}
-
-function formatVehicleNumber(e) {
-  e.target.value = e.target.value.toUpperCase();
-}
-
-// FIXED: No dashes in number plate
-function formatNumberPlate(e) {
-  let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  
-  if (value.length > 10) {
-    value = value.substring(0, 10);
-  }
-  
-  e.target.value = value;
-}
-
-async function handleUpdate(e) {
-  e.preventDefault();
-  
-  const dmsStatus       = document.querySelector('input[name="dmsStatus"]:checked')?.value || '';
-  const insuranceStatus = document.querySelector('input[name="insuranceStatus"]:checked')?.value || '';
-  const vahanStatus     = document.querySelector('input[name="vahanStatus"]:checked')?.value || '';
-
-  const data = {
-    dmsStatus,
-    insuranceStatus,
-    vahanStatus,
-    dmsDate:       (dmsStatus === 'Yes')       ? (document.getElementById('dmsDate')?.value || '')       : '',
-    insuranceDate: (insuranceStatus === 'Yes') ? (document.getElementById('insuranceDate')?.value || '') : '',
-    vahanDate:     (vahanStatus === 'Yes')     ? (document.getElementById('vahanDate')?.value || '')     : '',
-    numberPlateDetails: document.getElementById('numberPlateDetails').value.trim(),
-    numberPlateFitted: document.querySelector('input[name="numberPlateFitted"]:checked')?.value || '',
-    engineNumber: document.getElementById('engineNumber').value.trim(),
-    frameNumber: document.getElementById('frameNumber').value.trim()
+// stage state of a vehicle
+function stageState(r) {
+  return {
+    dms: !!r.dmsOperator,
+    ins: r.insuranceStatus === 'Yes',
+    vah: r.vahanStatus === 'Yes'
   };
-  
-  if (!data.dmsStatus && !data.insuranceStatus && !data.vahanStatus && 
-      !data.numberPlateDetails && !data.numberPlateFitted && 
-      !data.engineNumber && !data.frameNumber) {
-    showMessage('Please fill at least one field', 'error');
-    return;
-  }
-  
-  // FIXED: No dashes in validation
-  if (data.numberPlateDetails) {
-    const plateRegex = /^[A-Z]{2}\d{2}[A-Z]{2}\d{4}$/;
-    if (!plateRegex.test(data.numberPlateDetails)) {
-      showMessage('Invalid number plate format. Use: XX00XX0000 (no dashes)', 'error');
-      return;
-    }
-  }
-  
-  const currentDMS = currentRecord.dmsStatus || '';
-  const currentInsurance = currentRecord.insuranceStatus || '';
-  const currentVahan = currentRecord.vahanStatus || '';
-  
-  const newDMS = data.dmsStatus || currentDMS;
-  const newInsurance = data.insuranceStatus || currentInsurance;
-  const newVahan = data.vahanStatus || currentVahan;
-  
-  if (newInsurance === 'Yes' && newDMS !== 'Yes') {
-    showMessage('❌ Workflow Error: Insurance requires DMS first', 'error');
-    return;
-  }
-  
-  if (newVahan === 'Yes' && newInsurance !== 'Yes') {
-    showMessage('❌ Workflow Error: Vahan requires Insurance first', 'error');
-    return;
-  }
-  
-  showLoading(true);
-  
+}
+
+// ---------- data loading ----------
+async function loadMonth() {
+  searchMode = false;
+  document.getElementById('searchBox').value = '';
+  const month = document.getElementById('dashYear').value + '-' + String(document.getElementById('dashMonth').value).padStart(2, '0');
+  await fetchRows(month, '');
+}
+
+async function runSearch() {
+  const q = document.getElementById('searchBox').value.trim();
+  if (!q) { await loadMonth(); return; }
+  searchMode = true;
+  await fetchRows('', q);
+}
+
+async function clearSearch() {
+  document.getElementById('searchBox').value = '';
+  await loadMonth();
+}
+
+async function fetchRows(month, query) {
+  document.getElementById('opBody').innerHTML = '<tr><td colspan="12" class="empty">⏳ Loading…</td></tr>';
   try {
-    const response = await API.updateOperatorStatus(currentRecord.receiptNo, data);
-    
-    showLoading(false);
-    
-    if (response.success) {
-      showMessage('✅ Status updated successfully!', 'success');
-      
-      await loadPendingCounts();
-      
-      setTimeout(async () => {
-        await loadRecordDetails(currentRecord.receiptNo);
-      }, 1500);
-    } else {
-      showMessage(response.message, 'error');
-    }
-  } catch (error) {
-    showLoading(false);
-    showMessage('Error updating status', 'error');
+    const r = await API.getOperatorHsrpData(month, query);
+    if (!r.success) { document.getElementById('opBody').innerHTML = '<tr><td colspan="12" class="empty">' + esc(r.message || 'Error loading data') + '</td></tr>'; return; }
+    opRows = r.rows || [];
+    clearSelection(true);
+    renderAll();
+  } catch (e) {
+    document.getElementById('opBody').innerHTML = '<tr><td colspan="12" class="empty">Error: ' + esc(e.message) + '</td></tr>';
   }
 }
 
-function cancelUpdate() {
-  document.getElementById('updateSection').style.display = 'none';
-  document.getElementById('resultsSection').style.display = 'none';
-  currentRecord = null;
+// ---------- dashboard + list ----------
+function renderAll() {
+  renderDashboard();
+  renderList();
 }
 
-function showLoading(show) {
-  const loader = document.getElementById('loadingState');
-  if (loader) {
-    loader.style.display = show ? 'flex' : 'none';
+function renderDashboard() {
+  const total = opRows.length;
+  let dmsDone = 0, insDone = 0, vahDone = 0, allDone = 0;
+  opRows.forEach(r => {
+    const s = stageState(r);
+    if (s.dms) dmsDone++; if (s.ins) insDone++; if (s.vah) vahDone++;
+    if (s.dms && s.ins && s.vah) allDone++;
+  });
+  const cards = [
+    { key: 'all',  cls: 'c-all',  count: total,           label: '📋 Vehicles',          sub: searchMode ? 'search results' : 'this month' },
+    { key: 'dms',  cls: 'c-dms',  count: total - dmsDone, label: '🖥️ DMS Pending',       sub: dmsDone + ' done' },
+    { key: 'ins',  cls: 'c-ins',  count: total - insDone, label: '🛡️ Insurance Pending', sub: insDone + ' done' },
+    { key: 'vah',  cls: 'c-rto',  count: total - vahDone, label: '📑 RTO Pending',       sub: vahDone + ' done' },
+    { key: 'done', cls: 'c-done', count: allDone,         label: '✅ Completed',         sub: 'DMS + Insurance + RTO' }
+  ];
+  document.getElementById('dashCards').innerHTML = cards.map(c =>
+    '<div class="dash-card ' + c.cls + (activeCard === c.key ? ' active' : '') + '" onclick="setCard(\'' + c.key + '\')">' +
+    '<div class="dash-count">' + c.count + '</div><div class="dash-label">' + c.label + '</div><div class="dash-sub">' + c.sub + '</div></div>').join('');
+}
+
+function setCard(key) { activeCard = key; renderAll(); }
+
+function visibleRows() {
+  return opRows.filter(r => {
+    const s = stageState(r);
+    if (activeCard === 'dms') return !s.dms;
+    if (activeCard === 'ins') return !s.ins;
+    if (activeCard === 'vah') return !s.vah;
+    if (activeCard === 'done') return s.dms && s.ins && s.vah;
+    return true;
+  });
+}
+
+function stageCell(done, text, who) {
+  return done ? '<div class="stage ok">✔ ' + esc(text) + (who ? '<div class="who-name">' + esc(who) + '</div>' : '') + '</div>'
+              : '<div class="stage pend">Pending</div>';
+}
+
+function renderList() {
+  const rows = visibleRows();
+  const labels = { all: 'All vehicles', dms: 'DMS pending', ins: 'Insurance pending', vah: 'RTO pending', done: 'Completed' };
+  document.getElementById('filterLabel').textContent = '📌 ' + labels[activeCard] + ' · ' + rows.length + ' record' + (rows.length === 1 ? '' : 's') + (searchMode ? ' (search, all months)' : '');
+
+  const body = document.getElementById('opBody');
+  if (rows.length === 0) { body.innerHTML = '<tr><td colspan="12" class="empty">No records</td></tr>'; updateBulkBar(); return; }
+
+  const isAdmin = currentUser.role === 'admin';
+  body.innerHTML = rows.map(r => {
+    const s = stageState(r);
+    const complete = s.dms && s.ins && s.vah;
+    return '<tr class="' + (complete ? 'done-row' : '') + '">' +
+      '<td><input type="checkbox" class="row-cb" value="' + esc(r.srNo) + '"' + (complete ? ' disabled' : '') + ' onchange="onRowSelect(this)"></td>' +
+      '<td style="white-space:nowrap;font-weight:700;">' + esc(r.invoiceNo) + '</td>' +
+      '<td style="white-space:nowrap;">' + esc(_fmtDate(r.invoiceDate)) + '</td>' +
+      '<td>' + esc(r.customerName) + '</td>' +
+      '<td style="white-space:nowrap;">' + esc(r.mobileNo) + '</td>' +
+      '<td>' + esc(r.modelName) + '</td>' +
+      '<td style="font-family:monospace;font-size:12px;">' + esc(r.frameNo) + '</td>' +
+      '<td style="white-space:nowrap;">' + esc(r.registrationNo) + '</td>' +
+      '<td>' + stageCell(s.dms, 'DMS', r.dmsOperator) + '</td>' +
+      '<td>' + stageCell(s.ins, _fmtDate(r.insuranceDate) || 'Done', r.insuranceOperator) + '</td>' +
+      '<td>' + stageCell(s.vah, _fmtDate(r.vahanDate) || 'Done', r.vahanOperator) + '</td>' +
+      '<td style="white-space:nowrap;">' +
+        (complete ? '' : '<button class="btn btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="openUpdate(\'' + esc(r.srNo) + '\')">Update</button> ') +
+        (isAdmin && (s.dms || s.ins || s.vah) ? '<button class="btn btn-danger" style="padding:6px 12px;font-size:12px;" onclick="openUndo(\'' + esc(r.srNo) + '\')">Undo</button>' : '') +
+      '</td></tr>';
+  }).join('');
+  document.getElementById('selectAll').checked = false;
+  updateBulkBar();
+}
+
+// ---------- selection + bulk ----------
+function selectedIds() { return Array.from(document.querySelectorAll('.row-cb:checked')).map(cb => cb.value); }
+
+function updateBulkBar() {
+  const n = selectedIds().length;
+  document.getElementById('bulkCount').textContent = n + ' selected';
+  const any = document.getElementById('bulkDms').checked || document.getElementById('bulkIns').checked || document.getElementById('bulkVah').checked;
+  document.getElementById('bulkApplyBtn').disabled = n === 0 || !any;
+}
+
+function onRowSelect(cb) {
+  if (cb.checked && selectedIds().length > MAX_SELECT) { cb.checked = false; toast('You can select a maximum of ' + MAX_SELECT + ' vehicles at once.', 'error'); }
+  updateBulkBar();
+}
+
+function toggleSelectAll(master) {
+  const boxes = Array.from(document.querySelectorAll('.row-cb:not(:disabled)'));
+  if (!master.checked) { boxes.forEach(cb => { cb.checked = false; }); }
+  else {
+    boxes.forEach((cb, i) => { cb.checked = i < MAX_SELECT; });
+    if (boxes.length > MAX_SELECT) { toast('Selected the first ' + MAX_SELECT + ' (maximum per update).', 'error'); master.checked = false; }
+  }
+  updateBulkBar();
+}
+
+function clearSelection(silent) {
+  document.querySelectorAll('.row-cb').forEach(cb => { cb.checked = false; });
+  const sa = document.getElementById('selectAll'); if (sa) sa.checked = false;
+  updateBulkBar();
+}
+
+function onBulkStageChange() {
+  const needsDate = document.getElementById('bulkIns').checked || document.getElementById('bulkVah').checked;
+  document.getElementById('bulkDateWrap').style.display = needsDate ? 'inline' : 'none';
+  updateBulkBar();
+}
+
+function _summarise(results) {
+  let updated = 0; const skipped = []; const notMirrored = [];
+  results.forEach(r => {
+    if (r.done && r.done.length) updated++;
+    if (r.skipped && r.skipped.length) skipped.push((r.customerName || r.srNo) + ': ' + r.skipped.join(', '));
+    if (r.done && r.done.length && r.mirror && r.mirror.indexOf('Also saved') !== 0) notMirrored.push((r.customerName || r.srNo) + ' — ' + r.mirror);
+  });
+  let msg = updated + ' vehicle' + (updated === 1 ? '' : 's') + ' updated.';
+  if (skipped.length) msg += '\n\nSkipped (' + skipped.length + '):\n' + skipped.slice(0, 8).join('\n') + (skipped.length > 8 ? '\n…' : '');
+  if (notMirrored.length) msg += '\n\nSaved in HSRP but not in the Data sheet (' + notMirrored.length + '):\n' + notMirrored.slice(0, 8).join('\n') + (notMirrored.length > 8 ? '\n…' : '');
+  return msg;
+}
+
+async function applyBulk() {
+  const ids = selectedIds();
+  const stages = { dms: document.getElementById('bulkDms').checked, insurance: document.getElementById('bulkIns').checked, vahan: document.getElementById('bulkVah').checked };
+  if (!ids.length) { toast('Select at least one vehicle', 'error'); return; }
+  if (!stages.dms && !stages.insurance && !stages.vahan) { toast('Tick DMS, Insurance and/or RTO', 'error'); return; }
+  const date = document.getElementById('bulkDate').value;
+  if ((stages.insurance || stages.vahan) && !date) { toast('Pick the date', 'error'); return; }
+  if (date && date > _todayISO()) { toast('Date cannot be in the future', 'error'); return; }
+
+  const names = [stages.dms ? 'DMS' : '', stages.insurance ? 'Insurance' : '', stages.vahan ? 'RTO' : ''].filter(Boolean).join(' + ');
+  if (!confirm('Mark ' + names + ' done for ' + ids.length + ' vehicle' + (ids.length === 1 ? '' : 's') +
+      ((stages.insurance || stages.vahan) ? ' with date ' + _fmtDate(date) : '') + '?\n\nIt will be saved under your name (' + (currentUser.name || '') + ').\nInsurance and RTO cannot be changed afterwards.')) return;
+
+  const btn = document.getElementById('bulkApplyBtn');
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1'; btn.disabled = true; const old = btn.textContent; btn.textContent = '⏳ Saving…';
+  try {
+    const r = await API.applyOperatorStages(ids, stages, date);
+    if (!r.success) { alert('Error: ' + (r.message || 'Save failed')); return; }
+    alert(_summarise(r.results || []));
+    await refreshCurrent();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    delete btn.dataset.busy; btn.textContent = old; updateBulkBar();
   }
 }
 
-function showMessage(text, type) {
-  const msg = document.getElementById('statusMessage');
-  msg.textContent = text;
-  msg.className = 'message ' + type;
-  msg.classList.remove('hidden');
-  
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-  
-  if (type === 'success') {
-    setTimeout(() => {
-      msg.classList.add('hidden');
-    }, 3000);
+async function refreshCurrent() {
+  if (searchMode) await runSearch(); else await loadMonth();
+}
+
+// ---------- single update ----------
+let updTarget = null;
+
+function openUpdate(srNo) {
+  const r = opRows.find(x => String(x.srNo) === String(srNo));
+  if (!r) return;
+  updTarget = r;
+  const s = stageState(r);
+  document.getElementById('updTitle').textContent = 'Update — ' + (r.customerName || r.invoiceNo);
+  document.getElementById('updInfo').textContent = 'Invoice ' + r.invoiceNo + ' · ' + (r.modelName || '') + ' · ' + (r.frameNo || '');
+
+  const setOpt = (id, noteId, done, note, allowed, blockedNote) => {
+    const cb = document.getElementById(id);
+    cb.checked = false;
+    cb.disabled = done || !allowed;
+    document.getElementById(noteId).textContent = done ? '— done' + (note ? ' (' + note + ')' : '') : (allowed ? '' : '— ' + blockedNote);
+  };
+  setOpt('updDms', 'updDmsNote', s.dms, r.dmsOperator, true, '');
+  setOpt('updIns', 'updInsNote', s.ins, (_fmtDate(r.insuranceDate) + ' ' + (r.insuranceOperator || '')).trim(), true, '');
+  setOpt('updVah', 'updVahNote', s.vah, (_fmtDate(r.vahanDate) + ' ' + (r.vahanOperator || '')).trim(), true, '');
+  document.getElementById('updDate').value = _yesterdayISO();
+  document.getElementById('updateModal').classList.add('show');
+}
+
+async function saveSingle() {
+  if (!updTarget) return;
+  const stages = { dms: document.getElementById('updDms').checked, insurance: document.getElementById('updIns').checked, vahan: document.getElementById('updVah').checked };
+  if (!stages.dms && !stages.insurance && !stages.vahan) { toast('Tick at least one stage', 'error'); return; }
+  const date = document.getElementById('updDate').value;
+  if ((stages.insurance || stages.vahan) && !date) { toast('Pick the date', 'error'); return; }
+  if (date && date > _todayISO()) { toast('Date cannot be in the future', 'error'); return; }
+  const btn = document.getElementById('updSaveBtn');
+  if (btn.dataset.busy) return;
+  btn.dataset.busy = '1'; btn.disabled = true;
+  try {
+    const r = await API.applyOperatorStages([updTarget.srNo], stages, date);
+    if (!r.success) { alert('Error: ' + (r.message || 'Save failed')); return; }
+    closeModals();
+    alert(_summarise(r.results || []));
+    await refreshCurrent();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  } finally {
+    delete btn.dataset.busy; btn.disabled = false;
   }
 }
 
-function goBack() {
-  window.location.href = 'home.html';
+// ---------- admin undo ----------
+function openUndo(srNo) {
+  const r = opRows.find(x => String(x.srNo) === String(srNo));
+  if (!r) return;
+  const s = stageState(r);
+  document.getElementById('undoTitle').textContent = 'Undo — ' + (r.customerName || r.invoiceNo);
+  // RTO first, then Insurance, then DMS
+  const btns = [];
+  if (s.vah) btns.push(['vahan', 'RTO', _fmtDate(r.vahanDate) + ' · ' + (r.vahanOperator || ''), true]);
+  if (s.ins) btns.push(['insurance', 'Insurance', _fmtDate(r.insuranceDate) + ' · ' + (r.insuranceOperator || ''), !s.vah]);
+  if (s.dms) btns.push(['dms', 'DMS', r.dmsOperator || '', !s.ins]);
+  document.getElementById('undoBody').innerHTML =
+    '<div style="font-size:13px;color:#555;margin-bottom:10px;">Undo clears the stage in the HSRP sheet and in the Data sheet. Undo RTO first, then Insurance, then DMS.</div>' +
+    btns.map(b => '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee;">' +
+      '<div><strong>' + b[1] + '</strong><div style="font-size:12px;color:#777;">' + esc(b[2]) + '</div></div>' +
+      '<button class="btn btn-danger" ' + (b[3] ? '' : 'disabled title="Undo the later stage first"') + ' onclick="doUndo(\'' + esc(r.srNo) + '\', \'' + b[0] + '\', \'' + b[1] + '\')">Undo</button></div>').join('');
+  document.getElementById('undoModal').classList.add('show');
+}
+
+async function doUndo(srNo, stage, label) {
+  if (!confirm('Undo ' + label + ' for this vehicle? This clears it in both sheets.')) return;
+  try {
+    const r = await API.undoOperatorStage(srNo, stage);
+    if (!r.success) { alert('Error: ' + (r.message || 'Undo failed')); return; }
+    closeModals();
+    toast(label + ' undone', 'ok');
+    await refreshCurrent();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+function closeModals() {
+  document.getElementById('updateModal').classList.remove('show');
+  document.getElementById('undoModal').classList.remove('show');
 }
