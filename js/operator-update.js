@@ -173,7 +173,7 @@ function renderList() {
       '<td style="white-space:nowrap;">' + esc(r.mobileNo) + '</td>' +
       '<td>' + esc(r.modelName) + '</td>' +
       '<td style="font-family:monospace;font-size:12px;">' + esc(r.frameNo) + '</td>' +
-      '<td style="white-space:nowrap;">' + esc(r.registrationNo) + '</td>' +
+      '<td>' + esc(r.refCustomer) + '</td>' +
       '<td>' + stageCell(s.dms, 'DMS', r.dmsOperator) + '</td>' +
       '<td>' + stageCell(s.ins, _fmtDate(r.insuranceDate) || 'Done', r.insuranceOperator) + '</td>' +
       '<td>' + stageCell(s.vah, _fmtDate(r.vahanDate) || 'Done', r.vahanOperator) + '</td>' +
